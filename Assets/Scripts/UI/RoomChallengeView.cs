@@ -1,0 +1,466 @@
+using Godot;
+using System;
+using System.Linq;
+using DungeonFit.Core.Content;
+using DungeonFit.Core.Models;
+using DungeonFit.Core.Rules;
+using DungeonFit.Gameplay;
+
+namespace DungeonFit.UI;
+
+public partial class RoomChallengeView : Control
+{
+    private readonly RoomRunService _roomService = new();
+    private readonly DungeonRouteRules _routeRules = new();
+    private readonly MusicCatalog _musicCatalog = new();
+    private readonly EnemyCatalog _enemyCatalog = new();
+    private readonly RoomPhaseController _phase = new();
+
+    public event Action<RunSummary>? RoomContinueRequested;
+
+    private PlayerState _player = new();
+    private TaskTemplate _task = null!;
+    private int _stageNumber = 1;
+    private int _totalStages = 1;
+    private int _initialPlayerHp;
+    private RunSummary? _lastSummary;
+    private RoomRun _room = null!;
+    private WorkoutTimingProfile _timing = null!;
+    private double _restRemainingSeconds;
+    private bool _isRestCountingDown;
+    private RoomAudioBridge _audioBridge = null!;
+    private RoomResultPresenter _resultPresenter = null!;
+    private BattleEncounterView _battleEncounter = null!;
+    private Label _goldLabel = null!;
+    private Label _challengeName = null!;
+    private Label _roomName = null!;
+    private Label _waveMarkers = null!;
+    private Label _battleMessage = null!;
+    private Label _beatSubtitle = null!;
+    private Label _actionName = null!;
+    private Label _setStatus = null!;
+    private Label _restStatus = null!;
+    private PanelContainer _restPanel = null!;
+    private PanelContainer _reportPanel = null!;
+    private PanelContainer _resultPanel = null!;
+    private WaveIndicatorView _waveIndicator = null!;
+
+    public override void _Ready()
+    {
+        _goldLabel = GetNode<Label>("%GoldLabel");
+        _challengeName = GetNode<Label>("%ChallengeName");
+        _roomName = GetNode<Label>("%RoomName");
+        _waveMarkers = GetNode<Label>("%WaveMarkers");
+        _battleMessage = GetNode<Label>("%BattleMessage");
+        _beatSubtitle = GetNode<Label>("%BeatSubtitle");
+        _actionName = GetNode<Label>("%ActionName");
+        _setStatus = GetNode<Label>("%SetStatus");
+        _restStatus = GetNode<Label>("%RestStatus");
+        var enemyName = GetNode<Label>("%EnemyName");
+        var bossHealth = GetNode<ProgressBar>("%BossHealth");
+        var resultTitle = GetNode<Label>("%ResultTitle");
+        var rewardSummary = GetNode<Label>("%RewardSummary");
+        var resultContinueButton = GetNode<Button>("%ReturnTownButton");
+        _restPanel = GetNode<PanelContainer>("%RestPanel");
+        _reportPanel = GetNode<PanelContainer>("%ReportPanel");
+        _resultPanel = GetNode<PanelContainer>("%ResultPanel");
+        _waveIndicator = GetNode<WaveIndicatorView>("%WaveIndicator");
+        _battleEncounter = new BattleEncounterView(
+            GetNode<PanelContainer>("%PlayerToken"),
+            GetNode<Label>("%PlayerLabel"),
+            GetNode<PanelContainer>("%EnemyToken"),
+            GetNode<Label>("%EnemyLabel"),
+            enemyName,
+            bossHealth);
+
+        var audioPlayer = new AudioStreamPlayer
+        {
+            Name = "WorkoutMusicPlayer",
+        };
+        AddChild(audioPlayer);
+        _audioBridge = new RoomAudioBridge(audioPlayer, _musicCatalog);
+        _resultPresenter = new RoomResultPresenter(_resultPanel, resultTitle, rewardSummary, resultContinueButton);
+        _resultPresenter.ContinueRequested += RequestRoomExit;
+
+        var completeButton = GetNode<Button>("%CompleteButton");
+        completeButton.Text = Text.FinishSet;
+        completeButton.Pressed += ReportSet;
+        var partialButton = GetNode<Button>("%PartialButton");
+        partialButton.Visible = false;
+        partialButton.Disabled = true;
+        GetNode<Button>("%SkipButton").Pressed += SkipRoom;
+        GetNode<Button>("%PauseButton").Pressed += ToggleWavePause;
+        GetNode<Button>("%ReadyNowButton").Pressed += CompleteRestNow;
+        GetNode<Button>("%ExtendRestButton").Pressed += ExtendRest;
+        _waveIndicator.SetWaveCompleted += EnterBreak;
+        _waveIndicator.WaveAttackAnticipated += TriggerWaveAttackWindup;
+        _waveIndicator.WavePeakReached += TriggerWavePeakHit;
+
+        if (_task is not null)
+        {
+            StartRoom();
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        _audioBridge.Process(delta);
+
+        if (!_isRestCountingDown)
+        {
+            return;
+        }
+
+        _restRemainingSeconds = Math.Max(0, _restRemainingSeconds - delta);
+        Refresh(_room.Progress);
+
+        if (_restRemainingSeconds > 0)
+        {
+            return;
+        }
+
+        _isRestCountingDown = false;
+        _phase.AwaitReport();
+        _restPanel.Visible = false;
+        _reportPanel.Visible = true;
+        _battleMessage.Text = _room.Progress.IsBossWave
+            ? Text.RestCompleteBoss
+            : Text.RestComplete;
+    }
+
+    public override void _Input(InputEvent inputEvent)
+    {
+        if (!_phase.IsResult)
+        {
+            return;
+        }
+
+        if (_resultPresenter.HandleInput(inputEvent))
+        {
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    public void Initialize(PlayerState player, TaskTemplate task, int stageNumber, int totalStages, int initialPlayerHp)
+    {
+        _player = player;
+        _task = task;
+        _stageNumber = stageNumber;
+        _totalStages = totalStages;
+        _initialPlayerHp = initialPlayerHp;
+
+        if (IsNodeReady())
+        {
+            StartRoom();
+        }
+    }
+
+    private void StartRoom()
+    {
+        var enemy = _enemyCatalog.GetForDungeon(_task.DungeonTypeId);
+        _room = _roomService.Start(_task, _player.CombatStats, enemy, _initialPlayerHp);
+        _timing = _routeRules.CreateTimingProfile(
+            new DungeonRouteSlot(_task.DungeonTypeId, _task.TotalSets, _task.TargetReps, _task.MusicId, _task.RestSeconds),
+            _task.Bpm);
+        _battleEncounter.SetEnemy(enemy, _task.DungeonLevel);
+        _restPanel.Visible = false;
+        _reportPanel.Visible = false;
+        _resultPresenter.Hide();
+        StartWave(Text.WaveActive);
+        Refresh(_room.Progress);
+    }
+
+    private void StartWave(string message)
+    {
+        _phase.StartWave();
+        _isRestCountingDown = false;
+        _restPanel.Visible = false;
+        _reportPanel.Visible = false;
+        _beatSubtitle.Text = _room.Progress.IsBossWave ? Text.BossBeatFlow : Text.BeatFlow;
+        _battleMessage.Text = message;
+        _waveIndicator.Configure(_timing);
+        var combatState = _roomService.BeginActiveSet(_room);
+        _waveIndicator.StartSet();
+        _audioBridge.StartActiveSet(_task.MusicId, _timing.ActiveSetSeconds);
+        _battleEncounter.ShowActiveWave(_room.Progress, combatState);
+    }
+
+    private void EnterBreak()
+    {
+        if (!_phase.TryEnterRest())
+        {
+            return;
+        }
+
+        _waveIndicator.ShowRest();
+        _audioBridge.EnterRest();
+        _restRemainingSeconds = _timing.RestSeconds;
+        _isRestCountingDown = true;
+        _restPanel.Visible = true;
+        _reportPanel.Visible = false;
+        _beatSubtitle.Text = Text.Rest;
+        _battleMessage.Text = _room.Progress.IsBossWave
+            ? Text.BossWaveEnded
+            : Text.WaveEnded;
+        _battleEncounter.ShowRest(_room.Progress, _room.ActiveCombatState);
+        Refresh(_room.Progress);
+    }
+
+    private void TriggerWaveAttackWindup()
+    {
+        if (!_phase.IsActiveWave)
+        {
+            return;
+        }
+
+        _battleEncounter.ShowWaveAttackWindup(_room.Progress, _room.ActiveCombatState);
+    }
+
+    private void TriggerWavePeakHit()
+    {
+        if (!_phase.IsActiveWave)
+        {
+            return;
+        }
+
+        var repResult = _roomService.ResolveRepHit(_room);
+        _battleEncounter.ShowWavePeakHit(_room.Progress, repResult, _room.ActiveCombatState);
+    }
+
+    private void ReportSet()
+    {
+        if (!_phase.CanReportSet())
+        {
+            return;
+        }
+
+        var combatResult = _roomService.ReportSet(_room);
+        if (combatResult is null)
+        {
+            return;
+        }
+
+        var progress = _room.Progress;
+        _isRestCountingDown = false;
+        _phase.Clear();
+        _restPanel.Visible = false;
+        _reportPanel.Visible = false;
+        _battleEncounter.ShowSetReported(progress, combatResult);
+
+        if (progress.IsComplete)
+        {
+            FinishRoom(combatResult.EnemyDefeated && combatResult.IsBoss ? "Boss Cleared" : "Room Finished");
+            return;
+        }
+
+        var message = BuildSetResultMessage(combatResult);
+        StartWave(message);
+        Refresh(progress);
+    }
+
+    private void SkipRoom()
+    {
+        _roomService.Skip(_room);
+        FinishRoom("Room Withdrawn");
+    }
+
+    private void FinishRoom(string title)
+    {
+        var reward = _roomService.ResolveReward(_room);
+
+        _waveIndicator.StopSet();
+        _audioBridge.StopForResult();
+        _isRestCountingDown = false;
+        _phase.ShowResult();
+        _restPanel.Visible = false;
+        _reportPanel.Visible = false;
+        _lastSummary = new RunSummary(
+            title,
+            _task.RoomName,
+            _room.Progress.CompletedSets,
+            _task.TotalSets,
+            reward,
+            _room.SetResults.ToArray(),
+            _room.CombatResults.ToArray(),
+            _room.CurrentPlayerHp,
+            CalculateExperienceGained(_room.CombatResults));
+        _battleEncounter.ShowResult(_room.Progress, _room.CombatResults.LastOrDefault());
+        _resultPresenter.Show(_lastSummary);
+        _battleMessage.Text = title == "Boss Cleared"
+            ? Text.StageRewardBanked
+            : Text.WithdrawRewardBanked;
+        Refresh(_room.Progress);
+    }
+
+    private void Refresh(RoomProgress progress)
+    {
+        _roomName.Text = string.Format(Text.RoomNameFormat, _stageNumber, _totalStages, GetDungeonName(_task));
+        _challengeName.Text = _task.ChallengeName;
+        _actionName.Text = string.Format(Text.ActionFormat, _task.TotalSets, _task.TargetReps);
+        _setStatus.Text = progress.IsComplete
+            ? string.Format(Text.SetCompleteFormat, _task.TotalSets, _task.TotalSets)
+            : progress.IsSkipped
+                ? Text.WithdrawnStatus
+                : _isRestCountingDown
+                    ? string.Format(Text.SetRestFormat, progress.CurrentSet, progress.TotalSets, Math.Ceiling(_restRemainingSeconds))
+                    : _phase.IsActiveWave
+                        ? string.Format(Text.SetActiveFormat, progress.CurrentSet, progress.TotalSets)
+                        : string.Format(Text.SetWaitingRestFormat, progress.CurrentSet, progress.TotalSets, _timing.RestSeconds);
+        _restStatus.Text = _isRestCountingDown
+            ? string.Format(Text.RestTimerFormat, FormatSeconds(_restRemainingSeconds))
+            : _phase.IsActiveWave
+                ? string.Format(Text.ActiveWaveFormat, _timing.Bpm)
+                : string.Format(Text.RestTimerFormat, FormatSeconds(_timing.RestSeconds));
+        _waveMarkers.Text = BuildWaveMarkers(progress);
+        _goldLabel.Text = string.Format(Text.GoldFormat, _player.Gold);
+        GetNode<Label>("%NowPlaying").Text = string.Format(
+            Text.NowPlayingFormat,
+            _musicCatalog.GetById(_task.MusicId).DisplayName,
+            _timing.Bpm);
+    }
+
+    private static string BuildSetResultMessage(CombatSetResult result)
+    {
+        if (result.WasEvading)
+        {
+            return string.Format(Text.EvadedSet, result.PlayerHpAfter, result.Gold);
+        }
+
+        return result.EnemyDefeated
+            ? string.Format(Text.EnemyDefeatedSet, result.DamageDealt, result.PlayerHpAfter, result.Gold)
+            : string.Format(Text.EnemySurvivedSet, result.DamageDealt, result.DamageTaken, result.PlayerHpAfter, result.Gold);
+    }
+
+    private static int CalculateExperienceGained(System.Collections.Generic.IReadOnlyList<CombatSetResult> results)
+    {
+        var experience = 0;
+        foreach (var result in results)
+        {
+            experience += 8;
+            if (result.RewardKind == BankedRewardKind.Chest)
+            {
+                experience += 4;
+            }
+
+            if (result.IsBoss && result.RewardKind == BankedRewardKind.Chest)
+            {
+                experience += 12;
+            }
+        }
+
+        return experience;
+    }
+
+    private static string BuildWaveMarkers(RoomProgress progress)
+    {
+        var markers = new string[progress.TotalSets];
+
+        for (var index = 0; index < markers.Length; index++)
+        {
+            markers[index] = index < progress.CompletedSets ? "[x]" : "[ ]";
+        }
+
+        return string.Join(" ", markers);
+    }
+
+    private void ToggleWavePause()
+    {
+        _waveIndicator.TogglePause();
+        _audioBridge.TogglePause();
+        _battleMessage.Text = Text.PauseToggled;
+    }
+
+    private void CompleteRestNow()
+    {
+        if (!_isRestCountingDown)
+        {
+            return;
+        }
+
+        _restRemainingSeconds = 0;
+        _isRestCountingDown = false;
+        _phase.AwaitReport();
+        _restPanel.Visible = false;
+        _reportPanel.Visible = true;
+        _battleMessage.Text = Text.ReadyNow;
+        Refresh(_room.Progress);
+    }
+
+    private void ExtendRest()
+    {
+        if (!_isRestCountingDown)
+        {
+            return;
+        }
+
+        _restRemainingSeconds += 30;
+        _battleMessage.Text = Text.RestExtended;
+        Refresh(_room.Progress);
+    }
+
+    private void RequestRoomExit(RunSummary summary)
+    {
+        _audioBridge.StopImmediate();
+        RoomContinueRequested?.Invoke(summary);
+    }
+
+    private static string FormatSeconds(double seconds)
+    {
+        var clamped = Math.Max(0, (int)Math.Ceiling(seconds));
+        return $"{clamped / 60:00}:{clamped % 60:00}";
+    }
+
+    private static string GetDungeonName(TaskTemplate task)
+    {
+        return task.DungeonTypeId switch
+        {
+            "chest" => Text.ChestDungeon,
+            "shoulders" => Text.ShoulderDungeon,
+            "back" => Text.BackDungeon,
+            "legs" => Text.LegDungeon,
+            "core" => Text.CoreDungeon,
+            "arms" => Text.ArmDungeon,
+            _ => task.DungeonTypeName,
+        };
+    }
+
+    private static class Text
+    {
+        public const string RestCompleteBoss = "\u4f11\u606f\u7d50\u675f\u3002\u6309\u4e0b\u5b8c\u6210\u672c\u7d44\uff0c\u4ee5\u6230\u9b25\u6578\u503c\u7d50\u7b97 Boss\u3002";
+        public const string RestComplete = "\u4f11\u606f\u7d50\u675f\u3002\u6309\u4e0b\u5b8c\u6210\u672c\u7d44\uff0c\u4ee5\u6230\u9b25\u6578\u503c\u7d50\u7b97\u9019\u7d44\u3002";
+        public const string WaveActive = "Wave \u555f\u52d5\u3002\u8ddf\u8457\u7bc0\u594f\u5b8c\u6210\u9019\u7d44\uff0c\u76f4\u5230\u9032\u5165\u4f11\u606f\u3002";
+        public const string BossBeatFlow = "Boss \u7bc0\u594f";
+        public const string BeatFlow = "\u7bc0\u594f\u6307\u793a";
+        public const string Rest = "\u4f11\u606f";
+        public const string BossWaveEnded = "Boss Wave \u7d50\u675f\u3002\u4f11\u606f\u5012\u6578\u958b\u59cb\u3002";
+        public const string WaveEnded = "Wave \u7d50\u675f\u3002\u4f11\u606f\u5012\u6578\u958b\u59cb\u3002";
+        public const string PartialSet = "\u672c\u7d44\u5df2\u90e8\u5206\u5b8c\u6210\u3002\u4e0b\u4e00\u7d44\u6e96\u5099\u958b\u59cb\u3002";
+        public const string SetCleared = "Wave \u5df2\u5b8c\u6210\u3002\u4e0b\u4e00\u500b\u6575\u4eba\u4e0a\u524d\u3002";
+        public const string FinishSet = "\u5b8c\u6210\u672c\u7d44";
+        public const string EnemyDefeatedSet = "\u9020\u6210 {0} \u50b7\u5bb3\uff0c\u64ca\u7834\u6575\u4eba\u3002HP {1}\uff0c\u91d1\u5e63 +{2}\u3002";
+        public const string EnemySurvivedSet = "\u9020\u6210 {0} \u50b7\u5bb3\uff0c\u6575\u4eba\u672a\u5012\u4e0b\u4e26\u53cd\u64ca {1}\u3002HP {2}\uff0c\u91d1\u5e63 +{3}\u3002";
+        public const string EvadedSet = "HP \u4e0d\u8db3\uff0c\u89d2\u8272\u6539\u70ba\u8eb2\u907f\u3002HP {0}\uff0c\u91d1\u5e63 +{1}\u3002";
+        public const string StageRewardBanked = "\u623f\u9593\u6536\u76ca\u5df2\u5b58\u5165\u4eca\u65e5\u7d50\u7b97\u3002";
+        public const string WithdrawRewardBanked = "\u64a4\u9000\u6536\u76ca\u5df2\u5b58\u5165\u4eca\u65e5\u7d50\u7b97\u3002";
+        public const string RoomNameFormat = "\u623f\u9593 {0} / {1}  -  {2}";
+        public const string ActionFormat = "{0} \u7d44  x  {1} \u6b21";
+        public const string SetCompleteFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f\u5b8c\u6210";
+        public const string WithdrawnStatus = "\u5df2\u64a4\u9000\uff0c\u6311\u6230\u66ab\u505c";
+        public const string SetRestFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f {2:0}s";
+        public const string SetActiveFormat = "\u7d44\u6578 {0} / {1}  Wave \u9032\u884c\u4e2d";
+        public const string SetWaitingRestFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f {2}s";
+        public const string RestTimerFormat = "\u4f11\u606f  {0}";
+        public const string ActiveWaveFormat = "Wave \u9032\u884c\u4e2d  {0} BPM";
+        public const string GoldFormat = "\u91d1\u5e63 {0}";
+        public const string NowPlayingFormat = "\u64ad\u653e\u4e2d  {0}  /  Wave {1} BPM";
+        public const string PauseToggled = "Wave \u66ab\u505c\u72c0\u614b\u5df2\u5207\u63db\u3002";
+        public const string ReadyNow = "\u5df2\u6e96\u5099\u597d\u3002\u8acb\u56de\u5831\u9019\u7d44\u5b8c\u6210\u72c0\u614b\u3002";
+        public const string RestExtended = "\u4f11\u606f\u5ef6\u9577 30 \u79d2\u3002";
+        public const string ChestDungeon = "\u80f8\u5730\u57ce";
+        public const string ShoulderDungeon = "\u80a9\u5730\u57ce";
+        public const string BackDungeon = "\u80cc\u5730\u57ce";
+        public const string LegDungeon = "\u817f\u5730\u57ce";
+        public const string CoreDungeon = "\u6838\u5fc3\u5730\u57ce";
+        public const string ArmDungeon = "\u624b\u81c2\u5730\u57ce";
+    }
+}

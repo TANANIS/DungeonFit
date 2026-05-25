@@ -1,0 +1,112 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Assets/Scripts/UI/SetSummaryView.cs" id="1_set_summary"]
+
+[node name="SetSummary" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_set_summary")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.026, 0.024, 0.08, 1)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 44.0
+offset_top = 64.0
+offset_right = -44.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Layout" type="VBoxContainer" parent="SafeMargin"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Header" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+
+[node name="HeaderMargin" type="MarginContainer" parent="SafeMargin/Layout/Header"]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 26
+
+[node name="SummaryTitle" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "Stage Summary"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="SummaryPanel" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 760)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SummaryMargin" type="MarginContainer" parent="SafeMargin/Layout/SummaryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 34
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 34
+
+[node name="SummaryLayout" type="VBoxContainer" parent="SafeMargin/Layout/SummaryPanel/SummaryMargin"]
+layout_mode = 2
+theme_override_constants/separation = 26
+
+[node name="SummaryStats" type="Label" parent="SafeMargin/Layout/SummaryPanel/SummaryMargin/SummaryLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "Sets 0 / 0"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="SummaryHint" type="Label" parent="SafeMargin/Layout/SummaryPanel/SummaryMargin/SummaryLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 30
+text = "Rewards are banked for the daily summary."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="ButtonRow" type="HBoxContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="ReturnTownButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 32
+text = "End Training"
+
+[node name="ContinueButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 96)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 32
+text = "Continue"

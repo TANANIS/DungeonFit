@@ -1,0 +1,395 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Assets/Scripts/UI/RoomChallengeView.cs" id="1_main"]
+[ext_resource type="Script" path="res://Assets/Scripts/UI/WaveIndicatorView.cs" id="2_wave"]
+
+[node name="RoomChallenge" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.027451, 0.0352941, 0.0941176, 1)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 44.0
+offset_top = 56.0
+offset_right = -44.0
+offset_bottom = -56.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Layout" type="VBoxContainer" parent="SafeMargin"]
+layout_mode = 2
+theme_override_constants/separation = 22
+
+[node name="Header" type="HBoxContainer" parent="SafeMargin/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="HeaderLabels" type="VBoxContainer" parent="SafeMargin/Layout/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="RoomName" type="Label" parent="SafeMargin/Layout/Header/HeaderLabels"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Room"
+
+[node name="ChallengeName" type="Label" parent="SafeMargin/Layout/Header/HeaderLabels"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 64
+text = "Challenge"
+autowrap_mode = 3
+
+[node name="PauseButton" type="Button" parent="SafeMargin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 112)
+layout_mode = 2
+theme_override_font_sizes/font_size = 46
+text = "II"
+tooltip_text = "Pause"
+
+[node name="ProgressRow" type="HBoxContainer" parent="SafeMargin/Layout"]
+layout_mode = 2
+
+[node name="WaveMarkers" type="Label" parent="SafeMargin/Layout/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 42
+text = "[ ] [ ] [ ] [ ]"
+horizontal_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="SafeMargin/Layout/ProgressRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Gold 0"
+
+[node name="BattleStage" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 660)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BattleMargin" type="MarginContainer" parent="SafeMargin/Layout/BattleStage"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 18
+
+[node name="BattleLayout" type="VBoxContainer" parent="SafeMargin/Layout/BattleStage/BattleMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="BossStack" type="VBoxContainer" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnemyName" type="Label" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/BossStack"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Wave 1 Enemy"
+horizontal_alignment = 2
+
+[node name="BossHealth" type="ProgressBar" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/BossStack"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="Fighters" type="Control" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PlayerToken" type="PanelContainer" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/Fighters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 500)
+layout_mode = 1
+anchors_preset = -1
+offset_right = 480.0
+offset_bottom = 500.0
+
+[node name="PlayerLabel" type="Label" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/Fighters/PlayerToken"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 24
+text = "PLAYER"
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="EnemyToken" type="PanelContainer" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/Fighters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(500, 520)
+layout_mode = 1
+anchors_preset = -1
+offset_right = 500.0
+offset_bottom = 520.0
+
+[node name="EnemyLabel" type="Label" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout/Fighters/EnemyToken"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 24
+text = "ENEMY"
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="BattleMessage" type="Label" parent="SafeMargin/Layout/BattleStage/BattleMargin/BattleLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 27
+text = "Complete the active set to advance."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="BeatFlow" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 312)
+layout_mode = 2
+
+[node name="BeatMargin" type="MarginContainer" parent="SafeMargin/Layout/BeatFlow"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="BeatLayout" type="VBoxContainer" parent="SafeMargin/Layout/BeatFlow/BeatMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BeatTitle" type="Label" parent="SafeMargin/Layout/BeatFlow/BeatMargin/BeatLayout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Wave"
+
+[node name="BeatSubtitle" type="Label" parent="SafeMargin/Layout/BeatFlow/BeatMargin/BeatLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 27
+text = "Beat Flow"
+
+[node name="WaveIndicator" type="Control" parent="SafeMargin/Layout/BeatFlow/BeatMargin/BeatLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 185)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 0
+script = ExtResource("2_wave")
+
+[node name="RestPanel" type="PanelContainer" parent="SafeMargin/Layout"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 150)
+layout_mode = 2
+
+[node name="RestMargin" type="MarginContainer" parent="SafeMargin/Layout/RestPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 26
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 26
+theme_override_constants/margin_bottom = 20
+
+[node name="RestLayout" type="VBoxContainer" parent="SafeMargin/Layout/RestPanel/RestMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RestStatus" type="Label" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Rest  01:00"
+horizontal_alignment = 1
+
+[node name="RestButtonRow" type="HBoxContainer" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="ReadyNowButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/RestButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 26
+text = "Ready Now"
+
+[node name="ExtendRestButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/RestButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 26
+text = "+30s"
+
+[node name="WorkoutStatus" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+
+[node name="StatusMargin" type="MarginContainer" parent="SafeMargin/Layout/WorkoutStatus"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="StatusLayout" type="VBoxContainer" parent="SafeMargin/Layout/WorkoutStatus/StatusMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StatusRow" type="HBoxContainer" parent="SafeMargin/Layout/WorkoutStatus/StatusMargin/StatusLayout"]
+layout_mode = 2
+
+[node name="ActionName" type="Label" parent="SafeMargin/Layout/WorkoutStatus/StatusMargin/StatusLayout/StatusRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 36
+text = "Challenge  12 Reps"
+
+[node name="SetStatus" type="Label" parent="SafeMargin/Layout/WorkoutStatus/StatusMargin/StatusLayout/StatusRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Set 1 / 4"
+horizontal_alignment = 2
+
+[node name="NowPlaying" type="Label" parent="SafeMargin/Layout/WorkoutStatus/StatusMargin/StatusLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+text = "Now Playing"
+
+[node name="ReportPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.62
+anchor_right = 0.95
+anchor_bottom = 0.96
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ReportMargin" type="MarginContainer" parent="ReportPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 34
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 34
+
+[node name="ReportLayout" type="VBoxContainer" parent="ReportPanel/ReportMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="ReportTitle" type="Label" parent="ReportPanel/ReportMargin/ReportLayout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "完成本組"
+horizontal_alignment = 1
+
+[node name="ReportHint" type="Label" parent="ReportPanel/ReportMargin/ReportLayout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 27
+text = "按下後會依角色與敵人數值結算收益。"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="CompleteButton" type="Button" parent="ReportPanel/ReportMargin/ReportLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "完成本組"
+
+[node name="PartialButton" type="Button" parent="ReportPanel/ReportMargin/ReportLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Partial"
+
+[node name="SkipButton" type="Button" parent="ReportPanel/ReportMargin/ReportLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 74)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Withdraw"
+
+[node name="ResultPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.08
+anchor_top = 0.25
+anchor_right = 0.92
+anchor_bottom = 0.68
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="ResultMargin" type="MarginContainer" parent="ResultPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="ResultLayout" type="VBoxContainer" parent="ResultPanel/ResultMargin"]
+layout_mode = 2
+theme_override_constants/separation = 22
+alignment = 1
+
+[node name="ResultTitle" type="Label" parent="ResultPanel/ResultMargin/ResultLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 52
+text = "Boss Cleared"
+horizontal_alignment = 1
+
+[node name="RewardSummary" type="Label" parent="ResultPanel/ResultMargin/ResultLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "+80 Gold"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ReturnTownButton" type="Button" parent="ResultPanel/ResultMargin/ResultLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 92)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Continue"

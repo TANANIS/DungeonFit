@@ -1,0 +1,309 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Assets/Scripts/UI/TavernView.cs" id="1_tavern"]
+
+[node name="Tavern" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_tavern")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.022, 0.017, 0.055, 1)
+
+[node name="SafeMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = 34.0
+offset_right = -32.0
+offset_bottom = -34.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 0
+
+[node name="Layout" type="VBoxContainer" parent="SafeMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Header" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 132)
+layout_mode = 2
+
+[node name="HeaderMargin" type="MarginContainer" parent="SafeMargin/Layout/Header"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 18
+
+[node name="HeaderRow" type="HBoxContainer" parent="SafeMargin/Layout/Header/HeaderMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Portrait" type="PanelContainer" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(92, 92)
+layout_mode = 2
+
+[node name="PortraitLabel" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow/Portrait"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "YOU"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="IdentityColumn" type="VBoxContainer" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="NameLevelLabel" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow/IdentityColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "冒險者   Lv.1"
+
+[node name="ExpBar" type="ProgressBar" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow/IdentityColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+max_value = 300.0
+value = 120.0
+show_percentage = false
+
+[node name="GoldLabel" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "Gold 0"
+vertical_alignment = 1
+
+[node name="TopBackButton" type="Button" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(86, 86)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "SET"
+tooltip_text = "Settings"
+
+[node name="TitlePanel" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 118)
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="SafeMargin/Layout/TitlePanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "酒館
+裝備・倉庫・販售"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MainSplit" type="HBoxContainer" parent="SafeMargin/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="CharacterPanel" type="PanelContainer" parent="SafeMargin/Layout/MainSplit"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CharacterMargin" type="MarginContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="CharacterLayout" type="VBoxContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="StandIn" type="PanelContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout"]
+custom_minimum_size = Vector2(0, 260)
+layout_mode = 2
+
+[node name="StandInLabel" type="Label" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/StandIn"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "角色立繪"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="EquippedTitle" type="Label" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "裝備欄"
+horizontal_alignment = 1
+
+[node name="EquippedList" type="VBoxContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BonusPanel" type="PanelContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout"]
+custom_minimum_size = Vector2(0, 178)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BonusMargin" type="MarginContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/BonusPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 14
+
+[node name="BonusLayout" type="VBoxContainer" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/BonusPanel/BonusMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BonusTitle" type="Label" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/BonusPanel/BonusMargin/BonusLayout"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "目前加成"
+horizontal_alignment = 1
+
+[node name="BonusLinesLabel" type="Label" parent="SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/BonusPanel/BonusMargin/BonusLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 23
+text = "目前沒有裝備加成。"
+autowrap_mode = 3
+
+[node name="InventoryPanel" type="PanelContainer" parent="SafeMargin/Layout/MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="InventoryMargin" type="MarginContainer" parent="SafeMargin/Layout/MainSplit/InventoryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="InventoryLayout" type="VBoxContainer" parent="SafeMargin/Layout/MainSplit/InventoryPanel/InventoryMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="InventoryControls" type="HBoxContainer" parent="SafeMargin/Layout/MainSplit/InventoryPanel/InventoryMargin/InventoryLayout"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="FilterOption" type="OptionButton" parent="SafeMargin/Layout/MainSplit/InventoryPanel/InventoryMargin/InventoryLayout/InventoryControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 58)
+layout_mode = 2
+
+[node name="SortOption" type="OptionButton" parent="SafeMargin/Layout/MainSplit/InventoryPanel/InventoryMargin/InventoryLayout/InventoryControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="InventoryGrid" type="GridContainer" parent="SafeMargin/Layout/MainSplit/InventoryPanel/InventoryMargin/InventoryLayout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+columns = 4
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+
+[node name="DetailPanel" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 310)
+layout_mode = 2
+
+[node name="DetailMargin" type="MarginContainer" parent="SafeMargin/Layout/DetailPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 18
+
+[node name="DetailRow" type="HBoxContainer" parent="SafeMargin/Layout/DetailPanel/DetailMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="ItemIcon" type="PanelContainer" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow"]
+custom_minimum_size = Vector2(170, 170)
+layout_mode = 2
+
+[node name="ItemIconLabel" type="Label" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ItemIcon"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "裝備"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DetailText" type="VBoxContainer" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailTitle" type="Label" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "尚未選擇裝備"
+
+[node name="DetailMeta" type="Label" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 23
+
+[node name="DetailStats" type="Label" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+autowrap_mode = 3
+
+[node name="DetailHint" type="Label" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/DetailText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 21
+autowrap_mode = 3
+
+[node name="ActionColumn" type="VBoxContainer" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="EquipButton" type="Button" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ActionColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "裝備"
+
+[node name="SellButton" type="Button" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ActionColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "出售"
+
+[node name="LockButton" type="Button" parent="SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ActionColumn"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "鎖定"
+
+[node name="BottomBackButton" type="Button" parent="SafeMargin/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 98)
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "返回城鎮"

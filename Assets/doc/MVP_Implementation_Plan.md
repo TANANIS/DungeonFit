@@ -1,5 +1,7 @@
 # DungeonFit MVP Implementation Plan
 
+> Historical Note: This document records the early first-slice implementation plan. It is useful for understanding why the first playable loop was built in its original order, but it is no longer the source of truth for current product rules. Use `Assets/doc/DungeonFit_Document.md` for the latest combat, reward, loot, Town building, and MVP system direction.
+
 ## Purpose
 
 This document defines the first engineering slice for DungeonFit. The product MVP remains centered on a playable workout-to-dungeon loop, but the implementation should keep core rules outside UI scenes so later systems can extend the first slice instead of replacing it.
@@ -29,7 +31,7 @@ The current engineering slice is a smaller proof of that loop:
 - Four workout sets inside that stage.
 - Sets 1 to 3 map to normal waves.
 - Set 4 maps to the Boss.
-- Completion awards gold and one test equipment result immediately.
+- Superseded first-slice assumption: completion awarded gold and one test equipment result immediately. Current rules defer banked rewards to Daily Summary and reveal chest contents only after opening.
 - Town receives a run summary after settlement.
 
 This slice verifies the most important product question first: whether manually reporting a real workout set can feel like meaningful dungeon progress. It is intentionally not the final daily dungeon structure yet.
@@ -261,7 +263,7 @@ Recorded on May 23, 2026. Updated on May 25, 2026:
 - A thin `DungeonRun` / `DungeonRunService` now tracks the active plan, completed stage summaries, and current stage index.
 - A first Set Summary scene exists after each completed stage, showing stage result, completed sets, stage gold, banked chest count, and continue/return choices.
 - A first Daily Summary scene exists after a completed route, aggregating completed stages, sets, gold, and equipment rewards. It requires `Open All` before returning to Town.
-- `BankedReward` records one dungeon chest packet per completed set when a stage result is recorded, including a `RewardBundle` payload. `PlayerState` is applied only when the player uses `Open All` on the Daily Summary page, not when a room ends or when returning to Town.
+- Superseded first-slice assumption: `BankedReward` treated every completed set as a dungeon chest packet. Current rules record one reward packet per completed set, while only defeated enemies create chest packets; gold-only rewards remain valid banked rewards. `PlayerState` is applied only when the player uses `Open All` on the Daily Summary page, not when a room ends or when returning to Town.
 - A `--flow-smoke-test` diagnostics path verifies default plan stage progression, banked reward accumulation, and reward application timing.
 - The test room content now comes from an in-memory `TaskCatalog`; Room Challenge receives a `TaskTemplate` from Main instead of hardcoding its own task data.
 - Town shows the current `Today Route` summary, while Dungeon Plan shows the selected target-area route and resolved room details.

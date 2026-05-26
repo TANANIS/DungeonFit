@@ -149,6 +149,11 @@ public sealed class BattleEncounterView
             : (result.EnemyHpAfter / (float)result.EnemyMaxHp) * 100f;
     }
 
+    public void RefreshActiveHealth(RoomProgress progress, ActiveSetCombatState state)
+    {
+        RefreshHealth(progress, state);
+    }
+
     public void ShowResult(RoomProgress progress, CombatSetResult? finalResult)
     {
         PositionActors();

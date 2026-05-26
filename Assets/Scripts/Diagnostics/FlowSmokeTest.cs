@@ -66,6 +66,7 @@ public static class FlowSmokeTest
         session.CompleteDailyRun();
         lines.Add($"SESSION_AFTER_COMPLETE gold={session.Player.Gold}");
         lines.AddRange(RunSaveMigrationSmoke());
+        lines.AddRange(RunRecoveryAndSupplySmoke());
 
         var earlyExitSession = new GameSession(persistenceEnabled: false);
         earlyExitSession.UpdateDungeonRoute(new[]
@@ -246,6 +247,7 @@ public static class FlowSmokeTest
         };
         var missingChanged = GameSession.NormalizeSaveState(missingLoadoutState);
         yield return $"MIGRATION_MISSING changed={missingChanged} version={missingLoadoutState.Version} inventory={missingLoadoutState.Inventory?.Count} exp={missingLoadoutState.Experience}/{missingLoadoutState.ExperienceToNextLevel}";
+        yield return $"MIGRATION_HP currentHp={missingLoadoutState.CurrentHp} dailyKey={(string.IsNullOrWhiteSpace(missingLoadoutState.DailyStateKey) ? "none" : "set")}";
 
         var duplicateOne = new EquipmentItem(
             "duplicate_item",
@@ -280,6 +282,93 @@ public static class FlowSmokeTest
         var invalidChanged = GameSession.NormalizeSaveState(invalidLoadoutState);
         var distinctIds = invalidLoadoutState.Inventory?.Select(item => item.Id).Distinct().Count() ?? 0;
         yield return $"MIGRATION_INVALID changed={invalidChanged} version={invalidLoadoutState.Version} distinctIds={distinctIds} weapon={invalidLoadoutState.EquipmentLoadout?.WeaponId ?? "none"} accessory={invalidLoadoutState.EquipmentLoadout?.AccessoryId ?? "none"}";
+    }
+
+    private static IEnumerable<string> RunRecoveryAndSupplySmoke()
+    {
+        var recovery = new GameSession(persistenceEnabled: false);
+        recovery.Player.SetCurrentHp(0);
+        var moonFirst = recovery.UseMoonlightRecovery();
+        var moonHp = recovery.Player.CurrentHp;
+        var moonSecond = recovery.UseMoonlightRecovery();
+        yield return $"RECOVERY_MOON first={moonFirst} second={moonSecond} hp={moonHp}/{recovery.Player.MaxHp}";
+
+        var moonGuard = new GameSession(persistenceEnabled: false);
+        var moonGuardSelected = moonGuard.SelectDailyBlessing(DailyBlessing.MoonGuard);
+        yield return $"BLESSING_HP selected={moonGuardSelected} maxHp={moonGuard.Player.MaxHp}";
+
+        var bladeMoon = new GameSession(persistenceEnabled: false);
+        bladeMoon.SelectDailyBlessing(DailyBlessing.BladeMoon);
+        var catalog = new TaskCatalog();
+        var enemyCatalog = new EnemyCatalog();
+        var roomService = new RoomRunService();
+        var route = catalog.CreateDungeonPlanFromRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+        var stage = route.Stages[0];
+        var attackRoom = roomService.Start(stage, bladeMoon.Player.CombatStats, enemyCatalog.GetForDungeon(stage.DungeonTypeId), bladeMoon.Player.CurrentHp);
+        var attackRep = ResolveFullSet(roomService, attackRoom, 1).First();
+        yield return $"BLESSING_ATTACK attack={bladeMoon.Player.Attack} firstDamage={attackRep.DamageDealt}";
+
+        var starlight = new GameSession(persistenceEnabled: false);
+        starlight.SelectDailyBlessing(DailyBlessing.StarlightGold);
+        var goldRoom = roomService.Start(stage, starlight.Player.CombatStats, enemyCatalog.GetForDungeon(stage.DungeonTypeId), starlight.Player.CurrentHp);
+        ResolveFullSet(roomService, goldRoom, stage.TargetReps);
+        var goldResult = roomService.ReportSet(goldRoom)!;
+        yield return $"BLESSING_GOLD bonus={starlight.Player.DungeonGoldBonusPercent} gold={goldResult.Gold}";
+
+        var lockedBlessing = new GameSession(persistenceEnabled: false);
+        lockedBlessing.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+        lockedBlessing.StartOrGetActiveRun();
+        yield return $"BLESSING_LOCKED selected={lockedBlessing.SelectDailyBlessing(DailyBlessing.StarlightGold)}";
+
+        var herb = new GameSession(persistenceEnabled: false);
+        herb.Player.Load(300, null, currentHp: 0);
+        var basic = herb.BuyBasicHeal();
+        var afterBasic = $"{herb.Player.CurrentHp}/{herb.Player.MaxHp}/{herb.Player.Gold}";
+        var full = herb.BuyFullHeal();
+        yield return $"HERB_HEAL basic={basic} afterBasic={afterBasic} full={full} hp={herb.Player.CurrentHp}/{herb.Player.MaxHp} gold={herb.Player.Gold}";
+
+        var supply = new GameSession(persistenceEnabled: false);
+        supply.Player.Load(200, null, currentHp: -5);
+        var buy1 = supply.BuyHerbShopPotion();
+        var buy2 = supply.BuyHerbShopPotion();
+        var buy3 = supply.BuyHerbShopPotion();
+        var buy4 = supply.BuyHerbShopPotion();
+        var supplyUse = supply.UseSmallPotionInRoom(-5);
+        yield return $"HERB_POTION buys={buy1}/{buy2}/{buy3}/{buy4} used={supplyUse.Used} healed={supplyUse.Healed} hp={supplyUse.CurrentHp} count={supplyUse.Supply.SmallPotionCount}";
+
+        var hpSession = new GameSession(persistenceEnabled: false);
+        hpSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+        hpSession.StartOrGetActiveRun();
+        var hpStage = hpSession.ActiveRun!.CurrentStage;
+        hpSession.RecordStageResult(new RunSummary(
+            "HP Persist",
+            hpStage.RoomName,
+            1,
+            hpStage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 3, null),
+            new[] { CompletionResult.Partial },
+            null,
+            -5));
+        var tavern = hpSession.BuildTavernEquipmentViewModel();
+        yield return $"HP_PERSIST player={hpSession.Player.CurrentHp} tavern={tavern.Character.CurrentHp}/{tavern.Character.MaxHp}";
     }
 
     private static IEnumerable<string> RunCombatSmoke()

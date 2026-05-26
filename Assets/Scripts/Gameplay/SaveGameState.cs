@@ -5,7 +5,7 @@ namespace DungeonFit.Gameplay;
 
 public sealed class SaveGameState
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -16,6 +16,18 @@ public sealed class SaveGameState
     public int ExperienceToNextLevel { get; set; } = 300;
 
     public int Gold { get; set; }
+
+    public int? CurrentHp { get; set; }
+
+    public string DailyStateKey { get; set; } = string.Empty;
+
+    public bool MoonlightRecoveryUsed { get; set; }
+
+    public string DailyBlessingId { get; set; } = string.Empty;
+
+    public int SmallPotionCount { get; set; }
+
+    public int HerbShopPotionPurchasesToday { get; set; }
 
     public List<EquipmentItem>? Inventory { get; set; } = new();
 

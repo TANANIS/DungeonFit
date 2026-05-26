@@ -17,6 +17,7 @@ public partial class RoomChallengeView : Control
     private readonly RoomPhaseController _phase = new();
 
     public event Action<RunSummary>? RoomContinueRequested;
+    public event Func<int, SupplyUseResult>? SmallPotionRequested;
 
     private PlayerState _player = new();
     private TaskTemplate _task = null!;
@@ -24,6 +25,7 @@ public partial class RoomChallengeView : Control
     private int _totalStages = 1;
     private int _initialPlayerHp;
     private RunSummary? _lastSummary;
+    private RoomSupplyViewModel _supply = new(0, 3, false);
     private RoomRun _room = null!;
     private WorkoutTimingProfile _timing = null!;
     private double _restRemainingSeconds;
@@ -43,6 +45,9 @@ public partial class RoomChallengeView : Control
     private PanelContainer _restPanel = null!;
     private PanelContainer _reportPanel = null!;
     private PanelContainer _resultPanel = null!;
+    private PanelContainer _supplyPanel = null!;
+    private Label _supplyStatus = null!;
+    private Button _smallPotionButton = null!;
     private WaveIndicatorView _waveIndicator = null!;
 
     public override void _Ready()
@@ -64,6 +69,9 @@ public partial class RoomChallengeView : Control
         _restPanel = GetNode<PanelContainer>("%RestPanel");
         _reportPanel = GetNode<PanelContainer>("%ReportPanel");
         _resultPanel = GetNode<PanelContainer>("%ResultPanel");
+        _supplyPanel = GetNode<PanelContainer>("%SupplyPanel");
+        _supplyStatus = GetNode<Label>("%SupplyStatus");
+        _smallPotionButton = GetNode<Button>("%SmallPotionButton");
         _waveIndicator = GetNode<WaveIndicatorView>("%WaveIndicator");
         _battleEncounter = new BattleEncounterView(
             GetNode<PanelContainer>("%PlayerToken"),
@@ -92,6 +100,7 @@ public partial class RoomChallengeView : Control
         GetNode<Button>("%PauseButton").Pressed += ToggleWavePause;
         GetNode<Button>("%ReadyNowButton").Pressed += CompleteRestNow;
         GetNode<Button>("%ExtendRestButton").Pressed += ExtendRest;
+        _smallPotionButton.Pressed += UseSmallPotion;
         _waveIndicator.SetWaveCompleted += EnterBreak;
         _waveIndicator.WaveAttackAnticipated += TriggerWaveAttackWindup;
         _waveIndicator.WavePeakReached += TriggerWavePeakHit;
@@ -141,13 +150,20 @@ public partial class RoomChallengeView : Control
         }
     }
 
-    public void Initialize(PlayerState player, TaskTemplate task, int stageNumber, int totalStages, int initialPlayerHp)
+    public void Initialize(
+        PlayerState player,
+        TaskTemplate task,
+        int stageNumber,
+        int totalStages,
+        int initialPlayerHp,
+        RoomSupplyViewModel? supply = null)
     {
         _player = player;
         _task = task;
         _stageNumber = stageNumber;
         _totalStages = totalStages;
         _initialPlayerHp = initialPlayerHp;
+        _supply = supply ?? new RoomSupplyViewModel(0, 3, false);
 
         if (IsNodeReady())
         {
@@ -286,6 +302,7 @@ public partial class RoomChallengeView : Control
             CalculateExperienceGained(_room.CombatResults));
         _battleEncounter.ShowResult(_room.Progress, _room.CombatResults.LastOrDefault());
         _resultPresenter.Show(_lastSummary);
+        _supplyPanel.Visible = false;
         _battleMessage.Text = title == "Boss Cleared"
             ? Text.StageRewardBanked
             : Text.WithdrawRewardBanked;
@@ -317,6 +334,42 @@ public partial class RoomChallengeView : Control
             Text.NowPlayingFormat,
             _musicCatalog.GetById(_task.MusicId).DisplayName,
             _timing.Bpm);
+        RefreshSupply();
+    }
+
+    private void UseSmallPotion()
+    {
+        if (SmallPotionRequested is null)
+        {
+            return;
+        }
+
+        var result = SmallPotionRequested.Invoke(_room.CurrentPlayerHp);
+        if (!result.Used)
+        {
+            _battleMessage.Text = Text.NoPotionUsed;
+            _supply = result.Supply;
+            RefreshSupply();
+            return;
+        }
+
+        _roomService.HealPlayer(_room, result.Healed);
+        _supply = result.Supply;
+        _battleEncounter.RefreshActiveHealth(_room.Progress, _room.ActiveCombatState);
+        _battleMessage.Text = string.Format(Text.PotionUsed, result.Healed, _room.CurrentPlayerHp);
+        Refresh(_room.Progress);
+    }
+
+    private void RefreshSupply()
+    {
+        if (_supplyPanel is null)
+        {
+            return;
+        }
+
+        _supplyPanel.Visible = !_phase.IsResult;
+        _supplyStatus.Text = string.Format(Text.SupplyStatus, _supply.SmallPotionCount, _supply.CarryLimit);
+        _smallPotionButton.Disabled = !_supply.CanUseSmallPotion || _room.CurrentPlayerHp >= _player.MaxHp;
     }
 
     private static string BuildSetResultMessage(CombatSetResult result)
@@ -456,6 +509,9 @@ public partial class RoomChallengeView : Control
         public const string PauseToggled = "Wave \u66ab\u505c\u72c0\u614b\u5df2\u5207\u63db\u3002";
         public const string ReadyNow = "\u5df2\u6e96\u5099\u597d\u3002\u8acb\u56de\u5831\u9019\u7d44\u5b8c\u6210\u72c0\u614b\u3002";
         public const string RestExtended = "\u4f11\u606f\u5ef6\u9577 30 \u79d2\u3002";
+        public const string SupplyStatus = "\u5c0f\u578b\u85e5\u6c34 {0} / {1}";
+        public const string PotionUsed = "\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\uff0c\u6062\u5fa9 {0} HP\u3002\u76ee\u524d HP {1}\u3002";
+        public const string NoPotionUsed = "\u76ee\u524d\u7121\u6cd5\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\u3002";
         public const string ChestDungeon = "\u80f8\u5730\u57ce";
         public const string ShoulderDungeon = "\u80a9\u5730\u57ce";
         public const string BackDungeon = "\u80cc\u5730\u57ce";

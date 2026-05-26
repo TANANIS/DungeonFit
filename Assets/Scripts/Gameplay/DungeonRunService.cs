@@ -42,8 +42,8 @@ public sealed class DungeonRunService
             var reward = combatResult is null
                 ? BuildLegacyReward(summary, set, rewardKind)
                 : rewardKind == BankedRewardKind.Chest
-                ? _lootRoller.RollDungeonChest(chest)
-                : new RewardBundle(RewardSource.DungeonRoom, combatResult?.Gold ?? 0, null);
+                    ? RollChestReward(chest, combatResult.Gold)
+                    : new RewardBundle(RewardSource.DungeonRoom, combatResult.Gold, null);
 
             yield return new BankedReward(
                 stage.Id,
@@ -79,5 +79,11 @@ public sealed class DungeonRunService
             : null;
 
         return new RewardBundle(RewardSource.DungeonRoom, gold, equipment);
+    }
+
+    private RewardBundle RollChestReward(DungeonChest chest, int gold)
+    {
+        var reward = _lootRoller.RollDungeonChest(chest);
+        return reward with { Gold = gold };
     }
 }

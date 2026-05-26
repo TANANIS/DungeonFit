@@ -150,6 +150,7 @@ public sealed class RoomRun
 		var gold = _activeEnemyDefeated
 			? _activeSetIsBoss ? 20 : 10
 			: _activeSetIsBoss ? 8 : 3;
+		gold = ApplyGoldBonus(gold);
 		var chestTier = _activeSetIsBoss ? "Boss" : "Normal";
 		var combatResult = new CombatSetResult(
 			_activeSetNumber,
@@ -182,6 +183,18 @@ public sealed class RoomRun
 		}
 
 		IsSkipped = true;
+	}
+
+	public int HealPlayer(int amount)
+	{
+		if (amount <= 0)
+		{
+			return 0;
+		}
+
+		var before = CurrentPlayerHp;
+		CurrentPlayerHp = Math.Min(_playerStats.MaxHp, CurrentPlayerHp + amount);
+		return CurrentPlayerHp - before;
 	}
 
 	private ActiveSetCombatState BuildActiveState()
@@ -221,6 +234,16 @@ public sealed class RoomRun
 	{
 		var threshold = isBoss ? 45 : 25;
 		return StableRoll(AttackSeed(setNumber, repNumber), 100) < threshold;
+	}
+
+	private int ApplyGoldBonus(int gold)
+	{
+		if (_playerStats.DungeonGoldBonusPercent <= 0)
+		{
+			return gold;
+		}
+
+		return (int)Math.Ceiling(gold * (1 + (_playerStats.DungeonGoldBonusPercent / 100.0)));
 	}
 
 	private static int StableRoll(string seed, int maxExclusive)

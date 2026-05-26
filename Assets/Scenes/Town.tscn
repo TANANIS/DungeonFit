@@ -130,7 +130,7 @@ size_flags_vertical = 3
 [node name="HerbLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/HerbShop"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
-text = "Herb Shop"
+text = "藥草鋪"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -156,7 +156,7 @@ size_flags_vertical = 3
 [node name="StoreLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/GeneralStore"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
-text = "General Store"
+text = "鐵匠鋪"
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
@@ -184,7 +184,7 @@ size_flags_vertical = 3
 [node name="FountainLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Fountain"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
-text = "Moon Fountain"
+text = "月光泉"
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3

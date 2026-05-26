@@ -27,6 +27,11 @@ public sealed class RoomRunService
         return room.ResolveRepHit();
     }
 
+    public int HealPlayer(RoomRun room, int amount)
+    {
+        return room.HealPlayer(amount);
+    }
+
     public RoomProgress Skip(RoomRun room)
     {
         room.Skip();

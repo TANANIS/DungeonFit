@@ -14,6 +14,8 @@ public partial class Main : Control
     private const string DungeonPlanScenePath = "res://Assets/Scenes/DungeonPlan.tscn";
     private const string NoticeBoardScenePath = "res://Assets/Scenes/NoticeBoard.tscn";
     private const string TavernScenePath = "res://Assets/Scenes/Tavern.tscn";
+    private const string MoonlightFountainScenePath = "res://Assets/Scenes/MoonlightFountain.tscn";
+    private const string HerbShopScenePath = "res://Assets/Scenes/HerbShop.tscn";
     private const string SetSummaryScenePath = "res://Assets/Scenes/SetSummary.tscn";
     private const string DailySummaryScenePath = "res://Assets/Scenes/DailySummary.tscn";
     private const string RoomScenePath = "res://Assets/Scenes/RoomChallenge.tscn";
@@ -40,6 +42,16 @@ public partial class Main : Control
             AddChild(tavern);
             GD.Print("TAVERN_UI_LOADED");
             GD.Print($"TAVERN_SETTINGS_OPENED {tavern.SmokeOpenSettingsPanel()}");
+            var moonScene = GD.Load<PackedScene>(MoonlightFountainScenePath);
+            var moon = moonScene.Instantiate<MoonlightFountainView>();
+            moon.Initialize(tavernSession.BuildMoonlightFountainViewModel());
+            AddChild(moon);
+            GD.Print("MOONLIGHT_UI_LOADED");
+            var herbScene = GD.Load<PackedScene>(HerbShopScenePath);
+            var herb = herbScene.Instantiate<HerbShopView>();
+            herb.Initialize(tavernSession.BuildHerbShopViewModel());
+            AddChild(herb);
+            GD.Print("HERB_UI_LOADED");
             GetTree().Quit();
             return;
         }
@@ -55,15 +67,56 @@ public partial class Main : Control
         town.EnterDungeonRequested += ShowDungeonPlan;
         town.NoticeBoardRequested += ShowNoticeBoard;
         town.TavernRequested += () => ShowTavern();
+        town.MoonlightFountainRequested += ShowMoonlightFountain;
+        town.HerbShopRequested += ShowHerbShop;
         town.ManualSaveRequested += () => ManualSave(town);
         town.DeleteSaveRequested += ShowTownAfterDeleteSave;
+    }
+
+    private void ShowMoonlightFountain()
+    {
+        var fountain = LoadView<MoonlightFountainView>(MoonlightFountainScenePath);
+        fountain.Initialize(_session.BuildMoonlightFountainViewModel());
+        fountain.BackToTownRequested += ShowTown;
+        fountain.RecoveryRequested += () =>
+        {
+            _session.UseMoonlightRecovery();
+            ShowMoonlightFountain();
+        };
+        fountain.BlessingSelected += blessingId =>
+        {
+            _session.SelectDailyBlessing(blessingId);
+            ShowMoonlightFountain();
+        };
+    }
+
+    private void ShowHerbShop()
+    {
+        var herbShop = LoadView<HerbShopView>(HerbShopScenePath);
+        herbShop.Initialize(_session.BuildHerbShopViewModel());
+        herbShop.BackToTownRequested += ShowTown;
+        herbShop.BasicHealRequested += () =>
+        {
+            _session.BuyBasicHeal();
+            ShowHerbShop();
+        };
+        herbShop.FullHealRequested += () =>
+        {
+            _session.BuyFullHeal();
+            ShowHerbShop();
+        };
+        herbShop.PotionPurchaseRequested += () =>
+        {
+            _session.BuyHerbShopPotion();
+            ShowHerbShop();
+        };
     }
 
     private void ShowNoticeBoard()
     {
         _session.RefreshNoticeBoardIfExpired();
         var noticeBoard = LoadView<NoticeBoardView>(NoticeBoardScenePath);
-        noticeBoard.Initialize(_shortTermQuestCatalog.GetDailyBoard(), _session.ActiveShortTermQuests);
+        noticeBoard.Initialize(_shortTermQuestCatalog.GetDailyBoard(), _session.ActiveShortTermQuests, _session.Player);
         noticeBoard.BackToTownRequested += ShowTown;
         noticeBoard.EnterDungeonRequested += ShowDungeonPlan;
         noticeBoard.QuestAccepted += AcceptShortTermQuest;
@@ -140,8 +193,10 @@ public partial class Main : Control
             activeRun.CurrentStage,
             activeRun.CurrentStageIndex + 1,
             activeRun.Plan.Stages.Count,
-            activeRun.CurrentPlayerHp);
+            activeRun.CurrentPlayerHp,
+            _session.BuildRoomSupplyViewModel());
         room.RoomContinueRequested += CompleteRoomAndShowSetSummary;
+        room.SmallPotionRequested += currentHp => _session.UseSmallPotionInRoom(currentHp);
     }
 
     private void CompleteRoomAndShowSetSummary(RunSummary summary)

@@ -1,6 +1,6 @@
 # DungeonFit Design Document
 
-> Last updated: 2026-05-25
+> Last updated: 2026-05-26
 > Encoding: UTF-8
 
 ## Project Direction
@@ -39,7 +39,7 @@ Repeated dungeon types are valid and intentional. A route slot represents a targ
 
 Each `DungeonRouteSlot` stores:
 
-- `DungeonTypeId`: chest, shoulder, back, leg, core, arm.
+- `DungeonTypeId`: chest, shoulders, back, legs, core, arms.
 - `TargetSets`: selected set count.
 - `TargetReps`: selected reps per set.
 - `MusicId`: stable music identifier.
@@ -107,6 +107,8 @@ Current actor states:
 - Idle
 - Active
 - Rest
+- Evading
+- Moving
 - Hit
 - Defeated
 - Victory
@@ -122,6 +124,7 @@ Current imported actor assets:
 - Preserved but unused this round: Walk, Block, Attack02, Attack03, overview sheets.
 - Battle actors now use absolute positions inside the battle stage instead of an HBox layout. Player is anchored toward the lower-left combat position, while enemy/Boss is anchored toward the right-side combat position. This prepares the next pass for beat-synced attack movement.
 - Beat-synced attack display is split into wind-up and hit timing: Attack01 starts before the Wave peak, enemy Hurt happens at the Wave peak, and attack animation does not loop during a single rep.
+- Rep-time combat feedback switches actor states from combat results: player attack, player hurt, evasion, enemy attack, enemy hurt, defeated, and moving after a defeated enemy.
 
 The result Continue flow is:
 
@@ -193,9 +196,10 @@ Reward flow is now separated into preview, banked rewards, and claimed rewards.
 
 MVP reward rules:
 
-- Each completed set creates positive rewards.
+- Each completed set creates a positive reward packet.
 - A chest is created only when the enemy is defeated.
 - If the enemy survives, the set stores a gold-only reward.
+- Chest eligibility and reward packet existence must remain separate concepts.
 - Damage and HP update during reps; gold and chest eligibility are still sealed at set end.
 - Banked rewards are not applied immediately.
 - Daily Summary `Open All` applies banked rewards to `PlayerState`.
@@ -217,14 +221,17 @@ user://save.json
 Current saved data includes:
 
 - Player gold.
-- Player inventory.
+- Player level, EXP, and next-level threshold.
+- Player inventory and equipment loadout.
 - Selected dungeon route, only when it belongs to an active run.
 - Active run existence, including the edge case where the player started a route but has not cleared the first room yet.
+- Active run current HP.
 - Active run stage results.
 - Banked rewards.
 - Daily reward claimed state.
 - Last run summary.
 - Notice Board refresh key for the current 24-hour short-term quest board.
+- Active short-term quest state.
 
 Save is triggered when:
 
@@ -289,12 +296,67 @@ Most buildings can remain decorative until their systems are implemented.
 
 Planned buildings:
 
-- Tavern: quests, recruit, dialogue.
-- Herb shop: recovery items and materials.
-- General shop: equipment, consumables, tools.
+- Tavern: equipment review, loadout slots, warehouse inventory, selling, locking.
+- Herb shop: paid healing, potion purchases, and room-challenge supply items.
+- Blacksmith: equipment purchases, enhancement, and extending equipment usable level range.
 - Notice board: optional NPC quests.
-- Church: long-term oath quests, revive, blessing, prayer.
-- Fountain: recovery, blessing, ritual.
+- Church: long-term oath quests, basic NPC dialogue, story, prayer.
+- Moonlight Fountain: daily free recovery and today's blessing buff.
+
+## Remaining Core MVP Systems
+
+These systems are still required for the basic MVP because they support HP recovery, gold sinks, long-term goals, and Town return-state rewards.
+
+### Moonlight Fountain MVP
+
+- Show current player HP.
+- Allow one free recovery per day.
+- Restore a fixed percentage of HP.
+- Let the player choose one blessing buff for today.
+- Prevent repeat use after today's free recovery / blessing is consumed.
+- Save the daily used state and selected blessing.
+
+### Herb Shop MVP
+
+- Show current player HP.
+- Let the player spend gold to recover HP.
+- Sell small potions.
+- Allow purchased potions to be used during Room Challenge.
+- Enforce a daily purchase limit.
+- Save shop purchase counts and owned supplies.
+
+### Idle Reward MVP
+
+- Show the character exploring outdoors in the lower Town panel.
+- Accumulate small gold rewards at a fixed interval.
+- Let the player claim accumulated idle gold.
+- Apply a maximum accumulation cap.
+- On reload, grant partial offline accumulation based on elapsed time.
+- Save idle reward timestamps and unclaimed amount.
+
+### Blacksmith MVP
+
+- Show current equipment and inventory.
+- Let the player select one equipment item.
+- Spend gold to enhance the selected item.
+- Enhancement grants Power +1 or increases the main stat by +1.
+- Equipment has an enhancement cap.
+- Spend gold to extend the equipment usable level range.
+
+### Equipment Level Rules
+
+- Equipment has a recommended level range.
+- When the player's level exceeds the range, equipment effects decay.
+- The Blacksmith can extend the usable level range with gold.
+
+### Church MVP
+
+- Show long-term oath quests.
+- Objectives should accumulate over multiple days or many dungeon runs.
+- Completion rewards can include titles, large gold payouts, or rare equipment.
+- Only one long-term oath quest can be active at a time.
+- Abandoning an oath resets its progress.
+- Church quests should include basic NPC dialogue and story framing.
 
 ## NPC Quests And Route
 
@@ -429,10 +491,14 @@ Implemented:
 - Town -> Dungeon Plan -> Room Challenge -> Set Summary -> Daily Summary -> Town loop.
 - Dungeon route selection with repeated target-area dungeons.
 - Per-slot set count, reps, music, and rest seconds.
+- Rep-time combat with player/enemy HP, evasion, deterministic enemy attacks, kill-gated chest eligibility, and gold-only rewards.
+- Player Level / EXP / Attack / MaxHP scaling.
+- Dungeon loot profiles, rarity tables, unique equipment instance ids, and sealed Daily Summary chest reveal.
 - Room Challenge phase controller split.
 - Result panel presenter split.
 - Room audio bridge split.
 - Battle actor / encounter display split.
+- Tavern equipment MVP with character summary, loadout slots, inventory filters/sort, equip, unequip, sell, lock, and save-management panel.
 - Notice Board MVP skeleton with six short-term quest cards, detail panel, optional multi-quest acceptance, room-completion progress updates, ready-to-report state, direct gold reward claiming, claimed state persistence, local-date 24-hour refresh, and Dungeon Plan active quest bonus display.
 - Dungeon Plan helper presenters for grid, route list, and summary state.
 - Banked rewards with Open All claim timing.
@@ -446,8 +512,12 @@ Still MVP / placeholder:
 - Full loot table balancing.
 - Equipment affixes and rerolling.
 - Chest-opening animation.
-- Quest board and NPC quest rewards.
-- Notice Board reward claiming and 24-hour refresh timing.
+- Moonlight Fountain daily recovery and blessing.
+- Herb Shop paid healing and room potion supply.
+- Blacksmith equipment enhancement and usable-level extension.
+- Idle reward accumulation and offline catch-up.
+- Church long-term oath quest implementation.
+- Notice Board final visual polish, visible refresh countdown, and broader reward variety.
 - Android export/device verification.
 - Precise music loop points and latency calibration.
 
@@ -465,7 +535,7 @@ Medium:
 
 1. Some scene default text is still engineering UI and English.
 2. Dungeon Plan and Route Slot dialog are split enough for MVP, but final mobile visuals still need art-driven layout.
-3. Reward grouping in save data assumes one banked chest per completed set; update carefully if future rewards become variable per set.
+3. Reward grouping in save data assumes one reward packet per completed set; keep chest eligibility separate from gold-only rewards as future rewards become more variable.
 4. `WaveIndicatorView` still uses a Godot signal by design; revisit only if event debugging becomes painful.
 5. Notice Board progress currently advances when a matched room records any completed sets. Decide whether short-term quests that say "complete a room" should require full Boss Cleared instead of partial completion.
 6. Claimed short-term quests remain visible as completed until the local-date refresh clears the board.
@@ -484,6 +554,6 @@ Medium:
 3. Add a small save/load diagnostic path or unit-style test.
 4. Start curating actual music loop metadata track by track.
 5. Begin reward table expansion only after save/load is trusted.
-6. Complete Notice Board short-term quest loop:
+6. Polish Notice Board short-term quest loop:
    - decide full-room vs partial-completion progress rules,
    - add a visible refresh countdown or next-refresh timestamp.

@@ -10,6 +10,15 @@ namespace DungeonFit.Gameplay;
 
 public sealed class GameSession
 {
+    private const double MoonlightRecoveryPercent = 0.5;
+    private const double BasicHealPercent = 0.4;
+    private const double SmallPotionHealPercent = 0.3;
+    private const int BasicHealCost = 80;
+    private const int FullHealCost = 180;
+    private const int SmallPotionCost = 50;
+    private const int SmallPotionDailyPurchaseLimit = 3;
+    private const int SmallPotionCarryLimit = 3;
+
     private readonly TaskCatalog _taskCatalog = new();
     private readonly DungeonRunService _dungeonRunService = new();
     private readonly DungeonRouteRules _routeRules = new();
@@ -18,11 +27,16 @@ public sealed class GameSession
     private readonly bool _persistenceEnabled;
     private string _noticeBoardRefreshKey;
     private bool _noticeBoardRefreshKeyNeedsSave;
+    private string _dailyStateKey;
+    private bool _moonlightRecoveryUsed;
+    private int _smallPotionCount;
+    private int _herbShopPotionPurchasesToday;
 
     public GameSession(bool persistenceEnabled = true)
     {
         _persistenceEnabled = persistenceEnabled;
         _noticeBoardRefreshKey = GetTodayRefreshKey();
+        _dailyStateKey = GetTodayRefreshKey();
         SelectedDungeonRoute = new List<DungeonRouteSlot>();
         SelectedPlan = DungeonPlan.Empty;
 
@@ -84,11 +98,16 @@ public sealed class GameSession
         DailyRewardsClaimed = false;
         ActiveShortTermQuests = new List<ActiveShortTermQuest>();
         _noticeBoardRefreshKey = GetTodayRefreshKey();
+        _dailyStateKey = GetTodayRefreshKey();
+        _moonlightRecoveryUsed = false;
+        _smallPotionCount = 0;
+        _herbShopPotionPurchasesToday = 0;
     }
 
     public void RefreshNoticeBoardIfExpired()
     {
         var todayKey = GetTodayRefreshKey();
+        RefreshDailyStateIfExpired(todayKey);
 
         if (_noticeBoardRefreshKeyNeedsSave && _noticeBoardRefreshKey == todayKey)
         {
@@ -189,7 +208,7 @@ public sealed class GameSession
 
         if (ActiveRun is null)
         {
-            ActiveRun = _dungeonRunService.Start(SelectedPlan, Player.MaxHp);
+            ActiveRun = _dungeonRunService.Start(SelectedPlan, Player.CurrentHp);
             DailyRewardsClaimed = false;
             Save();
         }
@@ -219,9 +238,152 @@ public sealed class GameSession
                 LastSetSummary = LastSetSummary with { Run = updatedRun };
             }
 
+            if (summary.RemainingPlayerHp.HasValue)
+            {
+                Player.SetCurrentHp(summary.RemainingPlayerHp.Value);
+            }
+
             UpdateShortTermQuestProgress(completedStage, summary);
             Save();
         }
+    }
+
+    public MoonlightFountainViewModel BuildMoonlightFountainViewModel()
+    {
+        RefreshNoticeBoardIfExpired();
+        return new MoonlightFountainViewModel(
+            Player.Level,
+            Player.Experience,
+            Player.ExperienceToNextLevel,
+            Player.Gold,
+            Player.CurrentHp,
+            Player.MaxHp,
+            _moonlightRecoveryUsed,
+            !_moonlightRecoveryUsed && Player.CurrentHp < Player.MaxHp,
+            Player.DailyBlessingId,
+            ActiveRun is null && Player.DailyBlessingId == DailyBlessing.None,
+            BuildDailyBlessings());
+    }
+
+    public HerbShopViewModel BuildHerbShopViewModel()
+    {
+        RefreshNoticeBoardIfExpired();
+        var canHeal = Player.CurrentHp < Player.MaxHp;
+        return new HerbShopViewModel(
+            Player.Level,
+            Player.Experience,
+            Player.ExperienceToNextLevel,
+            Player.Gold,
+            Player.CurrentHp,
+            Player.MaxHp,
+            canHeal && Player.Gold >= BasicHealCost,
+            canHeal && Player.Gold >= FullHealCost,
+            Player.Gold >= SmallPotionCost && _herbShopPotionPurchasesToday < SmallPotionDailyPurchaseLimit,
+            _smallPotionCount,
+            _herbShopPotionPurchasesToday,
+            SmallPotionDailyPurchaseLimit);
+    }
+
+    public RoomSupplyViewModel BuildRoomSupplyViewModel()
+    {
+        var usable = Math.Min(_smallPotionCount, SmallPotionCarryLimit);
+        return new RoomSupplyViewModel(usable, SmallPotionCarryLimit, usable > 0);
+    }
+
+    public bool UseMoonlightRecovery()
+    {
+        RefreshNoticeBoardIfExpired();
+        if (_moonlightRecoveryUsed || Player.CurrentHp >= Player.MaxHp)
+        {
+            return false;
+        }
+
+        var healed = Player.HealPercent(MoonlightRecoveryPercent);
+        if (healed <= 0)
+        {
+            return false;
+        }
+
+        _moonlightRecoveryUsed = true;
+        Save();
+        return true;
+    }
+
+    public bool SelectDailyBlessing(string blessingId)
+    {
+        RefreshNoticeBoardIfExpired();
+        if (ActiveRun is not null || Player.DailyBlessingId != DailyBlessing.None)
+        {
+            return false;
+        }
+
+        var changed = Player.SetDailyBlessing(blessingId);
+        if (changed)
+        {
+            Save();
+        }
+
+        return changed;
+    }
+
+    public bool BuyBasicHeal()
+    {
+        RefreshNoticeBoardIfExpired();
+        if (Player.CurrentHp >= Player.MaxHp || !Player.SpendGold(BasicHealCost))
+        {
+            return false;
+        }
+
+        Player.HealPercent(BasicHealPercent);
+        Save();
+        return true;
+    }
+
+    public bool BuyFullHeal()
+    {
+        RefreshNoticeBoardIfExpired();
+        if (Player.CurrentHp >= Player.MaxHp || !Player.SpendGold(FullHealCost))
+        {
+            return false;
+        }
+
+        Player.HealToFull();
+        Save();
+        return true;
+    }
+
+    public bool BuyHerbShopPotion()
+    {
+        RefreshNoticeBoardIfExpired();
+        if (_herbShopPotionPurchasesToday >= SmallPotionDailyPurchaseLimit || !Player.SpendGold(SmallPotionCost))
+        {
+            return false;
+        }
+
+        _smallPotionCount++;
+        _herbShopPotionPurchasesToday++;
+        Save();
+        return true;
+    }
+
+    public SupplyUseResult UseSmallPotionInRoom(int currentRoomHp)
+    {
+        RefreshNoticeBoardIfExpired();
+        if (_smallPotionCount <= 0)
+        {
+            return new SupplyUseResult(false, 0, currentRoomHp, Player.MaxHp, BuildRoomSupplyViewModel());
+        }
+
+        Player.SetCurrentHp(currentRoomHp);
+        var healed = Player.HealPercent(SmallPotionHealPercent);
+        if (healed <= 0)
+        {
+            return new SupplyUseResult(false, 0, Player.CurrentHp, Player.MaxHp, BuildRoomSupplyViewModel());
+        }
+
+        _smallPotionCount--;
+        Save();
+        return new SupplyUseResult(true, healed, Player.CurrentHp, Player.MaxHp, BuildRoomSupplyViewModel());
     }
 
     public DailyRunSummary? BuildDailySummary()
@@ -336,7 +498,15 @@ public sealed class GameSession
             state.EquipmentLoadout,
             state.Level,
             state.Experience,
-            state.ExperienceToNextLevel);
+            state.ExperienceToNextLevel,
+            state.CurrentHp,
+            state.DailyBlessingId);
+        _dailyStateKey = string.IsNullOrWhiteSpace(state.DailyStateKey)
+            ? GetTodayRefreshKey()
+            : state.DailyStateKey;
+        _moonlightRecoveryUsed = state.MoonlightRecoveryUsed;
+        _smallPotionCount = Math.Max(0, state.SmallPotionCount);
+        _herbShopPotionPurchasesToday = Math.Max(0, state.HerbShopPotionPurchasesToday);
         var hasActiveRun = state.HasActiveRun || state.ActiveStageResults!.Count > 0;
         SelectedDungeonRoute = hasActiveRun
             ? _routeRules.NormalizeRoute(state.SelectedDungeonRoute!)
@@ -406,6 +576,30 @@ public sealed class GameSession
             changed = true;
         }
 
+        if (string.IsNullOrWhiteSpace(state.DailyStateKey))
+        {
+            state.DailyStateKey = GetTodayRefreshKey();
+            changed = true;
+        }
+
+        if (!DailyBlessing.IsValid(state.DailyBlessingId) && !string.IsNullOrEmpty(state.DailyBlessingId))
+        {
+            state.DailyBlessingId = DailyBlessing.None;
+            changed = true;
+        }
+
+        if (state.SmallPotionCount < 0)
+        {
+            state.SmallPotionCount = 0;
+            changed = true;
+        }
+
+        if (state.HerbShopPotionPurchasesToday < 0)
+        {
+            state.HerbShopPotionPurchasesToday = 0;
+            changed = true;
+        }
+
         if (state.Inventory is null)
         {
             state.Inventory = new List<EquipmentItem>();
@@ -438,6 +632,22 @@ public sealed class GameSession
 
         changed = NormalizeInventory(state.Inventory) || changed;
         changed = NormalizeLoadout(state.Inventory, state.EquipmentLoadout) || changed;
+
+        if (!state.CurrentHp.HasValue)
+        {
+            var player = new PlayerState();
+            player.Load(
+                state.Gold,
+                state.Inventory,
+                state.EquipmentLoadout,
+                state.Level,
+                state.Experience,
+                state.ExperienceToNextLevel,
+                null,
+                state.DailyBlessingId);
+            state.CurrentHp = player.MaxHp;
+            changed = true;
+        }
 
         foreach (var stage in state.ActiveStageResults)
         {
@@ -533,6 +743,12 @@ public sealed class GameSession
             Experience = Player.Experience,
             ExperienceToNextLevel = Player.ExperienceToNextLevel,
             Gold = Player.Gold,
+            CurrentHp = Player.CurrentHp,
+            DailyStateKey = _dailyStateKey,
+            MoonlightRecoveryUsed = _moonlightRecoveryUsed,
+            DailyBlessingId = Player.DailyBlessingId,
+            SmallPotionCount = _smallPotionCount,
+            HerbShopPotionPurchasesToday = _herbShopPotionPurchasesToday,
             Inventory = new List<EquipmentItem>(Player.Inventory),
             EquipmentLoadout = new EquipmentLoadout
             {
@@ -611,6 +827,41 @@ public sealed class GameSession
         _noticeBoardRefreshKey = todayKey;
         ActiveShortTermQuests = new List<ActiveShortTermQuest>();
         return true;
+    }
+
+    private void RefreshDailyStateIfExpired(string todayKey)
+    {
+        if (_dailyStateKey == todayKey)
+        {
+            return;
+        }
+
+        _dailyStateKey = todayKey;
+        _moonlightRecoveryUsed = false;
+        _herbShopPotionPurchasesToday = 0;
+        Player.ClearDailyBlessing();
+        Save();
+    }
+
+    private IReadOnlyList<DailyBlessingOptionViewModel> BuildDailyBlessings()
+    {
+        return new[]
+        {
+            BuildDailyBlessingOption(DailyBlessing.MoonGuard, "月光庇護", "今日最大 HP +10%"),
+            BuildDailyBlessingOption(DailyBlessing.BladeMoon, "鋒刃月影", "今日攻擊 +5%"),
+            BuildDailyBlessingOption(DailyBlessing.StarlightGold, "拾荒星光", "今日地城 Gold +10%"),
+        };
+    }
+
+    private DailyBlessingOptionViewModel BuildDailyBlessingOption(string id, string name, string description)
+    {
+        var selected = Player.DailyBlessingId == id;
+        return new DailyBlessingOptionViewModel(
+            id,
+            name,
+            description,
+            selected,
+            !selected && (ActiveRun is not null || Player.DailyBlessingId != DailyBlessing.None));
     }
 
     private static string GetTodayRefreshKey()

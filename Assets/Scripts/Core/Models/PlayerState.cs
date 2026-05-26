@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 namespace DungeonFit.Core.Models;
 
@@ -19,6 +20,10 @@ public sealed class PlayerState
 
     public int Gold { get; private set; }
 
+    public int CurrentHp { get; private set; } = DefaultBaseMaxHp;
+
+    public string DailyBlessingId { get; private set; } = DailyBlessing.None;
+
     public List<EquipmentItem> Inventory { get; } = new();
 
     public EquipmentLoadout Loadout { get; } = new();
@@ -29,13 +34,32 @@ public sealed class PlayerState
 
     public int BaseMaxHp => DefaultBaseMaxHp + ((Level - 1) * 2);
 
-    public int Attack => BaseAttack + SumEquippedStat(EquipmentStatType.Attack);
+    public int Attack
+    {
+        get
+        {
+            var attack = BaseAttack + SumEquippedStat(EquipmentStatType.Attack);
+            return DailyBlessingId == DailyBlessing.BladeMoon
+                ? (int)Math.Ceiling(attack * 1.05)
+                : attack;
+        }
+    }
 
-    public int MaxHp => BaseMaxHp + SumEquippedStat(EquipmentStatType.MaxHp);
+    public int MaxHp
+    {
+        get
+        {
+            var maxHp = BaseMaxHp + SumEquippedStat(EquipmentStatType.MaxHp);
+            return DailyBlessingId == DailyBlessing.MoonGuard
+                ? (int)Math.Ceiling(maxHp * 1.1)
+                : maxHp;
+        }
+    }
 
-    public int CurrentHp => MaxHp;
+    public int DungeonGoldBonusPercent => SumEquippedStat(EquipmentStatType.DungeonGoldBonusPercent) +
+        (DailyBlessingId == DailyBlessing.StarlightGold ? 10 : 0);
 
-    public PlayerCombatStats CombatStats => new(MaxHp, Attack, EquipmentScore);
+    public PlayerCombatStats CombatStats => new(MaxHp, Attack, EquipmentScore, DungeonGoldBonusPercent);
 
     public void Load(
         int gold,
@@ -43,12 +67,15 @@ public sealed class PlayerState
         EquipmentLoadout? loadout = null,
         int level = DefaultLevel,
         int experience = DefaultExperience,
-        int experienceToNextLevel = DefaultExperienceToNextLevel)
+        int experienceToNextLevel = DefaultExperienceToNextLevel,
+        int? currentHp = null,
+        string? dailyBlessingId = null)
     {
         Level = level <= 0 ? DefaultLevel : level;
         Experience = experience < 0 ? 0 : experience;
         ExperienceToNextLevel = experienceToNextLevel <= 0 ? GetExperienceToNextLevel(Level) : experienceToNextLevel;
         Gold = gold;
+        DailyBlessingId = DailyBlessing.IsValid(dailyBlessingId) ? dailyBlessingId! : DailyBlessing.None;
         Inventory.Clear();
 
         if (inventory is not null)
@@ -60,6 +87,7 @@ public sealed class PlayerState
         Loadout.ArmorId = loadout?.ArmorId;
         Loadout.AccessoryId = loadout?.AccessoryId;
         RemoveMissingEquippedItems();
+        CurrentHp = currentHp.HasValue ? ClampHp(currentHp.Value) : MaxHp;
     }
 
     public void Apply(RewardBundle reward)
@@ -87,6 +115,7 @@ public sealed class PlayerState
             Level++;
             levelsGained++;
             ExperienceToNextLevel = GetExperienceToNextLevel(Level);
+            ClampCurrentHp();
         }
 
         return levelsGained;
@@ -101,6 +130,7 @@ public sealed class PlayerState
         }
 
         Loadout.Equip(item);
+        ClampCurrentHp();
         return true;
     }
 
@@ -112,7 +142,74 @@ public sealed class PlayerState
         }
 
         Loadout.Unequip(slot);
+        ClampCurrentHp();
         return true;
+    }
+
+    public bool SpendGold(int amount)
+    {
+        if (amount <= 0 || Gold < amount)
+        {
+            return false;
+        }
+
+        Gold -= amount;
+        return true;
+    }
+
+    public void SetCurrentHp(int hp)
+    {
+        CurrentHp = ClampHp(hp);
+    }
+
+    public int HealPercent(double percent)
+    {
+        if (percent <= 0 || CurrentHp >= MaxHp)
+        {
+            return 0;
+        }
+
+        return Heal((int)Math.Ceiling(MaxHp * percent));
+    }
+
+    public int HealToFull()
+    {
+        if (CurrentHp >= MaxHp)
+        {
+            return 0;
+        }
+
+        var before = CurrentHp;
+        CurrentHp = MaxHp;
+        return CurrentHp - before;
+    }
+
+    public bool SetDailyBlessing(string blessingId)
+    {
+        if (!DailyBlessing.IsValid(blessingId))
+        {
+            return false;
+        }
+
+        if (DailyBlessingId == blessingId)
+        {
+            return true;
+        }
+
+        if (DailyBlessingId != DailyBlessing.None)
+        {
+            return false;
+        }
+
+        DailyBlessingId = blessingId;
+        ClampCurrentHp();
+        return true;
+    }
+
+    public void ClearDailyBlessing()
+    {
+        DailyBlessingId = DailyBlessing.None;
+        ClampCurrentHp();
     }
 
     public bool SetEquipmentLocked(string itemId, bool isLocked)
@@ -190,6 +287,28 @@ public sealed class PlayerState
         {
             Loadout.AccessoryId = null;
         }
+    }
+
+    private int Heal(int amount)
+    {
+        if (amount <= 0)
+        {
+            return 0;
+        }
+
+        var before = CurrentHp;
+        CurrentHp = Math.Min(MaxHp, CurrentHp + amount);
+        return CurrentHp - before;
+    }
+
+    private void ClampCurrentHp()
+    {
+        CurrentHp = ClampHp(CurrentHp);
+    }
+
+    private int ClampHp(int hp)
+    {
+        return Math.Clamp(hp, -MaxHp, MaxHp);
     }
 
     public static int GetExperienceToNextLevel(int level)

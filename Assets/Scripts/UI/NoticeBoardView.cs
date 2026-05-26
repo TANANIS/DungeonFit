@@ -14,7 +14,9 @@ public partial class NoticeBoardView : Control
 
     private IReadOnlyList<ShortTermQuestDefinition> _quests = Array.Empty<ShortTermQuestDefinition>();
     private IReadOnlyList<ActiveShortTermQuest> _activeQuests = Array.Empty<ActiveShortTermQuest>();
+    private PlayerState _player = new();
     private int _selectedIndex;
+    private HubHeaderControls _header = null!;
     private GridContainer _questGrid = null!;
     private Label _title = null!;
     private Label _description = null!;
@@ -33,10 +35,12 @@ public partial class NoticeBoardView : Control
 
     public void Initialize(
         IReadOnlyList<ShortTermQuestDefinition> quests,
-        IReadOnlyList<ActiveShortTermQuest> activeQuests)
+        IReadOnlyList<ActiveShortTermQuest> activeQuests,
+        PlayerState? player = null)
     {
         _quests = quests;
         _activeQuests = activeQuests;
+        _player = player ?? new PlayerState();
         _selectedIndex = 0;
 
         if (IsNodeReady())
@@ -73,52 +77,8 @@ public partial class NoticeBoardView : Control
 
     private Control BuildHeader()
     {
-        var panel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2(0, 120),
-        };
-
-        var margin = new MarginContainer();
-        margin.AddThemeConstantOverride("margin_left", 24);
-        margin.AddThemeConstantOverride("margin_top", 18);
-        margin.AddThemeConstantOverride("margin_right", 24);
-        margin.AddThemeConstantOverride("margin_bottom", 18);
-        panel.AddChild(margin);
-
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 18);
-        margin.AddChild(row);
-
-        var backButton = new Button
-        {
-            Text = Text.Back,
-            CustomMinimumSize = new Vector2(92, 82),
-        };
-        backButton.AddThemeFontSizeOverride("font_size", 34);
-        backButton.Pressed += () => BackToTownRequested?.Invoke();
-        row.AddChild(backButton);
-
-        var title = new Label
-        {
-            Text = Text.BoardTitle,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        title.AddThemeFontSizeOverride("font_size", 46);
-        row.AddChild(title);
-
-        var refresh = new Label
-        {
-            Text = Text.RefreshHint,
-            CustomMinimumSize = new Vector2(190, 0),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-        };
-        refresh.AddThemeFontSizeOverride("font_size", 23);
-        row.AddChild(refresh);
-
+        var panel = HubHeaderBuilder.Build(Text.BackTownShort, out _header);
+        _header.ActionButton.Pressed += () => BackToTownRequested?.Invoke();
         return panel;
     }
 
@@ -139,6 +99,15 @@ public partial class NoticeBoardView : Control
         var layout = new VBoxContainer();
         layout.AddThemeConstantOverride("separation", 22);
         margin.AddChild(layout);
+
+        var title = new Label
+        {
+            Text = $"{Text.BoardTitle}\n{Text.RefreshHint}",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        title.AddThemeFontSizeOverride("font_size", 38);
+        layout.AddChild(title);
 
         _questGrid = new GridContainer
         {
@@ -264,6 +233,7 @@ public partial class NoticeBoardView : Control
         }
 
         ClearChildren(_questGrid);
+        HubHeaderBuilder.Refresh(_header, _player.Level, _player.Experience, _player.ExperienceToNextLevel, _player.Gold);
 
         for (var index = 0; index < _quests.Count; index++)
         {
@@ -417,8 +387,9 @@ public partial class NoticeBoardView : Control
     private static class Text
     {
         public const string Back = "<";
+        public const string BackTownShort = "\u8fd4\u56de";
         public const string BoardTitle = "\u516c\u544a\u6b04";
-        public const string RefreshHint = "24H\n\u56fa\u5b9a\u5237\u65b0";
+        public const string RefreshHint = "24H \u56fa\u5b9a\u5237\u65b0";
         public const string BackTown = "\u8fd4\u56de\u57ce\u93ae";
         public const string EnterDungeon = "\u9032\u5165\u5730\u57ce";
         public const string RequirementTitle = "\u4efb\u52d9\u9700\u6c42";

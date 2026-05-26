@@ -10,6 +10,8 @@ public partial class TownView : Control
     public event Action? EnterDungeonRequested;
     public event Action? NoticeBoardRequested;
     public event Action? TavernRequested;
+    public event Action? MoonlightFountainRequested;
+    public event Action? HerbShopRequested;
     public event Action? ManualSaveRequested;
     public event Action? DeleteSaveRequested;
 
@@ -41,6 +43,12 @@ public partial class TownView : Control
         var tavern = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Tavern");
         tavern.MouseDefaultCursorShape = CursorShape.PointingHand;
         tavern.GuiInput += OnTavernInput;
+        var herbShop = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/HerbShop");
+        herbShop.MouseDefaultCursorShape = CursorShape.PointingHand;
+        herbShop.GuiInput += OnHerbShopInput;
+        var fountain = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Fountain");
+        fountain.MouseDefaultCursorShape = CursorShape.PointingHand;
+        fountain.GuiInput += OnFountainInput;
         BuildSettingsPanel();
         Refresh();
     }
@@ -219,6 +227,24 @@ public partial class TownView : Control
         if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
         {
             TavernRequested?.Invoke();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void OnHerbShopInput(InputEvent inputEvent)
+    {
+        if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            HerbShopRequested?.Invoke();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void OnFountainInput(InputEvent inputEvent)
+    {
+        if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            MoonlightFountainRequested?.Invoke();
             GetViewport().SetInputAsHandled();
         }
     }

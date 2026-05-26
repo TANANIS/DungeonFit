@@ -14,6 +14,8 @@ public partial class Main : Control
     private const string DungeonPlanScenePath = "res://Assets/Scenes/DungeonPlan.tscn";
     private const string NoticeBoardScenePath = "res://Assets/Scenes/NoticeBoard.tscn";
     private const string TavernScenePath = "res://Assets/Scenes/Tavern.tscn";
+    private const string BlacksmithScenePath = "res://Assets/Scenes/Blacksmith.tscn";
+    private const string ChurchScenePath = "res://Assets/Scenes/Church.tscn";
     private const string MoonlightFountainScenePath = "res://Assets/Scenes/MoonlightFountain.tscn";
     private const string HerbShopScenePath = "res://Assets/Scenes/HerbShop.tscn";
     private const string SetSummaryScenePath = "res://Assets/Scenes/SetSummary.tscn";
@@ -42,6 +44,16 @@ public partial class Main : Control
             AddChild(tavern);
             GD.Print("TAVERN_UI_LOADED");
             GD.Print($"TAVERN_SETTINGS_OPENED {tavern.SmokeOpenSettingsPanel()}");
+            var blacksmithScene = GD.Load<PackedScene>(BlacksmithScenePath);
+            var blacksmith = blacksmithScene.Instantiate<BlacksmithView>();
+            blacksmith.Initialize(tavernSession.BuildBlacksmithViewModel());
+            AddChild(blacksmith);
+            GD.Print("BLACKSMITH_UI_LOADED");
+            var churchScene = GD.Load<PackedScene>(ChurchScenePath);
+            var church = churchScene.Instantiate<ChurchView>();
+            church.Initialize(tavernSession.BuildChurchViewModel());
+            AddChild(church);
+            GD.Print("CHURCH_UI_LOADED");
             var moonScene = GD.Load<PackedScene>(MoonlightFountainScenePath);
             var moon = moonScene.Instantiate<MoonlightFountainView>();
             moon.Initialize(tavernSession.BuildMoonlightFountainViewModel());
@@ -63,12 +75,20 @@ public partial class Main : Control
     {
         _session.RefreshNoticeBoardIfExpired();
         var town = LoadView<TownView>(TownScenePath);
-        town.Initialize(_session.Player, _session.SelectedPlan, _session.LastRunSummary, _session.GetSaveStatus());
+        town.Initialize(
+            _session.Player,
+            _session.SelectedPlan,
+            _session.LastRunSummary,
+            _session.BuildIdleRewardViewModel(),
+            _session.GetSaveStatus());
         town.EnterDungeonRequested += ShowDungeonPlan;
         town.NoticeBoardRequested += ShowNoticeBoard;
         town.TavernRequested += () => ShowTavern();
+        town.BlacksmithRequested += () => ShowBlacksmith();
+        town.ChurchRequested += () => ShowChurch();
         town.MoonlightFountainRequested += ShowMoonlightFountain;
         town.HerbShopRequested += ShowHerbShop;
+        town.IdleRewardClaimed += () => ClaimIdleReward(town);
         town.ManualSaveRequested += () => ManualSave(town);
         town.DeleteSaveRequested += ShowTownAfterDeleteSave;
     }
@@ -152,6 +172,45 @@ public partial class Main : Control
         {
             _session.SetEquipmentLocked(itemId, isLocked);
             ShowTavern(filter, sort);
+        };
+    }
+
+    private void ShowBlacksmith(string? selectedItemId = null)
+    {
+        var blacksmith = LoadView<BlacksmithView>(BlacksmithScenePath);
+        blacksmith.Initialize(_session.BuildBlacksmithViewModel(selectedItemId));
+        blacksmith.BackToTownRequested += ShowTown;
+        blacksmith.EnhanceRequested += itemId =>
+        {
+            _session.EnhanceEquipment(itemId);
+            ShowBlacksmith(itemId);
+        };
+        blacksmith.DismantleRequested += itemId =>
+        {
+            _session.DismantleEnhancement(itemId);
+            ShowBlacksmith(itemId);
+        };
+    }
+
+    private void ShowChurch(string? selectedQuestId = null)
+    {
+        var church = LoadView<ChurchView>(ChurchScenePath);
+        church.Initialize(_session.BuildChurchViewModel(selectedQuestId));
+        church.BackToTownRequested += ShowTown;
+        church.OathAccepted += questId =>
+        {
+            _session.AcceptLongTermQuest(questId);
+            ShowChurch(questId);
+        };
+        church.OathAbandoned += () =>
+        {
+            _session.AbandonLongTermQuest();
+            ShowChurch(selectedQuestId);
+        };
+        church.OathRewardClaimed += () =>
+        {
+            _session.ClaimLongTermQuestReward();
+            ShowChurch(selectedQuestId);
         };
     }
 
@@ -251,7 +310,19 @@ public partial class Main : Control
     private void ManualSave(TownView town)
     {
         _session.ManualSave();
+        town.UpdateIdleReward(_session.BuildIdleRewardViewModel());
         town.UpdateSaveStatus(_session.GetSaveStatus());
+    }
+
+    private void ClaimIdleReward(TownView town)
+    {
+        _session.ClaimIdleRewards();
+        town.Initialize(
+            _session.Player,
+            _session.SelectedPlan,
+            _session.LastRunSummary,
+            _session.BuildIdleRewardViewModel(),
+            _session.GetSaveStatus());
     }
 
     private void ManualSave(TavernView tavern)

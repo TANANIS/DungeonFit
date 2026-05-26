@@ -143,7 +143,7 @@ size_flags_vertical = 3
 [node name="TavernLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Tavern"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 34
-text = "Tavern"
+text = "酒館"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -170,7 +170,7 @@ size_flags_vertical = 3
 [node name="NoticeLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/NoticeBoard"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Notice Board"
+text = "公告板"
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
@@ -198,14 +198,14 @@ size_flags_vertical = 3
 [node name="ChurchLabel" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Church"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Church"
+text = "教堂"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="TownHint" type="Label" parent="SafeMargin/Layout/TownStage/TownMargin/TownLayout"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "Buildings are visual anchors for later systems."
+text = "城鎮設施會隨著 MVP 逐步開放。"
 horizontal_alignment = 1
 autowrap_mode = 3
 
@@ -213,7 +213,7 @@ autowrap_mode = 3
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "Today Route: Preparing..."
+text = "今日路線：準備中..."
 horizontal_alignment = 1
 autowrap_mode = 3
 
@@ -239,7 +239,7 @@ layout_mode = 2
 [node name="IdleTokenLabel" type="Label" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleToken"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
-text = "IDLE"
+text = "探索"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -251,20 +251,20 @@ theme_override_constants/separation = 10
 [node name="IdleTitle" type="Label" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
-text = "Outdoor Exploration"
+text = "戶外探索"
 
 [node name="IdleStatus" type="Label" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 27
-text = "Outdoor exploration in progress."
+text = "戶外探索中。"
 autowrap_mode = 3
 
 [node name="LastReward" type="Label" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 25
-text = "No room rewards banked yet."
+text = "尚未暫存房間收益。"
 autowrap_mode = 3
 
 [node name="EnterDungeonButton" type="Button" parent="SafeMargin/Layout"]
@@ -272,4 +272,4 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 112)
 layout_mode = 2
 theme_override_font_sizes/font_size = 42
-text = "Enter Dungeon"
+text = "進入地城"

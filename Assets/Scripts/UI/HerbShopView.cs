@@ -68,9 +68,9 @@ public partial class HerbShopView : Control
         var heroLayout = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         heroLayout.AddThemeConstantOverride("separation", 12);
         hero.AddChild(heroLayout);
-        heroLayout.AddChild(CreateCenteredLabel("藥草鋪", 58));
-        heroLayout.AddChild(CreateCenteredLabel("藥水・恢復・補給", 30));
-        heroLayout.AddChild(CreateCenteredLabel("付費恢復生命值，並準備房間內補給。", 25));
+        heroLayout.AddChild(CreateCenteredLabel("草藥店", 58));
+        heroLayout.AddChild(CreateCenteredLabel("恢復生命，補充冒險藥水", 30));
+        heroLayout.AddChild(CreateCenteredLabel("準備好再回到地城，下一個房間會輕鬆一點。", 25));
 
         var heal = new PanelContainer { CustomMinimumSize = new Vector2(0, 260) };
         layout.AddChild(heal);
@@ -79,7 +79,7 @@ public partial class HerbShopView : Control
         var healLayout = new VBoxContainer();
         healLayout.AddThemeConstantOverride("separation", 14);
         healMargin.AddChild(healLayout);
-        healLayout.AddChild(CreateLabel("立即治療", 38));
+        healLayout.AddChild(CreateLabel("生命恢復", 38));
         _hpLabel = CreateLabel(string.Empty, 30);
         healLayout.AddChild(_hpLabel);
         _hpBar = new ProgressBar { ShowPercentage = false, CustomMinimumSize = new Vector2(0, 24) };
@@ -103,14 +103,14 @@ public partial class HerbShopView : Control
         var supplyLayout = new VBoxContainer();
         supplyLayout.AddThemeConstantOverride("separation", 18);
         supplyMargin.AddChild(supplyLayout);
-        supplyLayout.AddChild(CreateLabel("補給品", 38));
-        supplyLayout.AddChild(CreateLabel("小型藥水：房間挑戰中恢復 30% HP。", 27));
+        supplyLayout.AddChild(CreateLabel("冒險補給", 38));
+        supplyLayout.AddChild(CreateLabel("小型藥水可在房間內使用，恢復 30% HP。", 27));
         _potionStatus = CreateLabel(string.Empty, 27);
         supplyLayout.AddChild(_potionStatus);
         _potionButton = CreateButton("購買小型藥水\n50 Gold", 0, 92, 30);
         _potionButton.Pressed += () => PotionPurchaseRequested?.Invoke();
         supplyLayout.AddChild(_potionButton);
-        supplyLayout.AddChild(CreateCenteredLabel("補給品可於房間挑戰中使用。", 24));
+        supplyLayout.AddChild(CreateCenteredLabel("每日最多購買 3 瓶，房間中最多攜帶 3 瓶。", 24));
 
         var bottomButton = CreateButton("返回城鎮", 0, 112, 42);
         bottomButton.Pressed += () => BackToTownRequested?.Invoke();

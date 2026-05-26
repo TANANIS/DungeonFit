@@ -5,7 +5,7 @@ namespace DungeonFit.Gameplay;
 
 public sealed class SaveGameState
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 8;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -29,6 +29,10 @@ public sealed class SaveGameState
 
     public int HerbShopPotionPurchasesToday { get; set; }
 
+    public System.DateTime? IdleLastCalculatedAtUtc { get; set; }
+
+    public int UnclaimedIdleGold { get; set; }
+
     public List<EquipmentItem>? Inventory { get; set; } = new();
 
     public EquipmentLoadout? EquipmentLoadout { get; set; } = new();
@@ -50,6 +54,12 @@ public sealed class SaveGameState
     public List<ActiveShortTermQuest>? ActiveShortTermQuests { get; set; } = new();
 
     public ActiveShortTermQuest? ActiveShortTermQuest { get; set; }
+
+    public ActiveLongTermQuest? ActiveLongTermQuest { get; set; }
+
+    public List<string>? ClaimedLongTermQuestIds { get; set; } = new();
+
+    public List<string>? UnlockedTitles { get; set; } = new();
 }
 
 public sealed class SavedStageResult

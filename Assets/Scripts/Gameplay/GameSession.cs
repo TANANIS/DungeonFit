@@ -18,11 +18,15 @@ public sealed class GameSession
     private const int SmallPotionCost = 50;
     private const int SmallPotionDailyPurchaseLimit = 3;
     private const int SmallPotionCarryLimit = 3;
+    private const int IdleRewardIntervalMinutes = 10;
+    private const int IdleRewardGoldPerInterval = 1;
+    private const int IdleRewardMaxUnclaimedGold = 72;
 
     private readonly TaskCatalog _taskCatalog = new();
     private readonly DungeonRunService _dungeonRunService = new();
     private readonly DungeonRouteRules _routeRules = new();
     private readonly ShortTermQuestCatalog _shortTermQuestCatalog = new();
+    private readonly LongTermQuestCatalog _longTermQuestCatalog = new();
     private readonly SaveService _saveService = new();
     private readonly bool _persistenceEnabled;
     private string _noticeBoardRefreshKey;
@@ -31,12 +35,15 @@ public sealed class GameSession
     private bool _moonlightRecoveryUsed;
     private int _smallPotionCount;
     private int _herbShopPotionPurchasesToday;
+    private DateTime _idleLastCalculatedAtUtc;
+    private int _unclaimedIdleGold;
 
     public GameSession(bool persistenceEnabled = true)
     {
         _persistenceEnabled = persistenceEnabled;
         _noticeBoardRefreshKey = GetTodayRefreshKey();
         _dailyStateKey = GetTodayRefreshKey();
+        _idleLastCalculatedAtUtc = GetUtcNow();
         SelectedDungeonRoute = new List<DungeonRouteSlot>();
         SelectedPlan = DungeonPlan.Empty;
 
@@ -62,6 +69,12 @@ public sealed class GameSession
 
     public IReadOnlyList<ActiveShortTermQuest> ActiveShortTermQuests { get; private set; } = new List<ActiveShortTermQuest>();
 
+    public ActiveLongTermQuest? ActiveLongTermQuest { get; private set; }
+
+    public IReadOnlyList<string> ClaimedLongTermQuestIds { get; private set; } = new List<string>();
+
+    public IReadOnlyList<string> UnlockedTitles { get; private set; } = new List<string>();
+
     public bool CanEditPlan => ActiveRun is null;
 
     public SaveStatus GetSaveStatus()
@@ -79,6 +92,7 @@ public sealed class GameSession
     public void ManualSave()
     {
         RefreshNoticeBoardIfExpired();
+        RefreshIdleRewards();
         Save();
     }
 
@@ -97,11 +111,16 @@ public sealed class GameSession
         LastSetSummary = null;
         DailyRewardsClaimed = false;
         ActiveShortTermQuests = new List<ActiveShortTermQuest>();
+        ActiveLongTermQuest = null;
+        ClaimedLongTermQuestIds = new List<string>();
+        UnlockedTitles = new List<string>();
         _noticeBoardRefreshKey = GetTodayRefreshKey();
         _dailyStateKey = GetTodayRefreshKey();
         _moonlightRecoveryUsed = false;
         _smallPotionCount = 0;
         _herbShopPotionPurchasesToday = 0;
+        _idleLastCalculatedAtUtc = GetUtcNow();
+        _unclaimedIdleGold = 0;
     }
 
     public void RefreshNoticeBoardIfExpired()
@@ -180,6 +199,89 @@ public sealed class GameSession
         return true;
     }
 
+    public ChurchViewModel BuildChurchViewModel(string? selectedQuestId = null)
+    {
+        RefreshNoticeBoardIfExpired();
+        return new ChurchViewModel(
+            Player,
+            ActiveLongTermQuest,
+            ClaimedLongTermQuestIds,
+            UnlockedTitles,
+            selectedQuestId);
+    }
+
+    public bool AcceptLongTermQuest(string questId)
+    {
+        RefreshNoticeBoardIfExpired();
+        if (ActiveLongTermQuest is not null ||
+            string.IsNullOrWhiteSpace(questId) ||
+            ClaimedLongTermQuestIds.Contains(questId))
+        {
+            return false;
+        }
+
+        var definition = _longTermQuestCatalog.GetById(questId);
+        if (definition is null)
+        {
+            return false;
+        }
+
+        ActiveLongTermQuest = new ActiveLongTermQuest
+        {
+            QuestId = definition.Id,
+            StartedAtUtc = GetUtcNow(),
+        };
+        Save();
+        return true;
+    }
+
+    public bool AbandonLongTermQuest()
+    {
+        RefreshNoticeBoardIfExpired();
+        if (ActiveLongTermQuest is null)
+        {
+            return false;
+        }
+
+        ActiveLongTermQuest = null;
+        Save();
+        return true;
+    }
+
+    public bool ClaimLongTermQuestReward()
+    {
+        RefreshNoticeBoardIfExpired();
+        var activeQuest = ActiveLongTermQuest;
+        if (activeQuest is null || activeQuest.IsClaimed)
+        {
+            return false;
+        }
+
+        var definition = _longTermQuestCatalog.GetById(activeQuest.QuestId);
+        if (definition is null ||
+            activeQuest.Progress < definition.RequiredAmount ||
+            ClaimedLongTermQuestIds.Contains(definition.Id))
+        {
+            return false;
+        }
+
+        Player.Apply(new RewardBundle(RewardSource.ChurchOath, definition.RewardGold, null));
+        ClaimedLongTermQuestIds = ClaimedLongTermQuestIds
+            .Append(definition.Id)
+            .Distinct()
+            .ToList();
+        UnlockedTitles = UnlockedTitles
+            .Append(definition.RewardTitle)
+            .Where(title => !string.IsNullOrWhiteSpace(title))
+            .Distinct()
+            .ToList();
+        activeQuest.IsCompleted = true;
+        activeQuest.IsClaimed = true;
+        ActiveLongTermQuest = null;
+        Save();
+        return true;
+    }
+
     public void UpdateDungeonRoute(IEnumerable<DungeonRouteSlot> dungeonRouteSlots)
     {
         if (!CanEditPlan)
@@ -244,6 +346,7 @@ public sealed class GameSession
             }
 
             UpdateShortTermQuestProgress(completedStage, summary);
+            UpdateLongTermQuestProgress(completedStage, summary);
             Save();
         }
     }
@@ -288,6 +391,82 @@ public sealed class GameSession
     {
         var usable = Math.Min(_smallPotionCount, SmallPotionCarryLimit);
         return new RoomSupplyViewModel(usable, SmallPotionCarryLimit, usable > 0);
+    }
+
+    public IdleRewardViewModel BuildIdleRewardViewModel(DateTime? nowUtc = null)
+    {
+        RefreshIdleRewards(nowUtc);
+        return new IdleRewardViewModel(
+            _unclaimedIdleGold,
+            IdleRewardMaxUnclaimedGold,
+            IdleRewardIntervalMinutes,
+            _unclaimedIdleGold > 0,
+            BuildIdleRewardStatusText());
+    }
+
+    public bool RefreshIdleRewards(DateTime? nowUtc = null, bool persist = true)
+    {
+        var now = NormalizeUtc(nowUtc ?? GetUtcNow());
+        if (_idleLastCalculatedAtUtc == default)
+        {
+            _idleLastCalculatedAtUtc = now;
+            if (persist)
+            {
+                Save();
+            }
+
+            return true;
+        }
+
+        if (now <= _idleLastCalculatedAtUtc)
+        {
+            return false;
+        }
+
+        if (_unclaimedIdleGold >= IdleRewardMaxUnclaimedGold)
+        {
+            _idleLastCalculatedAtUtc = now;
+            if (persist)
+            {
+                Save();
+            }
+
+            return true;
+        }
+
+        var elapsedIntervals = (int)((now - _idleLastCalculatedAtUtc).TotalMinutes / IdleRewardIntervalMinutes);
+        if (elapsedIntervals <= 0)
+        {
+            return false;
+        }
+
+        var claimableSpace = IdleRewardMaxUnclaimedGold - _unclaimedIdleGold;
+        var earnedGold = Math.Min(elapsedIntervals * IdleRewardGoldPerInterval, claimableSpace);
+        _unclaimedIdleGold += earnedGold;
+        _idleLastCalculatedAtUtc = _unclaimedIdleGold >= IdleRewardMaxUnclaimedGold
+            ? now
+            : _idleLastCalculatedAtUtc.AddMinutes(elapsedIntervals * IdleRewardIntervalMinutes);
+        if (persist)
+        {
+            Save();
+        }
+
+        return true;
+    }
+
+    public bool ClaimIdleRewards(DateTime? nowUtc = null)
+    {
+        RefreshIdleRewards(nowUtc);
+        if (_unclaimedIdleGold <= 0)
+        {
+            return false;
+        }
+
+        Player.Apply(new RewardBundle(RewardSource.IdleReward, _unclaimedIdleGold, null));
+        _unclaimedIdleGold = 0;
+        _idleLastCalculatedAtUtc = NormalizeUtc(nowUtc ?? GetUtcNow());
+        Save();
+        return true;
     }
 
     public bool UseMoonlightRecovery()
@@ -398,6 +577,11 @@ public sealed class GameSession
         return new TavernEquipmentViewModel(Player, filter, sort);
     }
 
+    public BlacksmithViewModel BuildBlacksmithViewModel(string? selectedItemId = null)
+    {
+        return new BlacksmithViewModel(Player, selectedItemId);
+    }
+
     public void ClaimDailyRewards()
     {
         if (ActiveRun is null || DailyRewardsClaimed)
@@ -442,6 +626,42 @@ public sealed class GameSession
     {
         var changed = Player.SetEquipmentLocked(itemId, isLocked);
 
+        if (changed)
+        {
+            Save();
+        }
+
+        return changed;
+    }
+
+    public bool EnhanceEquipment(string itemId)
+    {
+        var item = Player.Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null)
+        {
+            return false;
+        }
+
+        var cost = BlacksmithRules.GetEnhancementCost(item.EnhancementLevel);
+        var changed = Player.EnhanceEquipment(itemId, cost, BlacksmithRules.MaxEnhancementLevel);
+        if (changed)
+        {
+            Save();
+        }
+
+        return changed;
+    }
+
+    public bool DismantleEnhancement(string itemId)
+    {
+        var item = Player.Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null)
+        {
+            return false;
+        }
+
+        var refund = BlacksmithRules.GetDismantleRefund(item.EnhancementLevel);
+        var changed = Player.DismantleEnhancement(itemId, refund);
         if (changed)
         {
             Save();
@@ -507,6 +727,9 @@ public sealed class GameSession
         _moonlightRecoveryUsed = state.MoonlightRecoveryUsed;
         _smallPotionCount = Math.Max(0, state.SmallPotionCount);
         _herbShopPotionPurchasesToday = Math.Max(0, state.HerbShopPotionPurchasesToday);
+        _idleLastCalculatedAtUtc = NormalizeUtc(state.IdleLastCalculatedAtUtc ?? GetUtcNow());
+        _unclaimedIdleGold = Math.Clamp(state.UnclaimedIdleGold, 0, IdleRewardMaxUnclaimedGold);
+        var idleChanged = RefreshIdleRewards(persist: false);
         var hasActiveRun = state.HasActiveRun || state.ActiveStageResults!.Count > 0;
         SelectedDungeonRoute = hasActiveRun
             ? _routeRules.NormalizeRoute(state.SelectedDungeonRoute!)
@@ -517,11 +740,20 @@ public sealed class GameSession
         LastRunSummary = state.LastRunSummary;
         DailyRewardsClaimed = state.DailyRewardsClaimed;
         ActiveShortTermQuests = RestoreShortTermQuests(state);
+        ClaimedLongTermQuestIds = state.ClaimedLongTermQuestIds!
+            .Where(id => _longTermQuestCatalog.GetById(id) is not null)
+            .Distinct()
+            .ToList();
+        UnlockedTitles = state.UnlockedTitles!
+            .Where(title => !string.IsNullOrWhiteSpace(title))
+            .Distinct()
+            .ToList();
+        ActiveLongTermQuest = RestoreLongTermQuest(state.ActiveLongTermQuest, ClaimedLongTermQuestIds);
         var shouldSaveAfterRestore = RefreshNoticeBoardFromSave(state);
 
         if (!hasActiveRun || SelectedPlan.Stages.Count == 0)
         {
-            if (state.SelectedDungeonRoute!.Count > 0 || shouldSaveAfterRestore || saveAfterNormalize)
+            if (state.SelectedDungeonRoute!.Count > 0 || shouldSaveAfterRestore || saveAfterNormalize || idleChanged)
             {
                 Save();
             }
@@ -542,7 +774,7 @@ public sealed class GameSession
 
         ActiveRun.RestorePlayerHp(state.ActiveRunCurrentHp ?? Player.MaxHp);
 
-        if (shouldSaveAfterRestore || saveAfterNormalize)
+        if (shouldSaveAfterRestore || saveAfterNormalize || idleChanged)
         {
             Save();
         }
@@ -600,6 +832,24 @@ public sealed class GameSession
             changed = true;
         }
 
+        if (state.UnclaimedIdleGold < 0)
+        {
+            state.UnclaimedIdleGold = 0;
+            changed = true;
+        }
+
+        if (state.UnclaimedIdleGold > IdleRewardMaxUnclaimedGold)
+        {
+            state.UnclaimedIdleGold = IdleRewardMaxUnclaimedGold;
+            changed = true;
+        }
+
+        if (!state.IdleLastCalculatedAtUtc.HasValue)
+        {
+            state.IdleLastCalculatedAtUtc = GetUtcNow();
+            changed = true;
+        }
+
         if (state.Inventory is null)
         {
             state.Inventory = new List<EquipmentItem>();
@@ -630,8 +880,21 @@ public sealed class GameSession
             changed = true;
         }
 
+        if (state.ClaimedLongTermQuestIds is null)
+        {
+            state.ClaimedLongTermQuestIds = new List<string>();
+            changed = true;
+        }
+
+        if (state.UnlockedTitles is null)
+        {
+            state.UnlockedTitles = new List<string>();
+            changed = true;
+        }
+
         changed = NormalizeInventory(state.Inventory) || changed;
         changed = NormalizeLoadout(state.Inventory, state.EquipmentLoadout) || changed;
+        changed = NormalizeLongTermQuestState(state) || changed;
 
         if (!state.CurrentHp.HasValue)
         {
@@ -691,6 +954,13 @@ public sealed class GameSession
                 changed = true;
                 seenIds.Add(item.Id);
             }
+
+            var normalizedEnhancementLevel = BlacksmithRules.ClampEnhancementLevel(item.EnhancementLevel);
+            if (item.EnhancementLevel != normalizedEnhancementLevel)
+            {
+                item.EnhancementLevel = normalizedEnhancementLevel;
+                changed = true;
+            }
         }
 
         return changed;
@@ -749,6 +1019,8 @@ public sealed class GameSession
             DailyBlessingId = Player.DailyBlessingId,
             SmallPotionCount = _smallPotionCount,
             HerbShopPotionPurchasesToday = _herbShopPotionPurchasesToday,
+            IdleLastCalculatedAtUtc = _idleLastCalculatedAtUtc,
+            UnclaimedIdleGold = _unclaimedIdleGold,
             Inventory = new List<EquipmentItem>(Player.Inventory),
             EquipmentLoadout = new EquipmentLoadout
             {
@@ -763,6 +1035,9 @@ public sealed class GameSession
             LastRunSummary = LastRunSummary,
             NoticeBoardRefreshKey = _noticeBoardRefreshKey,
             ActiveShortTermQuests = ActiveShortTermQuests.ToList(),
+            ActiveLongTermQuest = ActiveLongTermQuest,
+            ClaimedLongTermQuestIds = ClaimedLongTermQuestIds.ToList(),
+            UnlockedTitles = UnlockedTitles.ToList(),
         };
 
         if (ActiveRun is not null)
@@ -804,6 +1079,94 @@ public sealed class GameSession
         }
 
         return quests;
+    }
+
+    private ActiveLongTermQuest? RestoreLongTermQuest(
+        ActiveLongTermQuest? activeQuest,
+        IReadOnlyList<string> claimedQuestIds)
+    {
+        if (activeQuest is null ||
+            string.IsNullOrWhiteSpace(activeQuest.QuestId) ||
+            claimedQuestIds.Contains(activeQuest.QuestId))
+        {
+            return null;
+        }
+
+        var definition = _longTermQuestCatalog.GetById(activeQuest.QuestId);
+        if (definition is null)
+        {
+            return null;
+        }
+
+        activeQuest.Progress = Math.Clamp(activeQuest.Progress, 0, definition.RequiredAmount);
+        activeQuest.IsCompleted = activeQuest.Progress >= definition.RequiredAmount;
+        return activeQuest;
+    }
+
+    private static bool NormalizeLongTermQuestState(SaveGameState state)
+    {
+        var changed = false;
+        var catalog = new LongTermQuestCatalog();
+        var claimed = state.ClaimedLongTermQuestIds!
+            .Where(id => catalog.GetById(id) is not null)
+            .Distinct()
+            .ToList();
+        if (claimed.Count != state.ClaimedLongTermQuestIds!.Count)
+        {
+            state.ClaimedLongTermQuestIds = claimed;
+            changed = true;
+        }
+
+        var titles = state.UnlockedTitles!
+            .Where(title => !string.IsNullOrWhiteSpace(title))
+            .Distinct()
+            .ToList();
+        if (titles.Count != state.UnlockedTitles!.Count)
+        {
+            state.UnlockedTitles = titles;
+            changed = true;
+        }
+
+        var activeQuest = state.ActiveLongTermQuest;
+        if (activeQuest is null)
+        {
+            return changed;
+        }
+
+        var definition = catalog.GetById(activeQuest.QuestId);
+        if (definition is null || claimed.Contains(activeQuest.QuestId))
+        {
+            state.ActiveLongTermQuest = null;
+            return true;
+        }
+
+        var normalizedProgress = Math.Clamp(activeQuest.Progress, 0, definition.RequiredAmount);
+        if (normalizedProgress != activeQuest.Progress)
+        {
+            activeQuest.Progress = normalizedProgress;
+            changed = true;
+        }
+
+        var isCompleted = activeQuest.Progress >= definition.RequiredAmount;
+        if (activeQuest.IsCompleted != isCompleted)
+        {
+            activeQuest.IsCompleted = isCompleted;
+            changed = true;
+        }
+
+        if (activeQuest.IsClaimed)
+        {
+            activeQuest.IsClaimed = false;
+            changed = true;
+        }
+
+        if (activeQuest.StartedAtUtc == default)
+        {
+            activeQuest.StartedAtUtc = GetUtcNow();
+            changed = true;
+        }
+
+        return changed;
     }
 
     private bool RefreshNoticeBoardFromSave(SaveGameState state)
@@ -869,6 +1232,28 @@ public sealed class GameSession
         return DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
+    private string BuildIdleRewardStatusText()
+    {
+        return _unclaimedIdleGold <= 0
+            ? $"戶外探索中。每 {IdleRewardIntervalMinutes} 分鐘累積 1 金幣。"
+            : $"可領取 {_unclaimedIdleGold} / {IdleRewardMaxUnclaimedGold} 金幣。";
+    }
+
+    private static DateTime GetUtcNow()
+    {
+        return DateTime.UtcNow;
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+    }
+
     private void UpdateShortTermQuestProgress(TaskTemplate completedStage, RunSummary summary)
     {
         if (summary.CompletedSets <= 0 || ActiveShortTermQuests.Count == 0)
@@ -900,6 +1285,47 @@ public sealed class GameSession
             QuestId = activeQuest.QuestId,
             Progress = System.Math.Min(activeQuest.Progress + 1, definition.RequiredAmount),
             IsClaimed = activeQuest.IsClaimed,
+        };
+    }
+
+    private void UpdateLongTermQuestProgress(TaskTemplate completedStage, RunSummary summary)
+    {
+        var activeQuest = ActiveLongTermQuest;
+        if (activeQuest is null || activeQuest.IsClaimed)
+        {
+            return;
+        }
+
+        var definition = _longTermQuestCatalog.GetById(activeQuest.QuestId);
+        if (definition is null || activeQuest.Progress >= definition.RequiredAmount)
+        {
+            return;
+        }
+
+        var progressGain = CalculateLongTermQuestProgressGain(definition, completedStage, summary);
+        if (progressGain <= 0)
+        {
+            return;
+        }
+
+        activeQuest.Progress = Math.Min(definition.RequiredAmount, activeQuest.Progress + progressGain);
+        activeQuest.IsCompleted = activeQuest.Progress >= definition.RequiredAmount;
+    }
+
+    private static int CalculateLongTermQuestProgressGain(
+        LongTermQuestDefinition definition,
+        TaskTemplate completedStage,
+        RunSummary summary)
+    {
+        return definition.ObjectiveType switch
+        {
+            LongTermQuestObjectiveType.CompleteRooms => summary.CompletedSets > 0 ? 1 : 0,
+            LongTermQuestObjectiveType.CompleteDungeonTypeRooms =>
+                summary.CompletedSets > 0 && LongTermQuestCatalog.MatchesTarget(definition, completedStage.DungeonTypeId) ? 1 : 0,
+            LongTermQuestObjectiveType.DefeatBosses =>
+                summary.CombatResults?.Count(result => result.IsBoss && result.EnemyDefeated) ?? 0,
+            LongTermQuestObjectiveType.EarnGold => Math.Max(0, summary.Reward.Gold),
+            _ => 0,
         };
     }
 

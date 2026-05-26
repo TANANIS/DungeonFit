@@ -6,6 +6,9 @@ namespace DungeonFit.UI;
 
 public sealed class BattleEncounterView
 {
+    private const double EnemyCounterImpactDelaySeconds = 0.22;
+    private const double HitRecoverySeconds = 0.28;
+
     private readonly BattleActorView _player;
     private readonly BattleActorView _enemy;
     private readonly Control _stage;
@@ -89,9 +92,6 @@ public sealed class BattleEncounterView
             return;
         }
 
-        _player.SetState(GetPlayerPeakState(result));
-        _enemy.SetState(GetEnemyPeakState(result));
-        RefreshHealth(progress, state);
         _enemyName.Text = result.IsMovingAfterKill
             ? "\u6575\u4eba\u5df2\u5012\u4e0b\uff0c\u524d\u9032\u4e2d"
             : result.EnemyAttacked
@@ -100,8 +100,18 @@ public sealed class BattleEncounterView
                     ? string.Format("\u547d\u4e2d -{0}", result.DamageDealt)
                     : "\u8eb2\u907f\u4e2d";
 
+        if (result.EnemyAttacked && result.DamageTaken > 0)
+        {
+            ShowEnemyCounterWindup(progress, result);
+            return;
+        }
+
+        _player.SetState(GetPlayerPeakState(result));
+        _enemy.SetState(GetEnemyPeakState(result));
+        RefreshHealth(progress, state);
+
         _attackTween = _stage.CreateTween();
-        _attackTween.TweenInterval(0.3);
+        _attackTween.TweenInterval(HitRecoverySeconds);
         _attackTween.TweenCallback(Callable.From(() =>
         {
             if (progress.IsComplete || progress.IsSkipped)
@@ -181,6 +191,38 @@ public sealed class BattleEncounterView
     private int _playerHpSnapshot = 1;
     private int _playerMaxHpSnapshot = 1;
 
+    private void ShowEnemyCounterWindup(RoomProgress progress, CombatRepResult result)
+    {
+        _player.SetState(result.WasEvading ? BattleActorState.Evading : BattleActorState.Active);
+        _enemy.SetState(BattleActorState.Active);
+        RefreshHealthForRep(progress, result, showPlayerAfterHit: false);
+
+        _attackTween = _stage.CreateTween();
+        _attackTween.TweenInterval(EnemyCounterImpactDelaySeconds);
+        _attackTween.TweenCallback(Callable.From(() =>
+        {
+            if (progress.IsComplete || progress.IsSkipped)
+            {
+                return;
+            }
+
+            _player.SetState(BattleActorState.Hit);
+            _enemy.SetState(result.EnemyDefeated ? BattleActorState.Hit : BattleActorState.Active);
+            RefreshHealthForRep(progress, result, showPlayerAfterHit: true);
+        }));
+        _attackTween.TweenInterval(HitRecoverySeconds);
+        _attackTween.TweenCallback(Callable.From(() =>
+        {
+            if (progress.IsComplete || progress.IsSkipped)
+            {
+                return;
+            }
+
+            _player.SetState(result.PlayerHpAfter <= 0 ? BattleActorState.Evading : BattleActorState.Idle);
+            _enemy.SetState(result.EnemyDefeated ? BattleActorState.Defeated : BattleActorState.Idle);
+        }));
+    }
+
     private static BattleActorState GetPlayerPeakState(CombatRepResult result)
     {
         if (result.IsMovingAfterKill)
@@ -238,6 +280,26 @@ public sealed class BattleEncounterView
 
         _bossHealth.Visible = false;
         _enemy.ShowHp(state.EnemyHp, state.EnemyMaxHp, isPlayer: false, isEvading: false);
+    }
+
+    private void RefreshHealthForRep(RoomProgress progress, CombatRepResult result, bool showPlayerAfterHit)
+    {
+        var playerHp = showPlayerAfterHit ? result.PlayerHpAfter : result.PlayerHpBefore;
+        _playerHpSnapshot = playerHp;
+        _playerMaxHpSnapshot = result.PlayerMaxHp;
+        _player.ShowHp(playerHp, result.PlayerMaxHp, isPlayer: true, isEvading: result.WasEvading);
+
+        if (progress.IsBossWave)
+        {
+            _enemy.HideHp();
+            _bossHealth.Visible = true;
+            _bossHealth.MaxValue = Mathf.Max(1, result.EnemyMaxHp);
+            _bossHealth.Value = Mathf.Clamp(result.EnemyHpAfter, 0, Mathf.Max(1, result.EnemyMaxHp));
+            return;
+        }
+
+        _bossHealth.Visible = false;
+        _enemy.ShowHp(result.EnemyHpAfter, result.EnemyMaxHp, isPlayer: false, isEvading: false);
     }
 
     private void PositionActors()

@@ -10,19 +10,24 @@ public partial class TownView : Control
     public event Action? EnterDungeonRequested;
     public event Action? NoticeBoardRequested;
     public event Action? TavernRequested;
+    public event Action? BlacksmithRequested;
     public event Action? MoonlightFountainRequested;
     public event Action? HerbShopRequested;
+    public event Action? ChurchRequested;
+    public event Action? IdleRewardClaimed;
     public event Action? ManualSaveRequested;
     public event Action? DeleteSaveRequested;
 
     private PlayerState _player = new();
     private DungeonPlan _todayPlan = null!;
     private RunSummary? _lastRunSummary;
+    private IdleRewardViewModel _idleReward = new(0, 72, 10, false, string.Empty);
     private SaveStatus? _saveStatus;
     private Label _levelLabel = null!;
     private Label _goldLabel = null!;
     private Label _todayChallenge = null!;
     private Label _idleStatus = null!;
+    private Button _idleClaimButton = null!;
     private Label _lastReward = null!;
     private Label _saveStatusLabel = null!;
     private PanelContainer _settingsPanel = null!;
@@ -34,6 +39,8 @@ public partial class TownView : Control
         _todayChallenge = GetNode<Label>("%TodayChallenge");
         _idleStatus = GetNode<Label>("%IdleStatus");
         _lastReward = GetNode<Label>("%LastReward");
+        _idleClaimButton = CreateIdleClaimButton();
+        GetNode<VBoxContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText").AddChild(_idleClaimButton);
 
         GetNode<Button>("%EnterDungeonButton").Pressed += RequestEnterDungeon;
         GetNode<Button>("%SettingsButton").Pressed += ShowSettings;
@@ -43,12 +50,18 @@ public partial class TownView : Control
         var tavern = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Tavern");
         tavern.MouseDefaultCursorShape = CursorShape.PointingHand;
         tavern.GuiInput += OnTavernInput;
+        var blacksmith = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/GeneralStore");
+        blacksmith.MouseDefaultCursorShape = CursorShape.PointingHand;
+        blacksmith.GuiInput += OnBlacksmithInput;
         var herbShop = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/HerbShop");
         herbShop.MouseDefaultCursorShape = CursorShape.PointingHand;
         herbShop.GuiInput += OnHerbShopInput;
         var fountain = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Fountain");
         fountain.MouseDefaultCursorShape = CursorShape.PointingHand;
         fountain.GuiInput += OnFountainInput;
+        var church = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Church");
+        church.MouseDefaultCursorShape = CursorShape.PointingHand;
+        church.GuiInput += OnChurchInput;
         BuildSettingsPanel();
         Refresh();
     }
@@ -57,11 +70,13 @@ public partial class TownView : Control
         PlayerState player,
         DungeonPlan todayPlan,
         RunSummary? lastRunSummary,
+        IdleRewardViewModel idleReward,
         SaveStatus saveStatus)
     {
         _player = player;
         _todayPlan = todayPlan;
         _lastRunSummary = lastRunSummary;
+        _idleReward = idleReward;
         _saveStatus = saveStatus;
 
         if (IsNodeReady())
@@ -76,6 +91,12 @@ public partial class TownView : Control
         RefreshSaveStatus();
     }
 
+    public void UpdateIdleReward(IdleRewardViewModel idleReward)
+    {
+        _idleReward = idleReward;
+        RefreshIdleReward();
+    }
+
     private void Refresh()
     {
         _levelLabel.Text = string.Format(Text.AdventurerLevelFormat, _player.Level);
@@ -85,7 +106,7 @@ public partial class TownView : Control
             : _todayPlan.Stages.Count == 0
                 ? Text.RouteEmpty
                 : string.Format(Text.RouteSummaryFormat, _todayPlan.DisplayName, _todayPlan.Stages.Count, _todayPlan.TotalSets);
-        _idleStatus.Text = Text.IdleStatus;
+        RefreshIdleReward();
         _lastReward.Text = _lastRunSummary is null
             ? Text.NoBankedReward
             : string.Format(
@@ -97,6 +118,23 @@ public partial class TownView : Control
                 _lastRunSummary.TotalSets,
                 _lastRunSummary.ExperienceGained);
         RefreshSaveStatus();
+    }
+
+    private void RefreshIdleReward()
+    {
+        _idleStatus.Text = string.IsNullOrWhiteSpace(_idleReward.StatusText)
+            ? Text.IdleStatus
+            : _idleReward.StatusText;
+
+        if (_idleClaimButton is null)
+        {
+            return;
+        }
+
+        _idleClaimButton.Disabled = !_idleReward.CanClaim;
+        _idleClaimButton.Text = _idleReward.CanClaim
+            ? string.Format(Text.ClaimIdleRewardFormat, _idleReward.UnclaimedGold)
+            : string.Format(Text.IdleRewardEmptyFormat, _idleReward.RewardIntervalMinutes);
     }
 
     private void RefreshSaveStatus()
@@ -196,6 +234,17 @@ public partial class TownView : Control
         return button;
     }
 
+    private Button CreateIdleClaimButton()
+    {
+        var button = new Button
+        {
+            CustomMinimumSize = new Vector2(0, 64),
+        };
+        button.AddThemeFontSizeOverride("font_size", 27);
+        button.Pressed += () => IdleRewardClaimed?.Invoke();
+        return button;
+    }
+
     private void ShowSettings()
     {
         _settingsPanel.Visible = true;
@@ -231,6 +280,15 @@ public partial class TownView : Control
         }
     }
 
+    private void OnBlacksmithInput(InputEvent inputEvent)
+    {
+        if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            BlacksmithRequested?.Invoke();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
     private void OnHerbShopInput(InputEvent inputEvent)
     {
         if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
@@ -245,6 +303,15 @@ public partial class TownView : Control
         if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
         {
             MoonlightFountainRequested?.Invoke();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void OnChurchInput(InputEvent inputEvent)
+    {
+        if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+        {
+            ChurchRequested?.Invoke();
             GetViewport().SetInputAsHandled();
         }
     }
@@ -267,6 +334,8 @@ public partial class TownView : Control
         public const string RouteEmpty = "\u4eca\u65e5\u8def\u7dda\uff1a\u5c1a\u672a\u898f\u5283";
         public const string RouteSummaryFormat = "\u4eca\u65e5\u8def\u7dda\uff1a{0}\n{1} \u623f\u9593  /  {2} \u7d44";
         public const string IdleStatus = "\u6236\u5916\u63a2\u7d22\u4e2d\u3002";
+        public const string ClaimIdleRewardFormat = "\u9818\u53d6\u63a2\u7d22\u6536\u76ca +{0} \u91d1\u5e63";
+        public const string IdleRewardEmptyFormat = "\u63a2\u7d22\u4e2d\uff1a\u6bcf {0} \u5206\u9418 +1 \u91d1\u5e63";
         public const string NoBankedReward = "\u5c1a\u672a\u66ab\u5b58\u623f\u9593\u6536\u76ca\u3002";
         public const string LastRewardFormat = "{0}\uff1a{1}\n{2}  \u7d44\u6578 {3} / {4}  EXP +{5}";
         public const string SettingsTitle = "\u8a2d\u5b9a";

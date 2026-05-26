@@ -82,9 +82,9 @@ public static class HubHeaderBuilder
 
     public static void Refresh(HubHeaderControls controls, int level, int experience, int experienceToNextLevel, int gold)
     {
-        controls.NameLevelLabel.Text = $"冒險者     Lv.{level}";
+        controls.NameLevelLabel.Text = $"冒險者    Lv.{level}";
         controls.ExpBar.MaxValue = Mathf.Max(1, experienceToNextLevel);
         controls.ExpBar.Value = Mathf.Clamp(experience, 0, Mathf.Max(1, experienceToNextLevel));
-        controls.GoldLabel.Text = $"Gold  {gold}";
+        controls.GoldLabel.Text = $"金幣  {gold}";
     }
 }

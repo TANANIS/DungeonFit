@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System;
 using System.Linq;
+using System.Text.Json;
 using DungeonFit.Core.Content;
 using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
@@ -66,6 +68,9 @@ public static class FlowSmokeTest
         session.CompleteDailyRun();
         lines.Add($"SESSION_AFTER_COMPLETE gold={session.Player.Gold}");
         lines.AddRange(RunSaveMigrationSmoke());
+        lines.AddRange(RunIdleRewardSmoke());
+        lines.AddRange(RunBlacksmithSmoke());
+        lines.AddRange(RunChurchSmoke());
         lines.AddRange(RunRecoveryAndSupplySmoke());
 
         var earlyExitSession = new GameSession(persistenceEnabled: false);
@@ -248,6 +253,8 @@ public static class FlowSmokeTest
         var missingChanged = GameSession.NormalizeSaveState(missingLoadoutState);
         yield return $"MIGRATION_MISSING changed={missingChanged} version={missingLoadoutState.Version} inventory={missingLoadoutState.Inventory?.Count} exp={missingLoadoutState.Experience}/{missingLoadoutState.ExperienceToNextLevel}";
         yield return $"MIGRATION_HP currentHp={missingLoadoutState.CurrentHp} dailyKey={(string.IsNullOrWhiteSpace(missingLoadoutState.DailyStateKey) ? "none" : "set")}";
+        yield return $"MIGRATION_IDLE unclaimed={missingLoadoutState.UnclaimedIdleGold} timestamp={missingLoadoutState.IdleLastCalculatedAtUtc.HasValue}";
+        yield return $"MIGRATION_CHURCH active={(missingLoadoutState.ActiveLongTermQuest is null ? "none" : missingLoadoutState.ActiveLongTermQuest.QuestId)} claimed={missingLoadoutState.ClaimedLongTermQuestIds?.Count ?? -1} titles={missingLoadoutState.UnlockedTitles?.Count ?? -1}";
 
         var duplicateOne = new EquipmentItem(
             "duplicate_item",
@@ -279,9 +286,184 @@ public static class FlowSmokeTest
                 AccessoryId = "duplicate_item",
             },
         };
+        invalidLoadoutState.Inventory[0].EnhancementLevel = 9;
+        invalidLoadoutState.Inventory[1].EnhancementLevel = -2;
         var invalidChanged = GameSession.NormalizeSaveState(invalidLoadoutState);
         var distinctIds = invalidLoadoutState.Inventory?.Select(item => item.Id).Distinct().Count() ?? 0;
         yield return $"MIGRATION_INVALID changed={invalidChanged} version={invalidLoadoutState.Version} distinctIds={distinctIds} weapon={invalidLoadoutState.EquipmentLoadout?.WeaponId ?? "none"} accessory={invalidLoadoutState.EquipmentLoadout?.AccessoryId ?? "none"}";
+        yield return $"MIGRATION_ENHANCEMENT first={invalidLoadoutState.Inventory![0].EnhancementLevel} second={invalidLoadoutState.Inventory[1].EnhancementLevel}";
+    }
+
+    private static IEnumerable<string> RunIdleRewardSmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        var start = DateTime.UtcNow;
+        session.RefreshIdleRewards(start);
+        var fresh = session.BuildIdleRewardViewModel(start);
+        yield return $"IDLE_FRESH gold={fresh.UnclaimedGold} canClaim={fresh.CanClaim}";
+
+        session.RefreshIdleRewards(start.AddMinutes(10));
+        var tenMinutes = session.BuildIdleRewardViewModel(start.AddMinutes(10));
+        yield return $"IDLE_TEN_MINUTES gold={tenMinutes.UnclaimedGold} canClaim={tenMinutes.CanClaim}";
+
+        var firstClaim = session.ClaimIdleRewards(start.AddMinutes(10));
+        var secondClaim = session.ClaimIdleRewards(start.AddMinutes(10));
+        yield return $"IDLE_CLAIM first={firstClaim} second={secondClaim} playerGold={session.Player.Gold}";
+
+        session.RefreshIdleRewards(start.AddHours(24));
+        var capped = session.BuildIdleRewardViewModel(start.AddHours(24));
+        yield return $"IDLE_CAP gold={capped.UnclaimedGold}/{capped.MaxUnclaimedGold}";
+
+        session.ClaimIdleRewards(start.AddHours(24));
+        session.RefreshIdleRewards(start.AddHours(24).AddMinutes(9));
+        var partial = session.BuildIdleRewardViewModel(start.AddHours(24).AddMinutes(9));
+        session.RefreshIdleRewards(start.AddHours(24).AddMinutes(10));
+        var nextTick = session.BuildIdleRewardViewModel(start.AddHours(24).AddMinutes(10));
+        yield return $"IDLE_PARTIAL before={partial.UnclaimedGold} after={nextTick.UnclaimedGold}";
+    }
+
+    private static IEnumerable<string> RunBlacksmithSmoke()
+    {
+        var empty = new GameSession(persistenceEnabled: false);
+        var emptyModel = empty.BuildBlacksmithViewModel();
+        yield return $"BLACKSMITH_EMPTY items={emptyModel.Items.Count} canEnhance={emptyModel.CanEnhance}";
+
+        var item = new EquipmentItem(
+            "blacksmith_smoke_sword",
+            "moon_iron_shortsword",
+            "Smoke Sword",
+            EquipmentSlot.Weapon,
+            "chest",
+            "\u666e\u901a",
+            5,
+            80,
+            new[] { new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty) });
+        var session = new GameSession(persistenceEnabled: false);
+        session.Player.Load(40, new[] { item });
+        yield return $"BLACKSMITH_NO_GOLD enhance={session.EnhanceEquipment(item.Id)} gold={session.Player.Gold} level={item.EnhancementLevel}";
+
+        session.Player.Load(1000, new[] { item });
+        session.EquipItem(item.Id);
+        session.SetEquipmentLocked(item.Id, true);
+        var scoreBefore = session.Player.EquipmentScore;
+        var enhanceOne = session.EnhanceEquipment(item.Id);
+        yield return $"BLACKSMITH_ENHANCE equippedLocked={enhanceOne} gold={session.Player.Gold} level={item.EnhancementLevel} power={item.Power} score={scoreBefore}->{session.Player.EquipmentScore}";
+
+        while (session.EnhanceEquipment(item.Id))
+        {
+        }
+
+        yield return $"BLACKSMITH_CAP level={item.EnhancementLevel} power={item.Power} extra={session.EnhanceEquipment(item.Id)}";
+
+        var serialized = JsonSerializer.Serialize(new SaveGameState
+        {
+            Inventory = new List<EquipmentItem> { item },
+        });
+        var restored = JsonSerializer.Deserialize<SaveGameState>(serialized);
+        var restoredItem = restored?.Inventory?.FirstOrDefault();
+        yield return $"BLACKSMITH_SAVE_ROUNDTRIP level={restoredItem?.EnhancementLevel ?? -1} power={restoredItem?.Power ?? -1}";
+
+        var goldBeforeDismantle = session.Player.Gold;
+        var dismantle = session.DismantleEnhancement(item.Id);
+        yield return $"BLACKSMITH_DISMANTLE result={dismantle} level={item.EnhancementLevel} power={item.Power} refund={session.Player.Gold - goldBeforeDismantle}";
+        yield return $"BLACKSMITH_DISMANTLE_ZERO result={session.DismantleEnhancement(item.Id)} level={item.EnhancementLevel}";
+    }
+
+    private static IEnumerable<string> RunChurchSmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        var fresh = session.BuildChurchViewModel();
+        yield return $"CHURCH_EMPTY cards={fresh.Cards.Count} active={fresh.ActiveQuest?.QuestId ?? "none"} candidates={fresh.Cards.Count(card => card.CanSelect)} locked={fresh.Cards.Count(card => card.Status == ChurchQuestStatus.Locked)}";
+
+        var acceptMayor = session.AcceptLongTermQuest("mayor_missing_daughter");
+        var acceptSecond = session.AcceptLongTermQuest("blacksmith_unfinished_blade");
+        yield return $"CHURCH_ACCEPT first={acceptMayor} second={acceptSecond} active={session.ActiveLongTermQuest?.QuestId ?? "none"}";
+
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+        });
+        session.StartOrGetActiveRun();
+        for (var index = 0; index < 3; index++)
+        {
+            var stage = session.ActiveRun!.CurrentStage;
+            session.RecordStageResult(BuildChurchStageSummary(stage, 50, defeatedBoss: true));
+        }
+
+        yield return $"CHURCH_PROGRESS quest={session.ActiveLongTermQuest?.QuestId ?? "none"} progress={session.ActiveLongTermQuest?.Progress ?? -1} completed={session.ActiveLongTermQuest?.IsCompleted ?? false}";
+        var goldBeforeClaim = session.Player.Gold;
+        var claim = session.ClaimLongTermQuestReward();
+        var claimAgain = session.ClaimLongTermQuestReward();
+        yield return $"CHURCH_CLAIM result={claim} again={claimAgain} gold={goldBeforeClaim}->{session.Player.Gold} titles={session.UnlockedTitles.Count} active={session.ActiveLongTermQuest?.QuestId ?? "none"}";
+
+        var bossSession = new GameSession(persistenceEnabled: false);
+        bossSession.AcceptLongTermQuest("blacksmith_unfinished_blade");
+        bossSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+        bossSession.StartOrGetActiveRun();
+        var bossStage = bossSession.ActiveRun!.CurrentStage;
+        bossSession.RecordStageResult(BuildChurchStageSummary(bossStage, 10, defeatedBoss: false));
+        var afterNoBoss = bossSession.ActiveLongTermQuest?.Progress ?? -1;
+        bossSession.RecordStageResult(BuildChurchStageSummary(bossStage, 10, defeatedBoss: true));
+        yield return $"CHURCH_BOSS_PROGRESS noBoss={afterNoBoss} boss={bossSession.ActiveLongTermQuest?.Progress ?? -1}";
+
+        var goldSession = new GameSession(persistenceEnabled: false);
+        goldSession.AcceptLongTermQuest("herbalist_moondew_research");
+        goldSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("back", 4, 12, "Training Loop", 90),
+        });
+        goldSession.StartOrGetActiveRun();
+        var goldStage = goldSession.ActiveRun!.CurrentStage;
+        goldSession.RecordStageResult(BuildChurchStageSummary(goldStage, 300, defeatedBoss: true));
+        yield return $"CHURCH_GOLD_PROGRESS progress={goldSession.ActiveLongTermQuest?.Progress ?? -1}";
+
+        var abandon = goldSession.AbandonLongTermQuest();
+        yield return $"CHURCH_ABANDON result={abandon} active={goldSession.ActiveLongTermQuest?.QuestId ?? "none"}";
+
+        var serialized = JsonSerializer.Serialize(new SaveGameState
+        {
+            ActiveLongTermQuest = new ActiveLongTermQuest
+            {
+                QuestId = "priest_faint_faith",
+                Progress = 2,
+            },
+            UnlockedTitles = new List<string> { "尋光者" },
+            ClaimedLongTermQuestIds = new List<string> { "mayor_missing_daughter" },
+        });
+        var restored = JsonSerializer.Deserialize<SaveGameState>(serialized)!;
+        var normalized = GameSession.NormalizeSaveState(restored);
+        yield return $"CHURCH_SAVE_ROUNDTRIP normalized={normalized} active={restored.ActiveLongTermQuest?.QuestId ?? "none"} progress={restored.ActiveLongTermQuest?.Progress ?? -1} titles={restored.UnlockedTitles?.Count ?? -1}";
+    }
+
+    private static RunSummary BuildChurchStageSummary(TaskTemplate stage, int gold, bool defeatedBoss)
+    {
+        return new RunSummary(
+            "Church Smoke",
+            stage.RoomName,
+            stage.TotalSets,
+            stage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, gold, null),
+            CompletedResults(stage.TotalSets),
+            ClearedCombatResults(stage.TotalSets)
+                .Select(result => result with
+                {
+                    EnemyDefeated = !result.IsBoss || defeatedBoss,
+                    RewardKind = !result.IsBoss || defeatedBoss ? BankedRewardKind.Chest : BankedRewardKind.GoldOnly,
+                })
+                .ToArray(),
+            24);
     }
 
     private static IEnumerable<string> RunRecoveryAndSupplySmoke()

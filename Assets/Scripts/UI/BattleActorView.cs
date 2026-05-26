@@ -116,7 +116,7 @@ public sealed class BattleActorView
         _hpBar.MaxValue = safeMax;
         _hpBar.Value = Mathf.Clamp(currentHp, 0, safeMax);
         _hpLabel.Text = isPlayer && isEvading
-            ? $"躲避中 {currentHp} / {safeMax}"
+            ? $"迴避中 HP {currentHp} / {safeMax}"
             : $"HP {currentHp} / {safeMax}";
         ApplyHpColor(isPlayer, isEvading);
         CenterSprite();

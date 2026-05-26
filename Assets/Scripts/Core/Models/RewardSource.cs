@@ -4,5 +4,7 @@ public enum RewardSource
 {
 	DungeonRoom,
 	ShopChest,
-	NoticeBoardQuest
+	NoticeBoardQuest,
+	IdleReward,
+	ChurchOath
 }

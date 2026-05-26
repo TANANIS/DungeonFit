@@ -21,6 +21,8 @@ public sealed class EquipmentItem
 
     public int SellPrice { get; set; }
 
+    public int EnhancementLevel { get; set; }
+
     public bool IsLocked { get; set; }
 
     public List<EquipmentModifier> Modifiers { get; set; } = new();

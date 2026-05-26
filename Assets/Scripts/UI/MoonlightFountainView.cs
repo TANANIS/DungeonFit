@@ -69,8 +69,8 @@ public partial class MoonlightFountainView : Control
         heroLayout.AddThemeConstantOverride("separation", 12);
         hero.AddChild(heroLayout);
         heroLayout.AddChild(CreateCenteredLabel("月光泉", 62));
-        heroLayout.AddChild(CreateCenteredLabel("免費恢復・今日祝福", 30));
-        heroLayout.AddChild(CreateCenteredLabel("月光仍可回應你的祈願。", 26));
+        heroLayout.AddChild(CreateCenteredLabel("恢復體力，選擇今日祝福", 30));
+        heroLayout.AddChild(CreateCenteredLabel("祝福會在下一次地城探險中生效。", 26));
 
         var recovery = new PanelContainer { CustomMinimumSize = new Vector2(0, 230) };
         layout.AddChild(recovery);
@@ -79,7 +79,7 @@ public partial class MoonlightFountainView : Control
         var recoveryLayout = new VBoxContainer();
         recoveryLayout.AddThemeConstantOverride("separation", 14);
         recoveryMargin.AddChild(recoveryLayout);
-        recoveryLayout.AddChild(CreateLabel("月光洗禮", 38));
+        recoveryLayout.AddChild(CreateLabel("月光恢復", 38));
         _hpLabel = CreateLabel(string.Empty, 30);
         recoveryLayout.AddChild(_hpLabel);
         _hpBar = new ProgressBar { ShowPercentage = false, CustomMinimumSize = new Vector2(0, 24) };
@@ -103,9 +103,9 @@ public partial class MoonlightFountainView : Control
 
         foreach (var blessingOption in new[]
         {
-            (DailyBlessing.MoonGuard, "月光庇護\n最大 HP +10%"),
-            (DailyBlessing.BladeMoon, "鋒刃月影\n攻擊 +5%"),
-            (DailyBlessing.StarlightGold, "拾荒星光\nGold +10%"),
+            (DailyBlessing.MoonGuard, "月守\n最大 HP +10%"),
+            (DailyBlessing.BladeMoon, "刃月\n攻擊 +5%"),
+            (DailyBlessing.StarlightGold, "星光金幣\nGold +10%"),
         })
         {
             var button = CreateButton(blessingOption.Item2, 0, 150, 28);
@@ -148,7 +148,7 @@ public partial class MoonlightFountainView : Control
 
         _statusLabel.Text = _model.SelectedBlessingId == DailyBlessing.None
             ? _model.CanSelectBlessing ? "選擇 1 項今日祝福。" : "冒險中無法更換今日祝福。"
-            : "祝福效果僅在今日冒險中生效。";
+            : "祝福已選擇，今日無法再次更換。";
     }
 
     private static MarginContainer CreateMargin(int horizontal, int vertical)

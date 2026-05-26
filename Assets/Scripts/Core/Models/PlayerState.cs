@@ -224,6 +224,35 @@ public sealed class PlayerState
         return true;
     }
 
+    public bool EnhanceEquipment(string itemId, int cost, int maxEnhancementLevel)
+    {
+        var item = Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null ||
+            item.EnhancementLevel >= maxEnhancementLevel ||
+            !SpendGold(cost))
+        {
+            return false;
+        }
+
+        item.EnhancementLevel++;
+        item.Power++;
+        return true;
+    }
+
+    public bool DismantleEnhancement(string itemId, int refundGold)
+    {
+        var item = Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null || item.EnhancementLevel <= 0)
+        {
+            return false;
+        }
+
+        item.Power = Math.Max(0, item.Power - item.EnhancementLevel);
+        item.EnhancementLevel = 0;
+        Gold += Math.Max(0, refundGold);
+        return true;
+    }
+
     public bool SellEquipment(string itemId)
     {
         var item = Inventory.FirstOrDefault(equipment => equipment.Id == itemId);

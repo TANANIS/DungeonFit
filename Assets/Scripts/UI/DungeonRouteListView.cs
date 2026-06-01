@@ -12,6 +12,7 @@ public sealed class DungeonRouteListView
     private readonly VBoxContainer _routeList;
     private readonly DungeonCategoryCatalog _categoryCatalog;
     private readonly MusicCatalog _musicCatalog;
+    private readonly ExerciseCatalog _exerciseCatalog = new();
 
     public DungeonRouteListView(
         VBoxContainer routeList,
@@ -60,7 +61,7 @@ public sealed class DungeonRouteListView
                 VerticalAlignment = VerticalAlignment.Center,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
             };
-            label.AddThemeFontSizeOverride("font_size", hasRouteSlot ? 27 : 26);
+            label.AddThemeFontSizeOverride("font_size", hasRouteSlot ? 25 : 26);
             row.AddChild(label);
 
             if (canEditPlan && hasRouteSlot)
@@ -93,12 +94,13 @@ public sealed class DungeonRouteListView
         {
             var slot = selectedDungeonRoute[index];
             var category = _categoryCatalog.GetById(slot.DungeonTypeId);
-            return $"{index + 1}. {category.ShortName}{Text.DungeonSuffix}  {slot.TargetSets} x {slot.TargetReps}  {GetMusicName(slot.MusicId)}  休息 {slot.RestSeconds}s";
+            var exercise = _exerciseCatalog.GetById(slot.DungeonTypeId, slot.ExerciseId);
+            return $"{index + 1}. {category.ShortName}{Text.DungeonSuffix} / {exercise.Name}  {slot.TargetSets} x {slot.TargetReps}  {GetMusicName(slot.MusicId)}  休息 {slot.RestSeconds}s";
         }
 
         var stage = plan.Stages[index];
         var lockedCategory = _categoryCatalog.GetById(stage.DungeonTypeId);
-        return $"{GetStageMarker(run, canEditPlan, index)} {index + 1}. {lockedCategory.ShortName}{Text.DungeonSuffix}  {stage.TotalSets} x {stage.TargetReps}  {GetMusicName(stage.MusicId)}  休息 {stage.RestSeconds}s";
+        return $"{GetStageMarker(run, canEditPlan, index)} {index + 1}. {lockedCategory.ShortName}{Text.DungeonSuffix} / {stage.ActionName}  {stage.TotalSets} x {stage.TargetReps}  {GetMusicName(stage.MusicId)}  休息 {stage.RestSeconds}s";
     }
 
     private static string GetStageMarker(DungeonRun? run, bool canEditPlan, int index)

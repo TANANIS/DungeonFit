@@ -34,7 +34,7 @@ public static class UiScreenshotTest
         var session = new GameSession(persistenceEnabled: false);
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90, "chest_push_up"),
             new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
             new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
             new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
@@ -57,6 +57,8 @@ public static class UiScreenshotTest
             session.CanEditPlan,
             session.ActiveShortTermQuests);
         lines.Add(await TryCapture(parent, plan, "DungeonPlan"));
+
+        lines.Add(await TryCaptureDungeonPlanDialog(parent, session));
 
         var activeRun = session.StartOrGetActiveRun();
         if (activeRun is null)
@@ -152,6 +154,12 @@ public static class UiScreenshotTest
         await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
         await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
 
+        return CaptureMounted(parent, view, name);
+    }
+
+    private static string CaptureMounted<TView>(Control parent, TView view, string name)
+        where TView : Control
+    {
         var path = $"{OutputDirectory}/{name}.png";
         var displayServerName = DisplayServer.GetName();
         if (displayServerName.Contains("headless", System.StringComparison.OrdinalIgnoreCase) ||
@@ -190,6 +198,43 @@ public static class UiScreenshotTest
         return error == Error.Ok
             ? $"UI_SCREENSHOT_SAVED {name} {ProjectSettings.GlobalizePath(path)}"
             : $"UI_SCREENSHOT_FAILED {name} {error}";
+    }
+
+    private static async Task<string> TryCaptureDungeonPlanDialog(Control parent, GameSession session)
+    {
+        var plan = Load<DungeonPlanView>(DungeonPlanScenePath);
+        try
+        {
+            plan.Initialize(
+                session.SelectedPlan,
+                session.ActiveRun,
+                session.SelectedDungeonRoute,
+                session.CanEditPlan,
+                session.ActiveShortTermQuests);
+            parent.AddChild(plan);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!plan.SmokeOpenFirstDungeonDialog())
+            {
+                parent.RemoveChild(plan);
+                plan.Free();
+                return "UI_SCREENSHOT_SKIPPED DungeonPlanExerciseDialog not-opened";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, plan, "DungeonPlanExerciseDialog");
+        }
+        catch (System.Exception exception)
+        {
+            if (plan.GetParent() == parent)
+            {
+                parent.RemoveChild(plan);
+            }
+
+            plan.Free();
+            return $"UI_SCREENSHOT_FAILED DungeonPlanExerciseDialog {exception.GetType().Name}";
+        }
     }
 
     private static async Task<string> TryCapture<TView>(Control parent, TView view, string name)

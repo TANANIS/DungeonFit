@@ -88,6 +88,23 @@ public partial class DungeonPlanView : Control
         return _selectedDungeonRoute.ToArray();
     }
 
+    public bool SmokeOpenFirstDungeonDialog()
+    {
+        if (!_canEditPlan)
+        {
+            return false;
+        }
+
+        var categories = _categoryCatalog.GetAll();
+        if (categories.Count == 0)
+        {
+            return false;
+        }
+
+        OpenRouteSlotDialog(categories[0]);
+        return true;
+    }
+
     private void Refresh()
     {
         _planTitle.Text = _canEditPlan ? Text.SelectDungeon : _plan.DisplayName;

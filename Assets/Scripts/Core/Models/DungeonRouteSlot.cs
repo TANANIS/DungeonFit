@@ -5,4 +5,5 @@ public sealed record DungeonRouteSlot(
 	int TargetSets,
 	int TargetReps,
 	string MusicId,
-	int RestSeconds);
+	int RestSeconds,
+	string ExerciseId = "");

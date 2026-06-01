@@ -344,7 +344,7 @@ public partial class RoomChallengeView : Control
     {
         _roomName.Text = string.Format(Text.RoomNameFormat, _stageNumber, _totalStages, GetDungeonName(_task));
         _challengeName.Text = _task.ChallengeName;
-        _actionName.Text = string.Format(Text.ActionFormat, _task.TotalSets, _task.TargetReps);
+        _actionName.Text = string.Format(Text.ActionFormat, _task.ActionName, _task.TotalSets, _task.TargetReps);
         _setStatus.Text = progress.IsComplete
             ? string.Format(Text.SetCompleteFormat, _task.TotalSets, _task.TotalSets)
             : progress.IsSkipped
@@ -530,7 +530,7 @@ public partial class RoomChallengeView : Control
         public const string StageRewardBanked = "\u623f\u9593\u6536\u76ca\u5df2\u5b58\u5165\u4eca\u65e5\u7d50\u7b97\u3002";
         public const string WithdrawRewardBanked = "\u64a4\u9000\u6536\u76ca\u5df2\u5b58\u5165\u4eca\u65e5\u7d50\u7b97\u3002";
         public const string RoomNameFormat = "\u623f\u9593 {0} / {1}  -  {2}";
-        public const string ActionFormat = "{0} \u7d44  x  {1} \u6b21";
+        public const string ActionFormat = "{0}  {1} \u7d44 x {2} \u6b21";
         public const string SetCompleteFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f\u5b8c\u6210";
         public const string WithdrawnStatus = "\u5df2\u64a4\u9000\uff0c\u6311\u6230\u66ab\u505c";
         public const string SetRestFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f {2:0}s";

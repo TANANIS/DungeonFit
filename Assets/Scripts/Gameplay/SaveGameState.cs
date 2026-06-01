@@ -5,7 +5,7 @@ namespace DungeonFit.Gameplay;
 
 public sealed class SaveGameState
 {
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 10;
 
     public int Version { get; set; } = CurrentVersion;
 

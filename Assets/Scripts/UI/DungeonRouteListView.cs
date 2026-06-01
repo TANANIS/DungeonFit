@@ -45,6 +45,11 @@ public sealed class DungeonRouteListView
             {
                 CustomMinimumSize = new Vector2(0, 76),
             };
+            var rowPanel = new PanelContainer
+            {
+                CustomMinimumSize = new Vector2(0, 76),
+            };
+            DungeonFitUi.ApplyPanel(rowPanel, UiPanelStyle.Card);
 
             var label = new Label
             {
@@ -67,11 +72,13 @@ public sealed class DungeonRouteListView
                     CustomMinimumSize = new Vector2(72, 60),
                 };
                 removeButton.AddThemeFontSizeOverride("font_size", 28);
+                DungeonFitUi.ApplyButton(removeButton, UiButtonStyle.Danger);
                 removeButton.Pressed += () => onRemove(routeIndex);
                 row.AddChild(removeButton);
             }
 
-            _routeList.AddChild(row);
+            rowPanel.AddChild(row);
+            _routeList.AddChild(rowPanel);
         }
     }
 

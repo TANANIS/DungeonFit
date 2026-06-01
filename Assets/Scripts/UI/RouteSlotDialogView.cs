@@ -58,6 +58,7 @@ public partial class RouteSlotDialogView : Control
         {
             CustomMinimumSize = new Vector2(620, 620),
         };
+        DungeonFitUi.ApplyPanel(sheet, UiPanelStyle.Overlay);
         center.AddChild(sheet);
 
         var margin = new MarginContainer();
@@ -103,6 +104,7 @@ public partial class RouteSlotDialogView : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         cancelButton.AddThemeFontSizeOverride("font_size", 28);
+        DungeonFitUi.ApplyButton(cancelButton, UiButtonStyle.Secondary);
         cancelButton.Pressed += Close;
         buttonRow.AddChild(cancelButton);
 
@@ -112,6 +114,7 @@ public partial class RouteSlotDialogView : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         confirmButton.AddThemeFontSizeOverride("font_size", 28);
+        DungeonFitUi.ApplyButton(confirmButton, UiButtonStyle.Primary);
         confirmButton.Pressed += Confirm;
         buttonRow.AddChild(confirmButton);
     }

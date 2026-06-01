@@ -26,9 +26,20 @@ public partial class Main : Control
     private readonly ShortTermQuestCatalog _shortTermQuestCatalog = new();
     private Control? _currentView;
 
-    public override void _Ready()
+    public async override void _Ready()
     {
         GD.Print("DungeonFit entry loaded.");
+
+        if (OS.GetCmdlineUserArgs().Contains("--ui-screenshot-test"))
+        {
+            foreach (var line in await UiScreenshotTest.Run(this))
+            {
+                GD.Print(line);
+            }
+
+            GetTree().Quit();
+            return;
+        }
 
         if (OS.GetCmdlineUserArgs().Contains("--flow-smoke-test"))
         {

@@ -71,6 +71,8 @@ public partial class TavernView : Control
 
     private void BindNodes()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.CommonBackground);
         _nameLevelLabel = GetNode<Label>("%NameLevelLabel");
         _goldLabel = GetNode<Label>("%GoldLabel");
         _expBar = GetNode<ProgressBar>("%ExpBar");
@@ -86,6 +88,7 @@ public partial class TavernView : Control
         _lockButton = GetNode<Button>("%LockButton");
         _filterOption = GetNode<OptionButton>("%FilterOption");
         _sortOption = GetNode<OptionButton>("%SortOption");
+        ApplyArtStyles();
     }
 
     private void WireStaticControls()
@@ -299,6 +302,7 @@ public partial class TavernView : Control
             MouseFilter = MouseFilterEnum.Stop,
         };
         _settingsPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+        DungeonFitUi.ApplyPanel(_settingsPanel, UiPanelStyle.Overlay);
         AddChild(_settingsPanel);
         _settingsPanel.MoveToFront();
 
@@ -421,7 +425,27 @@ public partial class TavernView : Control
             CustomMinimumSize = new Vector2(0, 86),
         };
         button.AddThemeFontSizeOverride("font_size", 30);
+        DungeonFitUi.ApplyButton(button, text == Text.DeleteSave ? UiButtonStyle.Danger : UiButtonStyle.Secondary);
         return button;
+    }
+
+    private void ApplyArtStyles()
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header/HeaderMargin/HeaderRow/Portrait"), UiPanelStyle.Token);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/TitlePanel"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/MainSplit/CharacterPanel"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/StandIn"), UiPanelStyle.Token);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/MainSplit/CharacterPanel/CharacterMargin/CharacterLayout/BonusPanel"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/MainSplit/InventoryPanel"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/DetailPanel"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ItemIcon"), UiPanelStyle.Token);
+        DungeonFitUi.ApplyButton(GetNode<Button>("%TopBackButton"), UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(GetNode<Button>("%BottomBackButton"), UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(_equipButton, UiButtonStyle.Primary);
+        DungeonFitUi.ApplyButton(_sellButton, UiButtonStyle.Danger);
+        DungeonFitUi.ApplyButton(_lockButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyProgressBar(_expBar, new Color(0.48f, 0.82f, 0.58f));
     }
 
     private static void ClearChildren(Node node)

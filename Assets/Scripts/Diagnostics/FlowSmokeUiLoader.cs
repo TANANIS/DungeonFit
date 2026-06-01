@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using DungeonFit.Core.Content;
+using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
 using DungeonFit.UI;
 using Godot;
@@ -7,6 +9,11 @@ namespace DungeonFit.Diagnostics;
 
 public static class FlowSmokeUiLoader
 {
+    private const string TownScenePath = "res://Assets/Scenes/Town.tscn";
+    private const string DungeonPlanScenePath = "res://Assets/Scenes/DungeonPlan.tscn";
+    private const string RoomChallengeScenePath = "res://Assets/Scenes/RoomChallenge.tscn";
+    private const string SetSummaryScenePath = "res://Assets/Scenes/SetSummary.tscn";
+    private const string DailySummaryScenePath = "res://Assets/Scenes/DailySummary.tscn";
     private const string TavernScenePath = "res://Assets/Scenes/Tavern.tscn";
     private const string BlacksmithScenePath = "res://Assets/Scenes/Blacksmith.tscn";
     private const string ChurchScenePath = "res://Assets/Scenes/Church.tscn";
@@ -16,32 +23,112 @@ public static class FlowSmokeUiLoader
     public static IEnumerable<string> Run(Node parent)
     {
         var session = new GameSession(persistenceEnabled: false);
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+
+        var town = Load<TownView>(TownScenePath);
+        town.Initialize(
+            session.Player,
+            session.SelectedPlan,
+            session.LastRunSummary,
+            session.BuildIdleRewardViewModel(),
+            session.GetSaveStatus());
+        parent.AddChild(town);
+        yield return "TOWN_UI_LOADED";
+        Release(parent, town);
+
+        var plan = Load<DungeonPlanView>(DungeonPlanScenePath);
+        plan.Initialize(
+            session.SelectedPlan,
+            session.ActiveRun,
+            session.SelectedDungeonRoute,
+            session.CanEditPlan,
+            session.ActiveShortTermQuests);
+        parent.AddChild(plan);
+        yield return "DUNGEON_PLAN_UI_LOADED";
+        Release(parent, plan);
+
+        var activeRun = session.StartOrGetActiveRun();
+        if (activeRun is not null)
+        {
+            var room = Load<RoomChallengeView>(RoomChallengeScenePath);
+            room.Initialize(
+                session.Player,
+                activeRun.CurrentStage,
+                activeRun.CurrentStageIndex + 1,
+                activeRun.Plan.Stages.Count,
+                activeRun.CurrentPlayerHp,
+                session.BuildRoomSupplyViewModel());
+            parent.AddChild(room);
+            yield return "ROOM_CHALLENGE_UI_LOADED";
+            Release(parent, room);
+
+            session.RecordStageResult(new RunSummary(
+                "Smoke Cleared",
+                activeRun.CurrentStage.RoomName,
+                activeRun.CurrentStage.TotalSets,
+                activeRun.CurrentStage.TotalSets,
+                new RewardBundle(RewardSource.DungeonRoom, 40, null),
+                CompletedResults(activeRun.CurrentStage.TotalSets),
+                null,
+                session.Player.CurrentHp,
+                12));
+
+            if (session.LastSetSummary is not null)
+            {
+                var setSummary = Load<SetSummaryView>(SetSummaryScenePath);
+                setSummary.Initialize(session.LastSetSummary);
+                parent.AddChild(setSummary);
+                yield return "SET_SUMMARY_UI_LOADED";
+                Release(parent, setSummary);
+            }
+
+            var dailySummaryModel = session.BuildDailySummary();
+            if (dailySummaryModel is not null)
+            {
+                var dailySummary = Load<DailySummaryView>(DailySummaryScenePath);
+                dailySummary.Initialize(dailySummaryModel, session.DailyRewardsClaimed);
+                parent.AddChild(dailySummary);
+                yield return "DAILY_SUMMARY_UI_LOADED";
+                Release(parent, dailySummary);
+            }
+        }
 
         var tavern = Load<TavernView>(TavernScenePath);
         tavern.Initialize(session.BuildTavernEquipmentViewModel(), session.GetSaveStatus());
         parent.AddChild(tavern);
         yield return "TAVERN_UI_LOADED";
         yield return $"TAVERN_SETTINGS_OPENED {tavern.SmokeOpenSettingsPanel()}";
+        Release(parent, tavern);
 
         var blacksmith = Load<BlacksmithView>(BlacksmithScenePath);
         blacksmith.Initialize(session.BuildBlacksmithViewModel());
         parent.AddChild(blacksmith);
         yield return "BLACKSMITH_UI_LOADED";
+        Release(parent, blacksmith);
 
         var church = Load<ChurchView>(ChurchScenePath);
         church.Initialize(session.BuildChurchViewModel());
         parent.AddChild(church);
         yield return "CHURCH_UI_LOADED";
+        Release(parent, church);
 
         var moon = Load<MoonlightFountainView>(MoonlightFountainScenePath);
         moon.Initialize(session.BuildMoonlightFountainViewModel());
         parent.AddChild(moon);
         yield return "MOONLIGHT_UI_LOADED";
+        Release(parent, moon);
 
         var herb = Load<HerbShopView>(HerbShopScenePath);
         herb.Initialize(session.BuildHerbShopViewModel());
         parent.AddChild(herb);
         yield return "HERB_UI_LOADED";
+        Release(parent, herb);
     }
 
     private static TView Load<TView>(string scenePath)
@@ -49,5 +136,22 @@ public static class FlowSmokeUiLoader
     {
         var scene = GD.Load<PackedScene>(scenePath);
         return scene.Instantiate<TView>();
+    }
+
+    private static void Release(Node parent, Node child)
+    {
+        parent.RemoveChild(child);
+        child.Free();
+    }
+
+    private static IReadOnlyList<CompletionResult> CompletedResults(int totalSets)
+    {
+        var results = new CompletionResult[totalSets];
+        for (var index = 0; index < results.Length; index++)
+        {
+            results[index] = CompletionResult.Completed;
+        }
+
+        return results;
     }
 }

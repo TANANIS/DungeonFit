@@ -23,13 +23,14 @@ public sealed class DungeonTypeGridView
 
         foreach (var category in _categoryCatalog.GetAll())
         {
-            var button = new Button
-            {
-                Text = $"{category.ShortName}\n{Text.DungeonSuffix}",
-                CustomMinimumSize = new Vector2(190, 130),
-                Disabled = !canEditPlan || selectedCount >= DungeonRouteRules.MaxRouteSlots,
-            };
-            button.AddThemeFontSizeOverride("font_size", 30);
+            var button = DungeonFitUi.CreateIconTextButton(
+                UiThemePaths.DungeonIcon(category.Id),
+                $"{category.ShortName}\n{Text.DungeonSuffix}",
+                58,
+                UiButtonStyle.Secondary,
+                26);
+            button.CustomMinimumSize = new Vector2(190, 130);
+            button.Disabled = !canEditPlan || selectedCount >= DungeonRouteRules.MaxRouteSlots;
             button.Pressed += () => onSelected(category);
             _grid.AddChild(button);
         }

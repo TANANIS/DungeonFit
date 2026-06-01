@@ -18,11 +18,14 @@ public partial class SetSummaryView : Control
 
     public override void _Ready()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.SummaryBackground);
         _summaryTitle = GetNode<Label>("%SummaryTitle");
         _summaryStats = GetNode<Label>("%SummaryStats");
         _summaryHint = GetNode<Label>("%SummaryHint");
         _continueButton = GetNode<Button>("%ContinueButton");
         _endTrainingButton = GetNode<Button>("%ReturnTownButton");
+        ApplyArtStyles();
 
         _continueButton.Pressed += () => ContinueRequested?.Invoke();
         _endTrainingButton.Pressed += () => ReturnToTownRequested?.Invoke();
@@ -68,6 +71,14 @@ public partial class SetSummaryView : Control
             : string.Format(Text.NoChestHintFormat, nextLine);
         _continueButton.Text = _summary.NextStage is null ? Text.ViewDailySummary : Text.Continue;
         _endTrainingButton.Text = Text.EndTraining;
+    }
+
+    private void ApplyArtStyles()
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/SummaryPanel"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyButton(_continueButton, UiButtonStyle.Primary);
+        DungeonFitUi.ApplyButton(_endTrainingButton, UiButtonStyle.Secondary);
     }
 
     private static string GetDungeonName(TaskTemplate task)

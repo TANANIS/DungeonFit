@@ -1,4 +1,5 @@
 using System;
+using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
 using Godot;
 
@@ -54,12 +55,8 @@ public partial class ChurchView : Control
 
     private void BuildLayout()
     {
-        var background = new ColorRect
-        {
-            Color = new Color(0.018f, 0.014f, 0.05f, 1),
-        };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
-        AddChild(background);
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.CommonBackground);
 
         var safeMargin = new MarginContainer();
         safeMargin.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -83,26 +80,23 @@ public partial class ChurchView : Control
 
     private Control BuildHeader()
     {
-        var header = HubHeaderBuilder.Build("返回", out _header);
+        var header = HubHeaderBuilder.Build(Text.BackShort, out _header);
         _header.ActionButton.Pressed += () => BackToTownRequested?.Invoke();
         return header;
     }
 
     private static Control BuildHero()
     {
-        var panel = new PanelContainer
+        var panel = CreatePanel(180, UiPanelStyle.Main);
+        var layout = new VBoxContainer
         {
-            CustomMinimumSize = new Vector2(0, 180),
+            Alignment = BoxContainer.AlignmentMode.Center,
         };
-        var layout = new VBoxContainer();
-        layout.Alignment = BoxContainer.AlignmentMode.Center;
         layout.AddThemeConstantOverride("separation", 10);
         panel.AddChild(layout);
 
-        var title = CreateLabel("教堂", 58, HorizontalAlignment.Center);
-        layout.AddChild(title);
-        var subtitle = CreateLabel("人物委託・長期故事", 30, HorizontalAlignment.Center);
-        layout.AddChild(subtitle);
+        layout.AddChild(CreateLabel(Text.Title, 58, HorizontalAlignment.Center));
+        layout.AddChild(CreateLabel(Text.Subtitle, 30, HorizontalAlignment.Center));
         return panel;
     }
 
@@ -121,16 +115,9 @@ public partial class ChurchView : Control
 
     private Control BuildDetailPanel()
     {
-        var panel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2(0, 470),
-        };
+        var panel = CreatePanel(470, UiPanelStyle.Card);
 
-        var margin = new MarginContainer();
-        margin.AddThemeConstantOverride("margin_left", 26);
-        margin.AddThemeConstantOverride("margin_top", 22);
-        margin.AddThemeConstantOverride("margin_right", 26);
-        margin.AddThemeConstantOverride("margin_bottom", 22);
+        var margin = CreateMargin(26, 22);
         panel.AddChild(margin);
 
         var row = new HBoxContainer();
@@ -170,10 +157,10 @@ public partial class ChurchView : Control
         _requesterName = CreateLabel(string.Empty, 28, HorizontalAlignment.Center);
         requesterLayout.AddChild(_requesterName);
 
-        _primaryButton = CreateActionButton(string.Empty, 32);
+        _primaryButton = CreateActionButton(string.Empty, 32, UiButtonStyle.Primary);
         _primaryButton.Pressed += HandlePrimaryAction;
         requesterLayout.AddChild(_primaryButton);
-        _abandonButton = CreateActionButton("放棄誓約", 26);
+        _abandonButton = CreateActionButton(Text.Abandon, 26, UiButtonStyle.Danger);
         _abandonButton.Pressed += () => OathAbandoned?.Invoke();
         requesterLayout.AddChild(_abandonButton);
         return panel;
@@ -181,7 +168,7 @@ public partial class ChurchView : Control
 
     private Control BuildReturnButton()
     {
-        var button = CreateActionButton("返回城鎮", 40);
+        var button = CreateActionButton(Text.BackTown, 40, UiButtonStyle.Secondary);
         button.CustomMinimumSize = new Vector2(0, 96);
         button.Pressed += () => BackToTownRequested?.Invoke();
         return button;
@@ -195,6 +182,7 @@ public partial class ChurchView : Control
             MouseFilter = MouseFilterEnum.Stop,
         };
         _dialogOverlay.SetAnchorsPreset(LayoutPreset.FullRect);
+        DungeonFitUi.ApplyPanel(_dialogOverlay, UiPanelStyle.Overlay);
         AddChild(_dialogOverlay);
         _dialogOverlay.MoveToFront();
 
@@ -223,23 +211,23 @@ public partial class ChurchView : Control
         var smallButtons = new HBoxContainer();
         smallButtons.AddThemeConstantOverride("separation", 14);
         layout.AddChild(smallButtons);
-        _dialogSkipButton = CreateActionButton("跳過", 25);
+        _dialogSkipButton = CreateActionButton(Text.Skip, 25, UiButtonStyle.Secondary);
         _dialogSkipButton.Pressed += SkipDialog;
         smallButtons.AddChild(_dialogSkipButton);
-        _dialogAutoButton = CreateActionButton("自動", 25);
+        _dialogAutoButton = CreateActionButton(Text.Auto, 25, UiButtonStyle.Secondary);
         _dialogAutoButton.Pressed += ToggleAutoDialog;
         smallButtons.AddChild(_dialogAutoButton);
-        _dialogNextButton = CreateActionButton("下一句", 25);
+        _dialogNextButton = CreateActionButton(Text.Next, 25, UiButtonStyle.Primary);
         _dialogNextButton.Pressed += AdvanceDialog;
         smallButtons.AddChild(_dialogNextButton);
 
         var actionRow = new HBoxContainer();
         actionRow.AddThemeConstantOverride("separation", 14);
         layout.AddChild(actionRow);
-        _dialogAcceptButton = CreateActionButton("接受委託", 33);
+        _dialogAcceptButton = CreateActionButton(Text.AcceptOath, 33, UiButtonStyle.Primary);
         _dialogAcceptButton.Pressed += AcceptSelectedFromDialog;
         actionRow.AddChild(_dialogAcceptButton);
-        var laterButton = CreateActionButton("稍後再說", 33);
+        var laterButton = CreateActionButton(Text.Later, 33, UiButtonStyle.Secondary);
         laterButton.Pressed += HideDialog;
         actionRow.AddChild(laterButton);
 
@@ -265,12 +253,7 @@ public partial class ChurchView : Control
             _model.Player.Experience,
             _model.Player.ExperienceToNextLevel,
             _model.Player.Gold);
-        ClearChildren(_questGrid);
-        foreach (var card in _model.Cards)
-        {
-            _questGrid.AddChild(CreateQuestCard(card));
-        }
-
+        RefreshCardsOnly();
         RefreshDetail();
     }
 
@@ -279,7 +262,7 @@ public partial class ChurchView : Control
         var selected = card.Id == (_selectedQuestId ?? _model.SelectedQuestId);
         var button = new Button
         {
-            Text = $"{(selected ? "✓ " : string.Empty)}{card.Requester}\n{card.Title}\n\n{GetIconText(card.IconType)}\n{card.StatusLabel}\n{card.Progress}/{card.RequiredAmount}",
+            Text = $"{(selected ? Text.SelectedMarker : string.Empty)}{card.Requester}\n{card.Title}\n\n{GetIconText(card.IconType)}\n{card.StatusLabel}\n{card.Progress}/{card.RequiredAmount}",
             CustomMinimumSize = new Vector2(0, 250),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
@@ -287,6 +270,7 @@ public partial class ChurchView : Control
             Disabled = false,
         };
         button.AddThemeFontSizeOverride("font_size", 24);
+        DungeonFitUi.ApplyButton(button, selected ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
         button.Pressed += () =>
         {
             _selectedQuestId = card.Id;
@@ -313,18 +297,18 @@ public partial class ChurchView : Control
             return;
         }
 
-        _detailTitle.Text = $"✦ {detail.Title} ✦";
+        _detailTitle.Text = detail.Title;
         _detailText.Text = $"{detail.Description}\n\n委託人：{detail.Requester}";
-        _requirement.Text = $"任務需求\n{detail.RequirementText}  {detail.Progress}/{detail.RequiredAmount}";
-        _reward.Text = $"獎勵\n{detail.RewardGold} Gold\n稱號：{detail.RewardTitle}";
+        _requirement.Text = $"{Text.Requirement}\n{detail.RequirementText}  {detail.Progress}/{detail.RequiredAmount}";
+        _reward.Text = $"{Text.Reward}\n{detail.RewardGold} Gold\n稱號：{detail.RewardTitle}";
         _requesterPortrait.Text = $"{GetIconText(FindSelectedCard()?.IconType ?? string.Empty)}\n{detail.Requester}";
         _requesterName.Text = detail.Requester;
         _primaryButton.Text = detail.CanClaim
-            ? "領取獎勵"
+            ? Text.ClaimReward
             : detail.CanAccept
-                ? "接取委託"
+                ? Text.AcceptOath
                 : string.IsNullOrWhiteSpace(detail.DisabledReason)
-                    ? "進行中"
+                    ? Text.Unavailable
                     : detail.DisabledReason;
         _primaryButton.Disabled = !detail.CanAccept && !detail.CanClaim;
         _abandonButton.Visible = detail.CanAbandon;
@@ -346,7 +330,7 @@ public partial class ChurchView : Control
         }
 
         var tempModel = new ChurchViewModel(
-            new Core.Models.PlayerState(),
+            new PlayerState(),
             _model.ActiveQuest,
             _model.ClaimedQuestIds,
             _model.UnlockedTitles,
@@ -434,12 +418,12 @@ public partial class ChurchView : Control
         if (_dialogAutoTimer.IsStopped())
         {
             _dialogAutoTimer.Start();
-            _dialogAutoButton.Text = "停止";
+            _dialogAutoButton.Text = Text.StopAuto;
             return;
         }
 
         _dialogAutoTimer.Stop();
-        _dialogAutoButton.Text = "自動";
+        _dialogAutoButton.Text = Text.Auto;
     }
 
     private void AcceptSelectedFromDialog()
@@ -462,7 +446,7 @@ public partial class ChurchView : Control
     private void HideDialog()
     {
         _dialogAutoTimer.Stop();
-        _dialogAutoButton.Text = "自動";
+        _dialogAutoButton.Text = Text.Auto;
         _dialogOverlay.Visible = false;
     }
 
@@ -475,13 +459,13 @@ public partial class ChurchView : Control
         }
 
         _dialogText.Text = detail.DialogueLines.Count == 0
-            ? "若你願意，請接下這份委託。"
+            ? Text.NoDialogue
             : detail.DialogueLines[Math.Clamp(_dialogIndex, 0, detail.DialogueLines.Count - 1)];
         _dialogAcceptButton.Disabled = !_dialogRead;
         _dialogNextButton.Disabled = _dialogRead;
     }
 
-    private static Button CreateActionButton(string text, int fontSize)
+    private static Button CreateActionButton(string text, int fontSize, UiButtonStyle style)
     {
         var button = new Button
         {
@@ -490,6 +474,7 @@ public partial class ChurchView : Control
             CustomMinimumSize = new Vector2(0, 74),
         };
         button.AddThemeFontSizeOverride("font_size", fontSize);
+        DungeonFitUi.ApplyButton(button, style);
         return button;
     }
 
@@ -507,16 +492,33 @@ public partial class ChurchView : Control
         return label;
     }
 
+    private static PanelContainer CreatePanel(int height, UiPanelStyle style)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = new Vector2(0, height) };
+        DungeonFitUi.ApplyPanel(panel, style);
+        return panel;
+    }
+
+    private static MarginContainer CreateMargin(int horizontal, int vertical)
+    {
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", horizontal);
+        margin.AddThemeConstantOverride("margin_top", vertical);
+        margin.AddThemeConstantOverride("margin_right", horizontal);
+        margin.AddThemeConstantOverride("margin_bottom", vertical);
+        return margin;
+    }
+
     private static string GetIconText(string iconType)
     {
         return iconType switch
         {
-            "person" => "人物",
-            "sword" => "長劍",
-            "moon" => "月光",
+            "person" => "鎮民",
+            "sword" => "月刃",
+            "moon" => "星燈",
             "herb" => "藥草",
             "shield" => "守衛",
-            "letter" => "書信",
+            "letter" => "信件",
             _ => "誓約",
         };
     }
@@ -528,5 +530,26 @@ public partial class ChurchView : Control
             container.RemoveChild(child);
             child.QueueFree();
         }
+    }
+
+    private static class Text
+    {
+        public const string BackShort = "返回";
+        public const string BackTown = "返回城鎮";
+        public const string Title = "教堂";
+        public const string Subtitle = "長期誓約、祝禱與稱號";
+        public const string Abandon = "放棄誓約";
+        public const string Requirement = "誓約目標";
+        public const string Reward = "完成獎勵";
+        public const string ClaimReward = "領取獎勵";
+        public const string AcceptOath = "接受誓約";
+        public const string Unavailable = "尚不可用";
+        public const string Skip = "跳過";
+        public const string Auto = "自動";
+        public const string StopAuto = "停止";
+        public const string Next = "下一句";
+        public const string Later = "稍後再說";
+        public const string SelectedMarker = "[選取]\n";
+        public const string NoDialogue = "對方只是安靜地點了點頭。";
     }
 }

@@ -52,6 +52,8 @@ public partial class RoomChallengeView : Control
 
     public override void _Ready()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.RoomBackground);
         _goldLabel = GetNode<Label>("%GoldLabel");
         _challengeName = GetNode<Label>("%ChallengeName");
         _roomName = GetNode<Label>("%RoomName");
@@ -66,6 +68,8 @@ public partial class RoomChallengeView : Control
         var resultTitle = GetNode<Label>("%ResultTitle");
         var rewardSummary = GetNode<Label>("%RewardSummary");
         var resultContinueButton = GetNode<Button>("%ReturnTownButton");
+        GetNode<Label>("ReportPanel/ReportMargin/ReportLayout/ReportTitle").Text = Text.ReportTitle;
+        GetNode<Label>("ReportPanel/ReportMargin/ReportLayout/ReportHint").Text = Text.ReportHint;
         _restPanel = GetNode<PanelContainer>("%RestPanel");
         _reportPanel = GetNode<PanelContainer>("%ReportPanel");
         _resultPanel = GetNode<PanelContainer>("%ResultPanel");
@@ -80,6 +84,7 @@ public partial class RoomChallengeView : Control
             GetNode<Label>("%EnemyLabel"),
             enemyName,
             bossHealth);
+        ApplyArtStyles(bossHealth);
 
         var audioPlayer = new AudioStreamPlayer
         {
@@ -92,14 +97,26 @@ public partial class RoomChallengeView : Control
 
         var completeButton = GetNode<Button>("%CompleteButton");
         completeButton.Text = Text.FinishSet;
+        DungeonFitUi.ApplyButton(completeButton, UiButtonStyle.Primary);
         completeButton.Pressed += ReportSet;
         var partialButton = GetNode<Button>("%PartialButton");
         partialButton.Visible = false;
         partialButton.Disabled = true;
-        GetNode<Button>("%SkipButton").Pressed += SkipRoom;
-        GetNode<Button>("%PauseButton").Pressed += ToggleWavePause;
-        GetNode<Button>("%ReadyNowButton").Pressed += CompleteRestNow;
-        GetNode<Button>("%ExtendRestButton").Pressed += ExtendRest;
+        var skipButton = GetNode<Button>("%SkipButton");
+        skipButton.Text = Text.Withdraw;
+        DungeonFitUi.ApplyButton(skipButton, UiButtonStyle.Danger);
+        skipButton.Pressed += SkipRoom;
+        var pauseButton = GetNode<Button>("%PauseButton");
+        DungeonFitUi.ApplyButton(pauseButton, UiButtonStyle.Secondary);
+        pauseButton.Pressed += ToggleWavePause;
+        var readyButton = GetNode<Button>("%ReadyNowButton");
+        DungeonFitUi.ApplyButton(readyButton, UiButtonStyle.Primary);
+        readyButton.Pressed += CompleteRestNow;
+        var extendButton = GetNode<Button>("%ExtendRestButton");
+        DungeonFitUi.ApplyButton(extendButton, UiButtonStyle.Secondary);
+        extendButton.Pressed += ExtendRest;
+        DungeonFitUi.ApplyButton(_smallPotionButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyIconTextContent(_smallPotionButton, UiThemePaths.RoomPotion, Text.UsePotion, 32, 22, vertical: false);
         _smallPotionButton.Pressed += UseSmallPotion;
         _waveIndicator.SetWaveCompleted += EnterBreak;
         _waveIndicator.WaveAttackAnticipated += TriggerWaveAttackWindup;
@@ -184,6 +201,20 @@ public partial class RoomChallengeView : Control
         _resultPresenter.Hide();
         StartWave(Text.WaveActive);
         Refresh(_room.Progress);
+    }
+
+    private void ApplyArtStyles(ProgressBar bossHealth)
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/BattleStage"), UiPanelStyle.Battle);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/BeatFlow"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(_restPanel, UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(_supplyPanel, UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/WorkoutStatus"), UiPanelStyle.Card);
+        DungeonFitUi.ApplyPanel(_reportPanel, UiPanelStyle.Overlay);
+        DungeonFitUi.ApplyPanel(_resultPanel, UiPanelStyle.Overlay);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("%PlayerToken"), UiPanelStyle.Token);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("%EnemyToken"), UiPanelStyle.Token);
+        DungeonFitUi.ApplyProgressBar(bossHealth, new Color(0.78f, 0.2f, 0.28f));
     }
 
     private void StartWave(string message)
@@ -489,7 +520,10 @@ public partial class RoomChallengeView : Control
         public const string WaveEnded = "Wave \u7d50\u675f\u3002\u4f11\u606f\u5012\u6578\u958b\u59cb\u3002";
         public const string PartialSet = "\u672c\u7d44\u5df2\u90e8\u5206\u5b8c\u6210\u3002\u4e0b\u4e00\u7d44\u6e96\u5099\u958b\u59cb\u3002";
         public const string SetCleared = "Wave \u5df2\u5b8c\u6210\u3002\u4e0b\u4e00\u500b\u6575\u4eba\u4e0a\u524d\u3002";
+        public const string ReportTitle = "\u5b8c\u6210\u672c\u7d44";
+        public const string ReportHint = "\u6309\u4e0b\u5f8c\u6703\u4f9d\u89d2\u8272\u8207\u6575\u4eba\u6578\u503c\u7d50\u7b97\u6536\u76ca\u3002";
         public const string FinishSet = "\u5b8c\u6210\u672c\u7d44";
+        public const string Withdraw = "\u64a4\u9000";
         public const string EnemyDefeatedSet = "\u9020\u6210 {0} \u50b7\u5bb3\uff0c\u64ca\u7834\u6575\u4eba\u3002HP {1}\uff0c\u91d1\u5e63 +{2}\u3002";
         public const string EnemySurvivedSet = "\u9020\u6210 {0} \u50b7\u5bb3\uff0c\u6575\u4eba\u672a\u5012\u4e0b\u4e26\u53cd\u64ca {1}\u3002HP {2}\uff0c\u91d1\u5e63 +{3}\u3002";
         public const string EvadedSet = "HP \u4e0d\u8db3\uff0c\u89d2\u8272\u6539\u70ba\u8eb2\u907f\u3002HP {0}\uff0c\u91d1\u5e63 +{1}\u3002";
@@ -510,6 +544,7 @@ public partial class RoomChallengeView : Control
         public const string ReadyNow = "\u5df2\u6e96\u5099\u597d\u3002\u8acb\u56de\u5831\u9019\u7d44\u5b8c\u6210\u72c0\u614b\u3002";
         public const string RestExtended = "\u4f11\u606f\u5ef6\u9577 30 \u79d2\u3002";
         public const string SupplyStatus = "\u5c0f\u578b\u85e5\u6c34 {0} / {1}";
+        public const string UsePotion = "\u85e5\u6c34";
         public const string PotionUsed = "\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\uff0c\u6062\u5fa9 {0} HP\u3002\u76ee\u524d HP {1}\u3002";
         public const string NoPotionUsed = "\u76ee\u524d\u7121\u6cd5\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\u3002";
         public const string ChestDungeon = "\u80f8\u5730\u57ce";

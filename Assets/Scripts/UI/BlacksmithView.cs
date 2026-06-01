@@ -52,12 +52,8 @@ public partial class BlacksmithView : Control
 
     private void BuildUi()
     {
-        var background = new ColorRect
-        {
-            Color = new Color(0.035f, 0.025f, 0.02f, 1),
-        };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
-        AddChild(background);
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.CommonBackground);
 
         var safe = new MarginContainer();
         safe.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -71,28 +67,25 @@ public partial class BlacksmithView : Control
         layout.AddThemeConstantOverride("separation", 18);
         safe.AddChild(layout);
 
-        var header = HubHeaderBuilder.Build("返回", out _header);
+        var header = HubHeaderBuilder.Build(Text.BackShort, out _header);
         _header.ActionButton.Pressed += () => BackToTownRequested?.Invoke();
         layout.AddChild(header);
 
-        var hero = new PanelContainer { CustomMinimumSize = new Vector2(0, 250) };
+        var hero = CreatePanel(250, UiPanelStyle.Main);
         layout.AddChild(hero);
         var heroLayout = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         heroLayout.AddThemeConstantOverride("separation", 8);
         hero.AddChild(heroLayout);
-        heroLayout.AddChild(CreateCenteredLabel("鐵匠鋪", 62));
-        heroLayout.AddChild(CreateCenteredLabel("強化・拆除升級", 32));
-        heroLayout.AddChild(CreateCenteredLabel("讓裝備在下一趟地城前更可靠。", 25));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Title, 62));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Subtitle, 32));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Description, 25));
 
         var middle = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         middle.AddThemeConstantOverride("separation", 18);
         layout.AddChild(middle);
 
-        var inventoryPanel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2(0, 430),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        };
+        var inventoryPanel = CreatePanel(430, UiPanelStyle.Card);
+        inventoryPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         middle.AddChild(inventoryPanel);
         var inventoryMargin = CreateMargin(18, 16);
         inventoryPanel.AddChild(inventoryMargin);
@@ -101,11 +94,9 @@ public partial class BlacksmithView : Control
         _inventoryGrid.AddThemeConstantOverride("v_separation", 12);
         inventoryMargin.AddChild(_inventoryGrid);
 
-        var detailPanel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2(430, 430),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        };
+        var detailPanel = CreatePanel(430, UiPanelStyle.Card);
+        detailPanel.CustomMinimumSize = new Vector2(430, 430);
+        detailPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         middle.AddChild(detailPanel);
         var detailMargin = CreateMargin(22, 20);
         detailPanel.AddChild(detailMargin);
@@ -122,7 +113,7 @@ public partial class BlacksmithView : Control
         var modeRow = new HBoxContainer();
         modeRow.AddThemeConstantOverride("separation", 16);
         layout.AddChild(modeRow);
-        _enhanceModeButton = CreateButton("強化", 0, 82, 34);
+        _enhanceModeButton = CreateButton(Text.EnhanceMode, 0, 82, 34, UiButtonStyle.Primary);
         _enhanceModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _enhanceModeButton.Pressed += () =>
         {
@@ -130,7 +121,7 @@ public partial class BlacksmithView : Control
             Refresh();
         };
         modeRow.AddChild(_enhanceModeButton);
-        _dismantleModeButton = CreateButton("拆除升級", 0, 82, 34);
+        _dismantleModeButton = CreateButton(Text.DismantleMode, 0, 82, 34, UiButtonStyle.Secondary);
         _dismantleModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _dismantleModeButton.Pressed += () =>
         {
@@ -139,7 +130,7 @@ public partial class BlacksmithView : Control
         };
         modeRow.AddChild(_dismantleModeButton);
 
-        var operationPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 230) };
+        var operationPanel = CreatePanel(230, UiPanelStyle.Card);
         layout.AddChild(operationPanel);
         var operationMargin = CreateMargin(24, 18);
         operationPanel.AddChild(operationMargin);
@@ -150,7 +141,7 @@ public partial class BlacksmithView : Control
         operationLayout.AddChild(_operationPreview);
         _operationHint = CreateCenteredLabel(string.Empty, 24);
         operationLayout.AddChild(_operationHint);
-        _actionButton = CreateButton(string.Empty, 0, 92, 38);
+        _actionButton = CreateButton(string.Empty, 0, 92, 38, UiButtonStyle.Primary);
         _actionButton.Pressed += RunSelectedAction;
         operationLayout.AddChild(_actionButton);
     }
@@ -177,13 +168,20 @@ public partial class BlacksmithView : Control
 
         if (_model.Items.Count == 0)
         {
-            _inventoryGrid.AddChild(CreateLabel("目前沒有裝備。", 30));
+            _inventoryGrid.Columns = 1;
+            var empty = CreateCenteredLabel(Text.EmptyInventory, 30);
+            empty.CustomMinimumSize = new Vector2(0, 360);
+            empty.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            empty.SizeFlagsVertical = SizeFlags.ExpandFill;
+            empty.VerticalAlignment = VerticalAlignment.Center;
+            _inventoryGrid.AddChild(empty);
             return;
         }
 
+        _inventoryGrid.Columns = 2;
         foreach (var item in _model.Items)
         {
-            var button = CreateButton(BuildInventoryText(item), 0, 112, 22);
+            var button = CreateButton(BuildInventoryText(item), 0, 112, 22, UiButtonStyle.Secondary);
             button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             button.Disabled = item.Id == _selectedItemId;
             var itemId = item.Id;
@@ -212,24 +210,24 @@ public partial class BlacksmithView : Control
         var item = SelectedItem;
         if (item is null)
         {
-            _detailTitle.Text = "選擇裝備";
-            _detailMeta.Text = "背包目前沒有可強化的裝備。";
+            _detailTitle.Text = Text.NoItemTitle;
+            _detailMeta.Text = Text.NoItemMeta;
             _detailStats.Text = string.Empty;
             return;
         }
 
         _detailTitle.Text = $"{item.DisplayName}  +{item.EnhancementLevel}";
         _detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | Power {item.Power}";
-        var markers = item.IsEquipped ? "已裝備" : "背包中";
+        var markers = item.IsEquipped ? Text.Equipped : Text.NotEquipped;
         if (item.IsLocked)
         {
-            markers += " / 已鎖定";
+            markers += $" / {Text.Locked}";
         }
 
         var modifiers = item.ModifierLines.Count == 0
-            ? "沒有額外詞綴。"
+            ? Text.NoModifiers
             : string.Join("\n", item.ModifierLines);
-        _detailStats.Text = $"{markers}\n強化等級 {item.EnhancementLevel} / {item.MaxEnhancementLevel}\n{modifiers}";
+        _detailStats.Text = $"{markers}\n{Text.EnhancementLevel} {item.EnhancementLevel} / {item.MaxEnhancementLevel}\n{modifiers}";
     }
 
     private void RefreshOperation()
@@ -241,16 +239,16 @@ public partial class BlacksmithView : Control
         if (_mode == BlacksmithMode.Enhance)
         {
             _operationPreview.Text = item is null
-                ? "請先選擇裝備"
-                : $"目前 Power {item.Power}  >>>  強化後 Power {item.Power + 1}";
+                ? Text.SelectItemPrompt
+                : string.Format(Text.EnhancePreviewFormat, item.Power, item.Power + 1);
             var enhancementCost = item is null ? 0 : BlacksmithRules.GetEnhancementCost(item.EnhancementLevel);
             var canEnhance = CanEnhanceSelectedItem(item, enhancementCost);
             _operationHint.Text = item is null
-                ? "選擇一件裝備後即可查看強化費用。"
+                ? Text.EnhanceHint
                 : canEnhance
-                    ? $"消耗：{enhancementCost} Gold"
+                    ? string.Format(Text.CostFormat, enhancementCost)
                     : BuildEnhanceDisabledReason(item, enhancementCost);
-            _actionButton.Text = "進行強化";
+            _actionButton.Text = Text.RunEnhance;
             _actionButton.Disabled = !canEnhance;
             return;
         }
@@ -258,14 +256,14 @@ public partial class BlacksmithView : Control
         var canDismantle = item is not null && item.EnhancementLevel > 0;
         var refund = item is null ? 0 : BlacksmithRules.GetDismantleRefund(item.EnhancementLevel);
         _operationPreview.Text = item is null
-            ? "請先選擇裝備"
-            : $"目前 +{item.EnhancementLevel}  >>>  拆除後 +0";
+            ? Text.SelectItemPrompt
+            : string.Format(Text.DismantlePreviewFormat, item.EnhancementLevel);
         _operationHint.Text = item is null
-            ? "選擇一件裝備後即可拆除升級。"
+            ? Text.DismantleHint
             : canDismantle
-                ? $"返還：{refund} Gold"
-                : "這件裝備尚未強化。";
-        _actionButton.Text = "拆除升級";
+                ? string.Format(Text.RefundFormat, refund)
+                : Text.CannotDismantleZero;
+        _actionButton.Text = Text.RunDismantle;
         _actionButton.Disabled = !canDismantle;
     }
 
@@ -291,7 +289,7 @@ public partial class BlacksmithView : Control
 
     private static string BuildInventoryText(BlacksmithItemViewModel item)
     {
-        var marker = item.IsEquipped ? "已裝備 " : string.Empty;
+        var marker = item.IsEquipped ? $"{Text.Equipped} " : string.Empty;
         return $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity} / +{item.EnhancementLevel}\nPower {item.Power}";
     }
 
@@ -306,15 +304,22 @@ public partial class BlacksmithView : Control
     {
         if (item.EnhancementLevel >= BlacksmithRules.MaxEnhancementLevel)
         {
-            return "這件裝備已達強化上限。";
+            return Text.MaxEnhancementReached;
         }
 
         if (_model.Character.Gold < cost)
         {
-            return $"金幣不足，需要 {cost} Gold。";
+            return string.Format(Text.NotEnoughGoldFormat, cost);
         }
 
         return string.Empty;
+    }
+
+    private static PanelContainer CreatePanel(int height, UiPanelStyle style)
+    {
+        var panel = new PanelContainer { CustomMinimumSize = new Vector2(0, height) };
+        DungeonFitUi.ApplyPanel(panel, style);
+        return panel;
     }
 
     private static MarginContainer CreateMargin(int horizontal, int vertical)
@@ -341,7 +346,7 @@ public partial class BlacksmithView : Control
         return label;
     }
 
-    private static Button CreateButton(string text, int width, int height, int fontSize)
+    private static Button CreateButton(string text, int width, int height, int fontSize, UiButtonStyle style)
     {
         var button = new Button
         {
@@ -349,7 +354,37 @@ public partial class BlacksmithView : Control
             CustomMinimumSize = new Vector2(width, height),
         };
         button.AddThemeFontSizeOverride("font_size", fontSize);
+        DungeonFitUi.ApplyButton(button, style);
         return button;
     }
 
+    private static class Text
+    {
+        public const string BackShort = "返回";
+        public const string Title = "鐵匠鋪";
+        public const string Subtitle = "強化、拆解、調整裝備";
+        public const string Description = "消耗金幣提高裝備 Power，或拆解強化等級取回部分資源。";
+        public const string EnhanceMode = "強化";
+        public const string DismantleMode = "拆解";
+        public const string EmptyInventory = "目前沒有可處理的裝備。";
+        public const string NoItemTitle = "尚未選擇裝備";
+        public const string NoItemMeta = "從左側選擇一件裝備查看詳細數值。";
+        public const string Equipped = "已裝備";
+        public const string NotEquipped = "未裝備";
+        public const string Locked = "已鎖定";
+        public const string NoModifiers = "沒有額外詞綴。";
+        public const string EnhancementLevel = "強化等級";
+        public const string SelectItemPrompt = "請先選擇裝備";
+        public const string EnhancePreviewFormat = "目前 Power {0}  >>>  強化後 Power {1}";
+        public const string EnhanceHint = "選擇一件裝備後即可查看強化費用。";
+        public const string CostFormat = "消耗：{0} Gold";
+        public const string RunEnhance = "執行強化";
+        public const string DismantlePreviewFormat = "目前 +{0}  >>>  拆解後 +0";
+        public const string DismantleHint = "選擇已強化的裝備後即可拆解。";
+        public const string RefundFormat = "返還：{0} Gold";
+        public const string CannotDismantleZero = "這件裝備尚未強化，無法拆解。";
+        public const string RunDismantle = "拆解強化";
+        public const string MaxEnhancementReached = "這件裝備已達強化上限。";
+        public const string NotEnoughGoldFormat = "金幣不足，需要 {0} Gold。";
+    }
 }

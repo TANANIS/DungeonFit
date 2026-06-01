@@ -34,6 +34,8 @@ public partial class TownView : Control
 
     public override void _Ready()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.TownBackground);
         _levelLabel = GetNode<Label>("%LevelLabel");
         _goldLabel = GetNode<Label>("%GoldLabel");
         _todayChallenge = GetNode<Label>("%TodayChallenge");
@@ -44,24 +46,33 @@ public partial class TownView : Control
 
         GetNode<Button>("%EnterDungeonButton").Pressed += RequestEnterDungeon;
         GetNode<Button>("%SettingsButton").Pressed += ShowSettings;
+        var townGrid = GetNode<GridContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid");
         var noticeBoard = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/NoticeBoard");
+        DecorateFacility(noticeBoard, "notice_board", Text.NoticeBoard);
         noticeBoard.MouseDefaultCursorShape = CursorShape.PointingHand;
         noticeBoard.GuiInput += OnNoticeBoardInput;
         var tavern = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Tavern");
+        DecorateFacility(tavern, "tavern", Text.Tavern);
         tavern.MouseDefaultCursorShape = CursorShape.PointingHand;
         tavern.GuiInput += OnTavernInput;
         var blacksmith = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/GeneralStore");
+        DecorateFacility(blacksmith, "blacksmith", Text.Blacksmith);
         blacksmith.MouseDefaultCursorShape = CursorShape.PointingHand;
         blacksmith.GuiInput += OnBlacksmithInput;
         var herbShop = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/HerbShop");
+        DecorateFacility(herbShop, "herb_shop", Text.HerbShop);
         herbShop.MouseDefaultCursorShape = CursorShape.PointingHand;
         herbShop.GuiInput += OnHerbShopInput;
         var fountain = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Fountain");
+        DecorateFacility(fountain, "fountain", Text.Fountain);
         fountain.MouseDefaultCursorShape = CursorShape.PointingHand;
         fountain.GuiInput += OnFountainInput;
         var church = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Church");
+        DecorateFacility(church, "church", Text.Church);
         church.MouseDefaultCursorShape = CursorShape.PointingHand;
         church.GuiInput += OnChurchInput;
+        BuildTownMap(townGrid, herbShop, tavern, blacksmith, noticeBoard, fountain, church);
+        ApplyArtStyles();
         BuildSettingsPanel();
         Refresh();
     }
@@ -177,6 +188,7 @@ public partial class TownView : Control
             MouseFilter = MouseFilterEnum.Stop,
         };
         _settingsPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+        DungeonFitUi.ApplyPanel(_settingsPanel, UiPanelStyle.Overlay);
         AddChild(_settingsPanel);
         _settingsPanel.MoveToFront();
 
@@ -237,6 +249,7 @@ public partial class TownView : Control
             CustomMinimumSize = new Vector2(0, 86),
         };
         button.AddThemeFontSizeOverride("font_size", 30);
+        DungeonFitUi.ApplyButton(button, text == Text.DeleteSave ? UiButtonStyle.Danger : UiButtonStyle.Secondary);
         return button;
     }
 
@@ -247,8 +260,79 @@ public partial class TownView : Control
             CustomMinimumSize = new Vector2(0, 64),
         };
         button.AddThemeFontSizeOverride("font_size", 27);
+        DungeonFitUi.ApplyButton(button, UiButtonStyle.Secondary);
         button.Pressed += () => IdleRewardClaimed?.Invoke();
         return button;
+    }
+
+    private void ApplyArtStyles()
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/TownStage"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel"), UiPanelStyle.Card);
+        DungeonFitUi.DecorateExistingIconPanel(
+            GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleToken"),
+            UiThemePaths.IdleToken,
+            96);
+        DungeonFitUi.ApplyButton(GetNode<Button>("%EnterDungeonButton"), UiButtonStyle.Primary);
+        DungeonFitUi.ApplyButton(GetNode<Button>("%SettingsButton"), UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyProgressBar(
+            GetNode<ProgressBar>("SafeMargin/Layout/Header/HeaderMargin/HeaderRow/PlayerInfo/ExpBar"),
+            new Color(0.48f, 0.82f, 0.58f));
+    }
+
+    private static void DecorateFacility(PanelContainer panel, string iconId, string labelText)
+    {
+        if (panel.GetChildCount() > 0 && panel.GetChild(0) is Label label)
+        {
+            label.Text = labelText;
+        }
+
+        DungeonFitUi.DecorateExistingIconPanel(panel, UiThemePaths.TownFacilityIcon(iconId), 86);
+    }
+
+    private void BuildTownMap(
+        GridContainer townGrid,
+        PanelContainer herbShop,
+        PanelContainer tavern,
+        PanelContainer blacksmith,
+        PanelContainer noticeBoard,
+        PanelContainer fountain,
+        PanelContainer church)
+    {
+        var townLayout = GetNode<VBoxContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout");
+        var gridIndex = townGrid.GetIndex();
+        townLayout.RemoveChild(townGrid);
+
+        var map = new Control
+        {
+            Name = "TownMap",
+            CustomMinimumSize = new Vector2(0, 610),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        townLayout.AddChild(map);
+        townLayout.MoveChild(map, gridIndex);
+
+        PlaceFacility(map, herbShop, new Vector2(22, 168), new Vector2(225, 132));
+        PlaceFacility(map, tavern, new Vector2(362, 72), new Vector2(255, 152));
+        PlaceFacility(map, blacksmith, new Vector2(725, 170), new Vector2(225, 132));
+        PlaceFacility(map, noticeBoard, new Vector2(16, 420), new Vector2(230, 124));
+        PlaceFacility(map, fountain, new Vector2(370, 354), new Vector2(240, 132));
+        PlaceFacility(map, church, new Vector2(724, 456), new Vector2(230, 124));
+
+        townGrid.QueueFree();
+    }
+
+    private static void PlaceFacility(Control map, PanelContainer panel, Vector2 position, Vector2 size)
+    {
+        panel.GetParent()?.RemoveChild(panel);
+        map.AddChild(panel);
+        panel.SetAnchorsPreset(LayoutPreset.TopLeft);
+        panel.Position = position;
+        panel.Size = size;
+        panel.CustomMinimumSize = size;
+        panel.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+        panel.SizeFlagsVertical = SizeFlags.ShrinkBegin;
     }
 
     private void ShowSettings()
@@ -356,5 +440,11 @@ public partial class TownView : Control
         public const string Close = "\u95dc\u9589";
         public const string BossCleared = "Boss \u64ca\u7834";
         public const string RoomWithdrawn = "\u623f\u9593\u64a4\u9000";
+        public const string NoticeBoard = "\u544a\u793a\u677f";
+        public const string Tavern = "\u9152\u9928";
+        public const string Blacksmith = "\u9435\u5320\u92ea";
+        public const string HerbShop = "\u85e5\u8349\u92ea";
+        public const string Fountain = "\u6708\u5149\u6cc9";
+        public const string Church = "\u6559\u5802";
     }
 }

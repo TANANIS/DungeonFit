@@ -51,12 +51,8 @@ public partial class NoticeBoardView : Control
 
     private void BuildLayout()
     {
-        var background = new ColorRect
-        {
-            Color = new Color(0.025f, 0.022f, 0.072f, 1),
-        };
-        background.SetAnchorsPreset(LayoutPreset.FullRect);
-        AddChild(background);
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.CommonBackground);
 
         var safeMargin = new MarginContainer();
         safeMargin.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -88,6 +84,7 @@ public partial class NoticeBoardView : Control
         {
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Main);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 26);
@@ -129,6 +126,7 @@ public partial class NoticeBoardView : Control
             CustomMinimumSize = new Vector2(0, 520),
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Card);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 30);
@@ -190,6 +188,7 @@ public partial class NoticeBoardView : Control
             CustomMinimumSize = new Vector2(0, 86),
         };
         _primaryButton.AddThemeFontSizeOverride("font_size", 30);
+        DungeonFitUi.ApplyButton(_primaryButton, UiButtonStyle.Primary);
         _primaryButton.Pressed += HandlePrimaryAction;
         npcLayout.AddChild(_primaryButton);
 
@@ -210,6 +209,7 @@ public partial class NoticeBoardView : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         townButton.AddThemeFontSizeOverride("font_size", 32);
+        DungeonFitUi.ApplyButton(townButton, UiButtonStyle.Secondary);
         townButton.Pressed += () => BackToTownRequested?.Invoke();
         row.AddChild(townButton);
 
@@ -219,6 +219,7 @@ public partial class NoticeBoardView : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         dungeonButton.AddThemeFontSizeOverride("font_size", 38);
+        DungeonFitUi.ApplyButton(dungeonButton, UiButtonStyle.Primary);
         dungeonButton.Pressed += () => EnterDungeonRequested?.Invoke();
         row.AddChild(dungeonButton);
 
@@ -248,6 +249,7 @@ public partial class NoticeBoardView : Control
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
             };
             card.AddThemeFontSizeOverride("font_size", 25);
+            DungeonFitUi.ApplyButton(card, index == _selectedIndex ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
             card.Pressed += () =>
             {
                 _selectedIndex = questIndex;
@@ -276,7 +278,7 @@ public partial class NoticeBoardView : Control
         _requirement.Text = $"{Text.RequirementTitle}\n{quest.RequirementText}";
         _progress.Text = string.Format(Text.ProgressFormat, activeQuest?.Progress ?? 0, quest.RequiredAmount);
         _reward.Text = string.Format(Text.RewardFormat, quest.RewardGold);
-        _npcPortrait.Text = $"{Text.NpcToken}\n{GetIconText(quest.IconType)}";
+        _npcPortrait.Text = $"{Text.NpcPortrait}\n{GetIconText(quest.IconType)}";
         _npcName.Text = quest.NpcName;
         _primaryButton.Text = isClaimed
             ? Text.Claimed
@@ -337,7 +339,7 @@ public partial class NoticeBoardView : Control
                 ? Text.CompletedMarker
                 : Text.ActiveMarker;
         var selectedMarker = selected ? Text.SelectedMarker : string.Empty;
-        return $"{selectedMarker}{activeMarker}{quest.Title}\n\n{Text.NpcToken}\n{GetIconText(quest.IconType)}";
+        return $"{selectedMarker}{activeMarker}{quest.Title}\n\n{Text.NpcPortrait}\n{GetIconText(quest.IconType)}";
     }
 
     private ActiveShortTermQuest? FindActiveQuest(string questId)
@@ -399,7 +401,7 @@ public partial class NoticeBoardView : Control
         public const string Accepted = "\u5df2\u63a5\u53d6";
         public const string ClaimReward = "\u9818\u53d6\u734e\u52f5";
         public const string Claimed = "\u5df2\u5b8c\u6210";
-        public const string NpcToken = "NPC\nTOKEN";
+        public const string NpcPortrait = "\u59d4\u8a17\u4eba";
         public const string ActiveMarker = "[*] ";
         public const string CompletedMarker = "[x] ";
         public const string ClaimedMarker = "[v] ";

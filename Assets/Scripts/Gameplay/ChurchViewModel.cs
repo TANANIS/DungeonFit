@@ -148,11 +148,11 @@ public sealed class ChurchViewModel
     {
         return status switch
         {
-            ChurchQuestStatus.Available => "可接",
+            ChurchQuestStatus.Available => "可接受",
             ChurchQuestStatus.Active => "進行中",
-            ChurchQuestStatus.Completed => "完成",
+            ChurchQuestStatus.Completed => "可領取",
             ChurchQuestStatus.Claimed => "已完成",
-            _ => "線索",
+            _ => "未解鎖",
         };
     }
 
@@ -160,7 +160,7 @@ public sealed class ChurchViewModel
     {
         return definition.ObjectiveType switch
         {
-            LongTermQuestObjectiveType.DefeatBosses => $"擊破 Boss {definition.RequiredAmount} 次",
+            LongTermQuestObjectiveType.DefeatBosses => $"擊敗 Boss {definition.RequiredAmount} 次",
             LongTermQuestObjectiveType.EarnGold => $"累積獲得 {definition.RequiredAmount} Gold",
             LongTermQuestObjectiveType.CompleteRooms => $"完成任意房間 {definition.RequiredAmount} 次",
             LongTermQuestObjectiveType.CompleteDungeonTypeRooms => $"完成指定地城房間 {definition.RequiredAmount} 次",
@@ -175,17 +175,17 @@ public sealed class ChurchViewModel
     {
         if (isClaimed)
         {
-            return "此委託已完成。";
+            return "這項誓約已經完成。";
         }
 
         if (card.Status == ChurchQuestStatus.Locked)
         {
-            return "目前只有線索，尚未開放接取。";
+            return "目前尚未解鎖，先完成其他誓約。";
         }
 
         if (activeQuest is not null && activeQuest.QuestId != card.Id)
         {
-            return "一次只能持有一個誓約。";
+            return "一次只能持有一項長期誓約。";
         }
 
         return string.Empty;

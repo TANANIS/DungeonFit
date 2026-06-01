@@ -34,6 +34,8 @@ public partial class DungeonPlanView : Control
 
     public override void _Ready()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.DungeonPlanBackground);
         _planTitle = GetNode<Label>("%PlanTitle");
         _planSubtitle = GetNode<Label>("%PlanSubtitle");
         _planSummary = GetNode<Label>("%PlanSummary");
@@ -43,6 +45,7 @@ public partial class DungeonPlanView : Control
         _dungeonTypeGridView = new DungeonTypeGridView(_dungeonTypeGrid, _categoryCatalog);
         _routeListView = new DungeonRouteListView(_routeList, _categoryCatalog, _musicCatalog);
         _summaryPresenter = new DungeonPlanSummaryPresenter(_planSummary, _startAdventureButton);
+        ApplyArtStyles();
 
         _slotDialog = new RouteSlotDialogView();
         _slotDialog.RouteSlotConfirmed += AddRouteSlot;
@@ -50,7 +53,9 @@ public partial class DungeonPlanView : Control
         _slotDialog.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
         _startAdventureButton.Pressed += RequestPrimaryAction;
-        GetNode<Button>("%BackTownButton").Pressed += () => BackToTownRequested?.Invoke();
+        var backButton = GetNode<Button>("%BackTownButton");
+        DungeonFitUi.ApplyButton(backButton, UiButtonStyle.Secondary);
+        backButton.Pressed += () => BackToTownRequested?.Invoke();
 
         if (_plan is not null)
         {
@@ -133,6 +138,13 @@ public partial class DungeonPlanView : Control
         }
 
         StartAdventureRequested?.Invoke();
+    }
+
+    private void ApplyArtStyles()
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/RoutePanel"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyButton(_startAdventureButton, UiButtonStyle.Primary);
     }
 
     private static class Text

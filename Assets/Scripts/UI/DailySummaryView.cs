@@ -22,12 +22,15 @@ public partial class DailySummaryView : Control
 
     public override void _Ready()
     {
+        DungeonFitUi.ApplyTheme(this);
+        DungeonFitUi.AddBackground(this, UiThemePaths.SummaryBackground);
         _summaryTitle = GetNode<Label>("%SummaryTitle");
         _summaryStats = GetNode<Label>("%SummaryStats");
         _rewardList = GetNode<Label>("%RewardList");
         _summaryHint = GetNode<Label>("%SummaryHint");
         _openAllButton = GetNode<Button>("%OpenAllButton");
         _returnTownButton = GetNode<Button>("%ReturnTownButton");
+        ApplyArtStyles();
 
         _openAllButton.Pressed += OpenChests;
         _returnTownButton.Pressed += () => ReturnToTownRequested?.Invoke();
@@ -84,6 +87,14 @@ public partial class DailySummaryView : Control
         _openAllButton.Disabled = _isClaimed;
         _openAllButton.Text = _isClaimed ? Text.Opened : Text.OpenAll;
         _returnTownButton.Disabled = !_isClaimed;
+    }
+
+    private void ApplyArtStyles()
+    {
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/SummaryPanel"), UiPanelStyle.Main);
+        DungeonFitUi.ApplyButton(_openAllButton, UiButtonStyle.Primary);
+        DungeonFitUi.ApplyButton(_returnTownButton, UiButtonStyle.Secondary);
     }
 
     private async void OpenChests()

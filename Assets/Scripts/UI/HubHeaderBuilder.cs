@@ -16,6 +16,7 @@ public static class HubHeaderBuilder
         {
             CustomMinimumSize = new Vector2(0, 132),
         };
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Main);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 24);
@@ -32,6 +33,7 @@ public static class HubHeaderBuilder
         {
             CustomMinimumSize = new Vector2(92, 92),
         };
+        DungeonFitUi.ApplyPanel(portrait, UiPanelStyle.Token);
         row.AddChild(portrait);
 
         var portraitLabel = new Label
@@ -59,6 +61,7 @@ public static class HubHeaderBuilder
             CustomMinimumSize = new Vector2(0, 20),
             ShowPercentage = false,
         };
+        DungeonFitUi.ApplyProgressBar(expBar, new Color(0.48f, 0.82f, 0.58f));
         identityColumn.AddChild(expBar);
 
         var goldLabel = new Label
@@ -74,6 +77,7 @@ public static class HubHeaderBuilder
             CustomMinimumSize = new Vector2(86, 86),
         };
         actionButton.AddThemeFontSizeOverride("font_size", 28);
+        DungeonFitUi.ApplyButton(actionButton, UiButtonStyle.Secondary);
         row.AddChild(actionButton);
 
         controls = new HubHeaderControls(nameLevel, expBar, goldLabel, actionButton);
@@ -82,9 +86,9 @@ public static class HubHeaderBuilder
 
     public static void Refresh(HubHeaderControls controls, int level, int experience, int experienceToNextLevel, int gold)
     {
-        controls.NameLevelLabel.Text = $"冒險者    Lv.{level}";
+        controls.NameLevelLabel.Text = $"\u5192\u96aa\u8005  Lv.{level}";
         controls.ExpBar.MaxValue = Mathf.Max(1, experienceToNextLevel);
         controls.ExpBar.Value = Mathf.Clamp(experience, 0, Mathf.Max(1, experienceToNextLevel));
-        controls.GoldLabel.Text = $"金幣  {gold}";
+        controls.GoldLabel.Text = $"\u91d1\u5e63  {gold}";
     }
 }

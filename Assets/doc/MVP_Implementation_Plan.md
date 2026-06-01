@@ -289,4 +289,4 @@ Recorded on May 23, 2026. Updated on May 25, 2026:
 - The current UI uses placeholder fighters. Final art, Spine animation, action-specific Wave shapes, and exact audio sync are not integrated.
 - The current playable loop is Town -> Dungeon Plan -> current stage Room Challenge -> result -> Set Summary -> Dungeon Plan with updated route progress -> Daily Summary -> Open All -> Town. MVP per-set chest banking exists; full chest-opening animation is not implemented yet.
 - Ending training from Set Summary now routes into Daily Summary first. Town gold only changes after `Open All`, so players cannot accidentally bypass reward claim by returning to Town early.
-- JSON content loading, analytics, idle gold, shop, full chest tables, affix rerolls, music unlocks, and fatigue rules remain deferred.
+- JSON content loading, analytics, full chest tables, affix rerolls, music unlocks, and fatigue rules remain deferred. Idle gold, healing shop, potion supply, Blacksmith, Church, and Notice Board now exist as MVP systems but still need balancing and presentation polish.

@@ -7,10 +7,13 @@ public sealed record SaveStatus(
     int CompletedStageCount,
     int BankedRewardCount,
     int BankedChestCount,
-    bool DailyRewardsClaimed)
+    bool DailyRewardsClaimed,
+    string? WarningMessage = null)
 {
     public string SummaryText =>
-        HasSaveFile
+        !string.IsNullOrWhiteSpace(WarningMessage)
+            ? WarningMessage
+            : HasSaveFile
             ? $"Gold {Gold} / Route {RouteSlotCount} / Completed {CompletedStageCount} / Rewards {BankedRewardCount} / Chests {BankedChestCount}"
             : "No save file";
 }

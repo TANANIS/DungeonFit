@@ -362,6 +362,12 @@ public partial class TavernView : Control
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(_saveStatus.WarningMessage))
+        {
+            _saveStatusLabel.Text = _saveStatus.WarningMessage;
+            return;
+        }
+
         _saveStatusLabel.Text = _saveStatus.HasSaveFile
             ? string.Format(
                 Text.SaveStatusFormat,

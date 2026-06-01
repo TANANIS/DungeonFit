@@ -506,17 +506,21 @@ Implemented:
 - Music metadata through `MusicId`.
 - Flow smoke test for route progression and reward claim timing.
 
-Still MVP / placeholder:
+Implemented MVP systems that still need tuning or presentation polish:
 
-- Visual art and final mobile polish.
-- Full loot table balancing.
-- Equipment affixes and rerolling.
-- Chest-opening animation.
 - Moonlight Fountain daily recovery and blessing.
 - Herb Shop paid healing and room potion supply.
 - Blacksmith equipment enhancement and usable-level extension.
 - Idle reward accumulation and offline catch-up.
 - Church long-term oath quest implementation.
+- Notice Board short-term quest claiming, persistence, and daily refresh.
+
+Still MVP / placeholder:
+
+- Visual art and final mobile polish.
+- Full loot table balancing.
+- Equipment affix expansion and rerolling.
+- Chest-opening animation.
 - Notice Board final visual polish, visible refresh countdown, and broader reward variety.
 - Android export/device verification.
 - Precise music loop points and latency calibration.

@@ -26,7 +26,7 @@ public sealed class RoomRun
 		_playerStats = playerStats;
 		_enemy = enemy;
 		_enemyLevel = Math.Max(1, task.DungeonLevel);
-		CurrentPlayerHp = Math.Clamp(initialPlayerHp, -playerStats.MaxHp, playerStats.MaxHp);
+		CurrentPlayerHp = Math.Clamp(initialPlayerHp, 0, playerStats.MaxHp);
 	}
 
 	public TaskTemplate Task { get; }
@@ -109,7 +109,7 @@ public sealed class RoomRun
 			{
 				enemyAttacked = true;
 				damageTaken = wasEvading ? 1 : (_activeSetIsBoss ? _enemy.GetBossAttack(_enemyLevel) : _enemy.GetNormalAttack(_enemyLevel));
-				CurrentPlayerHp = Math.Max(-_playerStats.MaxHp, CurrentPlayerHp - damageTaken);
+				CurrentPlayerHp = Math.Max(0, CurrentPlayerHp - damageTaken);
 				_activeDamageTaken += damageTaken;
 			}
 		}

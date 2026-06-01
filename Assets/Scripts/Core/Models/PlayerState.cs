@@ -337,7 +337,7 @@ public sealed class PlayerState
 
     private int ClampHp(int hp)
     {
-        return Math.Clamp(hp, -MaxHp, MaxHp);
+        return Math.Clamp(hp, 0, MaxHp);
     }
 
     public static int GetExperienceToNextLevel(int level)

@@ -29,6 +29,7 @@ public sealed class GameSession
     private readonly LongTermQuestCatalog _longTermQuestCatalog = new();
     private readonly SaveService _saveService = new();
     private readonly bool _persistenceEnabled;
+    private string? _saveWarningMessage;
     private string _noticeBoardRefreshKey;
     private bool _noticeBoardRefreshKeyNeedsSave;
     private string _dailyStateKey;
@@ -49,7 +50,11 @@ public sealed class GameSession
 
         if (_persistenceEnabled)
         {
-            Restore(_saveService.Load());
+            var loadResult = _saveService.Load();
+            _saveWarningMessage = loadResult.Status == SaveLoadStatus.Corrupted
+                ? "存檔讀取失敗，已使用新狀態。"
+                : null;
+            Restore(loadResult.State);
         }
     }
 
@@ -86,7 +91,8 @@ public sealed class GameSession
             ActiveRun?.CompletedStages ?? 0,
             ActiveRun?.BankedRewards.Count ?? 0,
             ActiveRun?.BankedRewards.Count(reward => reward.IsChest) ?? 0,
-            DailyRewardsClaimed);
+            DailyRewardsClaimed,
+            _saveWarningMessage);
     }
 
     public void ManualSave()
@@ -94,6 +100,7 @@ public sealed class GameSession
         RefreshNoticeBoardIfExpired();
         RefreshIdleRewards();
         Save();
+        _saveWarningMessage = null;
     }
 
     public void DeleteSaveAndReset()
@@ -121,6 +128,7 @@ public sealed class GameSession
         _herbShopPotionPurchasesToday = 0;
         _idleLastCalculatedAtUtc = GetUtcNow();
         _unclaimedIdleGold = 0;
+        _saveWarningMessage = null;
     }
 
     public void RefreshNoticeBoardIfExpired()
@@ -1256,7 +1264,7 @@ public sealed class GameSession
 
     private void UpdateShortTermQuestProgress(TaskTemplate completedStage, RunSummary summary)
     {
-        if (summary.CompletedSets <= 0 || ActiveShortTermQuests.Count == 0)
+        if (!IsStageFullyCompleted(summary) || ActiveShortTermQuests.Count == 0)
         {
             return;
         }
@@ -1319,14 +1327,22 @@ public sealed class GameSession
     {
         return definition.ObjectiveType switch
         {
-            LongTermQuestObjectiveType.CompleteRooms => summary.CompletedSets > 0 ? 1 : 0,
+            LongTermQuestObjectiveType.CompleteRooms => IsStageFullyCompleted(summary) ? 1 : 0,
             LongTermQuestObjectiveType.CompleteDungeonTypeRooms =>
-                summary.CompletedSets > 0 && LongTermQuestCatalog.MatchesTarget(definition, completedStage.DungeonTypeId) ? 1 : 0,
+                IsStageFullyCompleted(summary) && LongTermQuestCatalog.MatchesTarget(definition, completedStage.DungeonTypeId) ? 1 : 0,
             LongTermQuestObjectiveType.DefeatBosses =>
                 summary.CombatResults?.Count(result => result.IsBoss && result.EnemyDefeated) ?? 0,
             LongTermQuestObjectiveType.EarnGold => Math.Max(0, summary.Reward.Gold),
             _ => 0,
         };
+    }
+
+    private static bool IsStageFullyCompleted(RunSummary summary)
+    {
+        return summary.TotalSets > 0 &&
+            summary.CompletedSets >= summary.TotalSets &&
+            Enumerable.Range(1, summary.TotalSets)
+                .All(setNumber => summary.GetSetResult(setNumber) == CompletionResult.Completed);
     }
 
     private ActiveShortTermQuest ClaimShortTermQuestReward(

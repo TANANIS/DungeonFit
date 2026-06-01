@@ -14,23 +14,26 @@ public sealed class SaveService
         IncludeFields = false,
     };
 
-    public SaveGameState? Load()
+    public SaveLoadResult Load()
     {
         if (!FileAccess.FileExists(SavePath))
         {
-            return null;
+            return SaveLoadResult.Missing();
         }
 
         try
         {
             using var file = FileAccess.Open(SavePath, FileAccess.ModeFlags.Read);
             var json = file.GetAsText();
-            return JsonSerializer.Deserialize<SaveGameState>(json, JsonOptions);
+            var state = JsonSerializer.Deserialize<SaveGameState>(json, JsonOptions);
+            return state is null
+                ? SaveLoadResult.Corrupted("Save file was empty or unreadable.")
+                : SaveLoadResult.Loaded(state);
         }
         catch (Exception exception)
         {
             GD.PushWarning($"Failed to load save: {exception.Message}");
-            return null;
+            return SaveLoadResult.Corrupted(exception.Message);
         }
     }
 

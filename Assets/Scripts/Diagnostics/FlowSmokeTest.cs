@@ -71,6 +71,7 @@ public static class FlowSmokeTest
         lines.AddRange(RunIdleRewardSmoke());
         lines.AddRange(RunBlacksmithSmoke());
         lines.AddRange(RunChurchSmoke());
+        lines.AddRange(RunQuestProgressSmoke());
         lines.AddRange(RunRecoveryAndSupplySmoke());
 
         var earlyExitSession = new GameSession(persistenceEnabled: false);
@@ -553,6 +554,63 @@ public static class FlowSmokeTest
         yield return $"HP_PERSIST player={hpSession.Player.CurrentHp} tavern={tavern.Character.CurrentHp}/{tavern.Character.MaxHp}";
     }
 
+    private static IEnumerable<string> RunQuestProgressSmoke()
+    {
+        var shortPartial = BuildQuestSession("chest");
+        shortPartial.AcceptShortTermQuest("herbal_chest");
+        RecordSyntheticStage(shortPartial, CompletionResult.Partial, 1);
+        yield return $"QUEST_SHORT_PARTIAL progress={shortPartial.ActiveShortTermQuests.First().Progress}";
+
+        var shortComplete = BuildQuestSession("chest");
+        shortComplete.AcceptShortTermQuest("herbal_chest");
+        RecordSyntheticStage(shortComplete, CompletionResult.Completed, 4);
+        yield return $"QUEST_SHORT_COMPLETE progress={shortComplete.ActiveShortTermQuests.First().Progress}";
+
+        var longPartial = BuildQuestSession("chest");
+        longPartial.AcceptLongTermQuest("guard_gate_disturbance");
+        RecordSyntheticStage(longPartial, CompletionResult.Partial, 1);
+        yield return $"QUEST_LONG_PARTIAL progress={longPartial.ActiveLongTermQuest?.Progress ?? -1}";
+
+        var longComplete = BuildQuestSession("chest");
+        longComplete.AcceptLongTermQuest("guard_gate_disturbance");
+        RecordSyntheticStage(longComplete, CompletionResult.Completed, 4);
+        yield return $"QUEST_LONG_COMPLETE progress={longComplete.ActiveLongTermQuest?.Progress ?? -1}";
+    }
+
+    private static GameSession BuildQuestSession(string firstDungeonType)
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot(firstDungeonType, 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+        });
+        session.StartOrGetActiveRun();
+        return session;
+    }
+
+    private static void RecordSyntheticStage(GameSession session, CompletionResult result, int completedSets)
+    {
+        var stage = session.ActiveRun!.CurrentStage;
+        var setResults = Enumerable.Range(1, stage.TotalSets)
+            .Select(set => set <= completedSets ? result : CompletionResult.Skipped)
+            .ToArray();
+        var combatResults = result == CompletionResult.Completed
+            ? ClearedCombatResults(stage.TotalSets)
+            : Array.Empty<CombatSetResult>();
+        session.RecordStageResult(new RunSummary(
+            "Quest Smoke",
+            stage.RoomName,
+            completedSets,
+            stage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, completedSets * 3, null),
+            setResults,
+            combatResults,
+            24));
+    }
+
     private static IEnumerable<string> RunCombatSmoke()
     {
         var catalog = new TaskCatalog();
@@ -600,7 +658,7 @@ public static class FlowSmokeTest
         var floorRoom = roomService.Start(stage, new PlayerCombatStats(24, 3, 0), enemy, -23);
         ResolveFullSet(roomService, floorRoom, stage.TargetReps);
         var floor = roomService.ReportSet(floorRoom)!;
-        yield return $"COMBAT_HP_FLOOR hp={floor.PlayerHpAfter} min={-24}";
+        yield return $"COMBAT_HP_FLOOR hp={floor.PlayerHpAfter} min={0}";
 
         var deterministicRoomA = roomService.Start(stage, new PlayerCombatStats(24, 3, 0), enemy, 24);
         var deterministicRoomB = roomService.Start(stage, new PlayerCombatStats(24, 3, 0), enemy, 24);

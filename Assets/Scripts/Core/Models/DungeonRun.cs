@@ -11,7 +11,7 @@ public sealed class DungeonRun
     {
         Plan = plan;
         RunId = System.Guid.NewGuid().ToString("N");
-        CurrentPlayerHp = initialPlayerHp;
+        CurrentPlayerHp = System.Math.Max(0, initialPlayerHp);
     }
 
     public DungeonPlan Plan { get; }
@@ -47,7 +47,7 @@ public sealed class DungeonRun
 
         _stageSummaries.Add(summary);
         _bankedRewards.AddRange(bankedRewards);
-        CurrentPlayerHp = summary.RemainingPlayerHp ?? CurrentPlayerHp;
+        CurrentPlayerHp = System.Math.Max(0, summary.RemainingPlayerHp ?? CurrentPlayerHp);
     }
 
     public void RestoreStageResult(RunSummary summary, IEnumerable<BankedReward> bankedRewards)
@@ -59,11 +59,11 @@ public sealed class DungeonRun
 
         _stageSummaries.Add(summary);
         _bankedRewards.AddRange(bankedRewards);
-        CurrentPlayerHp = summary.RemainingPlayerHp ?? CurrentPlayerHp;
+        CurrentPlayerHp = System.Math.Max(0, summary.RemainingPlayerHp ?? CurrentPlayerHp);
     }
 
     public void RestorePlayerHp(int playerHp)
     {
-        CurrentPlayerHp = playerHp;
+        CurrentPlayerHp = System.Math.Max(0, playerHp);
     }
 }

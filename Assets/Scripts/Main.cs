@@ -37,33 +37,11 @@ public partial class Main : Control
                 GD.Print(line);
             }
 
-            var tavernScene = GD.Load<PackedScene>(TavernScenePath);
-            var tavern = tavernScene.Instantiate<TavernView>();
-            var tavernSession = new GameSession(persistenceEnabled: false);
-            tavern.Initialize(tavernSession.BuildTavernEquipmentViewModel(), tavernSession.GetSaveStatus());
-            AddChild(tavern);
-            GD.Print("TAVERN_UI_LOADED");
-            GD.Print($"TAVERN_SETTINGS_OPENED {tavern.SmokeOpenSettingsPanel()}");
-            var blacksmithScene = GD.Load<PackedScene>(BlacksmithScenePath);
-            var blacksmith = blacksmithScene.Instantiate<BlacksmithView>();
-            blacksmith.Initialize(tavernSession.BuildBlacksmithViewModel());
-            AddChild(blacksmith);
-            GD.Print("BLACKSMITH_UI_LOADED");
-            var churchScene = GD.Load<PackedScene>(ChurchScenePath);
-            var church = churchScene.Instantiate<ChurchView>();
-            church.Initialize(tavernSession.BuildChurchViewModel());
-            AddChild(church);
-            GD.Print("CHURCH_UI_LOADED");
-            var moonScene = GD.Load<PackedScene>(MoonlightFountainScenePath);
-            var moon = moonScene.Instantiate<MoonlightFountainView>();
-            moon.Initialize(tavernSession.BuildMoonlightFountainViewModel());
-            AddChild(moon);
-            GD.Print("MOONLIGHT_UI_LOADED");
-            var herbScene = GD.Load<PackedScene>(HerbShopScenePath);
-            var herb = herbScene.Instantiate<HerbShopView>();
-            herb.Initialize(tavernSession.BuildHerbShopViewModel());
-            AddChild(herb);
-            GD.Print("HERB_UI_LOADED");
+            foreach (var line in FlowSmokeUiLoader.Run(this))
+            {
+                GD.Print(line);
+            }
+
             GetTree().Quit();
             return;
         }

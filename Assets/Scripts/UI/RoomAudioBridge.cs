@@ -44,4 +44,9 @@ public sealed class RoomAudioBridge
     {
         _musicPlayer.TogglePause();
     }
+
+    public void SetPaused(bool isPaused)
+    {
+        _musicPlayer.SetPaused(isPaused);
+    }
 }

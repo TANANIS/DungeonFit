@@ -30,6 +30,8 @@ public partial class WaveIndicatorView : Control
 
     public bool IsRunning => _isRunning;
 
+    public bool IsPaused => _isPaused;
+
     public int CompletedReps => _reps == 0
         ? 0
         : Math.Clamp((int)Math.Floor(_elapsedSeconds / SecondsPerRep), 0, _reps);
@@ -128,6 +130,19 @@ public partial class WaveIndicatorView : Control
 
         _isPaused = !_isPaused;
 
+        QueueRedraw();
+    }
+
+    public void SetPaused(bool isPaused)
+    {
+        if (!_isRunning)
+        {
+            _isPaused = false;
+            QueueRedraw();
+            return;
+        }
+
+        _isPaused = isPaused;
         QueueRedraw();
     }
 

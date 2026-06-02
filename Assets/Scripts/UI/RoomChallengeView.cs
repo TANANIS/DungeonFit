@@ -17,6 +17,7 @@ public partial class RoomChallengeView : Control
     private readonly RoomPhaseController _phase = new();
 
     public event Action<RunSummary>? RoomContinueRequested;
+    public event Action<int>? ReturnToTownRequested;
     public event Func<int, SupplyUseResult>? SmallPotionRequested;
 
     private PlayerState _player = new();
@@ -30,6 +31,7 @@ public partial class RoomChallengeView : Control
     private WorkoutTimingProfile _timing = null!;
     private double _restRemainingSeconds;
     private bool _isRestCountingDown;
+    private bool _isPaused;
     private RoomAudioBridge _audioBridge = null!;
     private RoomResultPresenter _resultPresenter = null!;
     private BattleEncounterView _battleEncounter = null!;
@@ -45,6 +47,7 @@ public partial class RoomChallengeView : Control
     private PanelContainer _restPanel = null!;
     private PanelContainer _reportPanel = null!;
     private PanelContainer _resultPanel = null!;
+    private PanelContainer _pausePanel = null!;
     private PanelContainer _supplyPanel = null!;
     private Label _supplyStatus = null!;
     private Button _smallPotionButton = null!;
@@ -85,6 +88,7 @@ public partial class RoomChallengeView : Control
             enemyName,
             bossHealth);
         ApplyArtStyles(bossHealth);
+        BuildPausePanel();
 
         var audioPlayer = new AudioStreamPlayer
         {
@@ -107,8 +111,9 @@ public partial class RoomChallengeView : Control
         DungeonFitUi.ApplyButton(skipButton, UiButtonStyle.Danger);
         skipButton.Pressed += SkipRoom;
         var pauseButton = GetNode<Button>("%PauseButton");
+        pauseButton.Text = Text.PauseButton;
         DungeonFitUi.ApplyButton(pauseButton, UiButtonStyle.Secondary);
-        pauseButton.Pressed += ToggleWavePause;
+        pauseButton.Pressed += PauseDungeon;
         var readyButton = GetNode<Button>("%ReadyNowButton");
         DungeonFitUi.ApplyButton(readyButton, UiButtonStyle.Primary);
         readyButton.Pressed += CompleteRestNow;
@@ -132,7 +137,7 @@ public partial class RoomChallengeView : Control
     {
         _audioBridge.Process(delta);
 
-        if (!_isRestCountingDown)
+        if (_isPaused || !_isRestCountingDown)
         {
             return;
         }
@@ -188,6 +193,18 @@ public partial class RoomChallengeView : Control
         }
     }
 
+    public bool SmokeOpenPauseMenu()
+    {
+        PauseDungeon();
+        return _isPaused && _pausePanel.Visible;
+    }
+
+    public bool SmokeResumePauseMenu()
+    {
+        ResumeDungeon();
+        return !_isPaused && !_pausePanel.Visible;
+    }
+
     private void StartRoom()
     {
         var enemy = _enemyCatalog.GetForDungeon(_task.DungeonTypeId);
@@ -196,6 +213,8 @@ public partial class RoomChallengeView : Control
             new DungeonRouteSlot(_task.DungeonTypeId, _task.TotalSets, _task.TargetReps, _task.MusicId, _task.RestSeconds),
             _task.Bpm);
         _battleEncounter.SetEnemy(enemy, _task.DungeonLevel);
+        _isPaused = false;
+        _pausePanel.Visible = false;
         _restPanel.Visible = false;
         _reportPanel.Visible = false;
         _resultPresenter.Hide();
@@ -217,8 +236,75 @@ public partial class RoomChallengeView : Control
         DungeonFitUi.ApplyProgressBar(bossHealth, new Color(0.78f, 0.2f, 0.28f));
     }
 
+    private void BuildPausePanel()
+    {
+        _pausePanel = new PanelContainer
+        {
+            Name = "PausePanel",
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        _pausePanel.SetAnchorsPreset(LayoutPreset.FullRect);
+        DungeonFitUi.ApplyPanel(_pausePanel, UiPanelStyle.Overlay);
+        AddChild(_pausePanel);
+        _pausePanel.MoveToFront();
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 58);
+        margin.AddThemeConstantOverride("margin_top", 210);
+        margin.AddThemeConstantOverride("margin_right", 58);
+        margin.AddThemeConstantOverride("margin_bottom", 210);
+        _pausePanel.AddChild(margin);
+
+        var layout = new VBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+        };
+        layout.AddThemeConstantOverride("separation", 22);
+        margin.AddChild(layout);
+
+        var title = new Label
+        {
+            Text = Text.PauseTitle,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        title.AddThemeFontSizeOverride("font_size", 58);
+        layout.AddChild(title);
+
+        var status = new Label
+        {
+            Text = Text.PauseDescription,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        status.AddThemeFontSizeOverride("font_size", 28);
+        layout.AddChild(status);
+
+        var resumeButton = CreatePauseMenuButton(Text.ResumeDungeon, UiButtonStyle.Primary);
+        resumeButton.Pressed += ResumeDungeon;
+        layout.AddChild(resumeButton);
+
+        var returnButton = CreatePauseMenuButton(Text.ReturnTown, UiButtonStyle.Secondary);
+        returnButton.Pressed += ReturnTownFromPause;
+        layout.AddChild(returnButton);
+    }
+
+    private static Button CreatePauseMenuButton(string text, UiButtonStyle style)
+    {
+        var button = new Button
+        {
+            Text = text,
+            CustomMinimumSize = new Vector2(0, 92),
+        };
+        button.AddThemeFontSizeOverride("font_size", 34);
+        DungeonFitUi.ApplyButton(button, style);
+        return button;
+    }
+
     private void StartWave(string message)
     {
+        _isPaused = false;
+        _pausePanel.Visible = false;
         _phase.StartWave();
         _isRestCountingDown = false;
         _restPanel.Visible = false;
@@ -315,6 +401,8 @@ public partial class RoomChallengeView : Control
     {
         var reward = _roomService.ResolveReward(_room);
 
+        _isPaused = false;
+        _pausePanel.Visible = false;
         _waveIndicator.StopSet();
         _audioBridge.StopForResult();
         _isRestCountingDown = false;
@@ -357,14 +445,20 @@ public partial class RoomChallengeView : Control
         _restStatus.Text = _isRestCountingDown
             ? string.Format(Text.RestTimerFormat, FormatSeconds(_restRemainingSeconds))
             : _phase.IsActiveWave
-                ? string.Format(Text.ActiveWaveFormat, _timing.Bpm)
+                ? string.Format(Text.ActiveWaveFormat, _timing.RepsPerMinute)
                 : string.Format(Text.RestTimerFormat, FormatSeconds(_timing.RestSeconds));
+        if (_isPaused)
+        {
+            _setStatus.Text = Text.PausedStatus;
+            _restStatus.Text = Text.PausedStatus;
+        }
+
         _waveMarkers.Text = BuildWaveMarkers(progress);
         _goldLabel.Text = string.Format(Text.GoldFormat, _player.Gold);
         GetNode<Label>("%NowPlaying").Text = string.Format(
             Text.NowPlayingFormat,
             _musicCatalog.GetById(_task.MusicId).DisplayName,
-            _timing.Bpm);
+            _timing.RepsPerMinute);
         RefreshSupply();
     }
 
@@ -447,11 +541,44 @@ public partial class RoomChallengeView : Control
         return string.Join(" ", markers);
     }
 
-    private void ToggleWavePause()
+    private void PauseDungeon()
     {
-        _waveIndicator.TogglePause();
-        _audioBridge.TogglePause();
-        _battleMessage.Text = Text.PauseToggled;
+        if (_phase.IsResult || _isPaused)
+        {
+            return;
+        }
+
+        _isPaused = true;
+        _waveIndicator.SetPaused(true);
+        _audioBridge.SetPaused(true);
+        _pausePanel.Visible = true;
+        _pausePanel.MoveToFront();
+        _battleMessage.Text = Text.PausedMessage;
+        Refresh(_room.Progress);
+    }
+
+    private void ResumeDungeon()
+    {
+        if (!_isPaused)
+        {
+            return;
+        }
+
+        _isPaused = false;
+        _waveIndicator.SetPaused(false);
+        _audioBridge.SetPaused(false);
+        _pausePanel.Visible = false;
+        _battleMessage.Text = Text.ResumedMessage;
+        Refresh(_room.Progress);
+    }
+
+    private void ReturnTownFromPause()
+    {
+        _isPaused = false;
+        _waveIndicator.StopSet();
+        _audioBridge.StopImmediate();
+        _pausePanel.Visible = false;
+        ReturnToTownRequested?.Invoke(_room.CurrentPlayerHp);
     }
 
     private void CompleteRestNow()
@@ -547,6 +674,14 @@ public partial class RoomChallengeView : Control
         public const string UsePotion = "\u85e5\u6c34";
         public const string PotionUsed = "\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\uff0c\u6062\u5fa9 {0} HP\u3002\u76ee\u524d HP {1}\u3002";
         public const string NoPotionUsed = "\u76ee\u524d\u7121\u6cd5\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\u3002";
+        public const string PauseButton = "\u2161";
+        public const string PauseTitle = "\u66ab\u505c";
+        public const string PauseDescription = "\u526f\u672c\u9032\u5ea6\u6703\u4fdd\u7559\u5728\u76ee\u524d\u623f\u9593\uff0c\u8fd4\u56de\u57ce\u93ae\u5f8c\u53ef\u518d\u6b21\u9032\u5165\u7e7c\u7e8c\u6311\u6230\u3002";
+        public const string ResumeDungeon = "\u7e7c\u7e8c\u526f\u672c";
+        public const string ReturnTown = "\u8fd4\u56de\u57ce\u93ae";
+        public const string PausedStatus = "\u526f\u672c\u66ab\u505c\u4e2d";
+        public const string PausedMessage = "\u526f\u672c\u5df2\u66ab\u505c\u3002";
+        public const string ResumedMessage = "\u526f\u672c\u7e7c\u7e8c\u3002";
         public const string ChestDungeon = "\u80f8\u5730\u57ce";
         public const string ShoulderDungeon = "\u80a9\u5730\u57ce";
         public const string BackDungeon = "\u80cc\u5730\u57ce";

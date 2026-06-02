@@ -146,6 +146,14 @@ public sealed class WorkoutMusicPlayer
         }
     }
 
+    public void SetPaused(bool isPaused)
+    {
+        if (_player.Playing)
+        {
+            _player.StreamPaused = isPaused;
+        }
+    }
+
     private void StartFade(float targetDb, double durationSeconds, FadeMode mode)
     {
         _fadeMode = mode;

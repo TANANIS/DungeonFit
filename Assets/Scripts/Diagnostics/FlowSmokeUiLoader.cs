@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using DungeonFit.Core.Content;
 using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
@@ -17,6 +17,7 @@ public static class FlowSmokeUiLoader
     private const string TavernScenePath = "res://Assets/Scenes/Tavern.tscn";
     private const string BlacksmithScenePath = "res://Assets/Scenes/Blacksmith.tscn";
     private const string ChurchScenePath = "res://Assets/Scenes/Church.tscn";
+    private const string NoticeBoardScenePath = "res://Assets/Scenes/NoticeBoard.tscn";
     private const string MoonlightFountainScenePath = "res://Assets/Scenes/MoonlightFountain.tscn";
     private const string HerbShopScenePath = "res://Assets/Scenes/HerbShop.tscn";
 
@@ -25,10 +26,10 @@ public static class FlowSmokeUiLoader
         var session = new GameSession(persistenceEnabled: false);
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90, "chest_push_up"),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
 
         var town = Load<TownView>(TownScenePath);
@@ -66,6 +67,8 @@ public static class FlowSmokeUiLoader
                 session.BuildRoomSupplyViewModel());
             parent.AddChild(room);
             yield return "ROOM_CHALLENGE_UI_LOADED";
+            yield return $"ROOM_PAUSE_OPENED {room.SmokeOpenPauseMenu()}";
+            yield return $"ROOM_PAUSE_RESUMED {room.SmokeResumePauseMenu()}";
             Release(parent, room);
 
             session.RecordStageResult(new RunSummary(
@@ -117,6 +120,12 @@ public static class FlowSmokeUiLoader
         parent.AddChild(church);
         yield return "CHURCH_UI_LOADED";
         Release(parent, church);
+
+        var noticeBoard = Load<NoticeBoardView>(NoticeBoardScenePath);
+        noticeBoard.Initialize(new ShortTermQuestCatalog().GetDailyBoard(), session.ActiveShortTermQuests, session.Player);
+        parent.AddChild(noticeBoard);
+        yield return "NOTICE_BOARD_UI_LOADED";
+        Release(parent, noticeBoard);
 
         var moon = Load<MoonlightFountainView>(MoonlightFountainScenePath);
         moon.Initialize(session.BuildMoonlightFountainViewModel());

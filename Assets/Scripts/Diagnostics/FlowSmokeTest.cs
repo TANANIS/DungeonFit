@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -18,10 +18,10 @@ public static class FlowSmokeTest
         var plan = catalog.GetDefaultPlan();
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("shoulders", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("shoulders", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         var run = service.Start(plan, session.Player.MaxHp);
         var lines = new List<string>
@@ -70,6 +70,8 @@ public static class FlowSmokeTest
         lines.AddRange(RunSaveMigrationSmoke());
         lines.AddRange(RunIdleRewardSmoke());
         lines.AddRange(RunBlacksmithSmoke());
+        lines.AddRange(RunBetaContentSmoke());
+        lines.AddRange(RunRunInterruptionSmoke());
         lines.AddRange(RunChurchSmoke());
         lines.AddRange(RunQuestProgressSmoke());
         lines.AddRange(RunRecoveryAndSupplySmoke());
@@ -207,10 +209,10 @@ public static class FlowSmokeTest
         var service = new DungeonRunService();
         var route = catalog.CreateDungeonPlanFromRoute(new[]
         {
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("back", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("back", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         var run = service.Start(route, 24);
         var stage = run.CurrentStage;
@@ -264,6 +266,8 @@ public static class FlowSmokeTest
             EquipmentSlot.Weapon,
             "chest",
             "\u666e\u901a",
+            1,
+            5,
             5,
             80,
             new[] { new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty) });
@@ -274,6 +278,8 @@ public static class FlowSmokeTest
             EquipmentSlot.Weapon,
             "chest",
             "\u666e\u901a",
+            1,
+            5,
             5,
             80,
             new[] { new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty) });
@@ -336,6 +342,8 @@ public static class FlowSmokeTest
             EquipmentSlot.Weapon,
             "chest",
             "\u666e\u901a",
+            1,
+            5,
             5,
             80,
             new[] { new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty) });
@@ -355,6 +363,9 @@ public static class FlowSmokeTest
         }
 
         yield return $"BLACKSMITH_CAP level={item.EnhancementLevel} power={item.Power} extra={session.EnhanceEquipment(item.Id)}";
+        var extensionBefore = item.EffectiveRecommendedLevelMax;
+        var extend = session.ExtendEquipmentLevelRange(item.Id);
+        yield return $"BLACKSMITH_EXTEND result={extend} max={extensionBefore}->{item.EffectiveRecommendedLevelMax} gold={session.Player.Gold}";
 
         var serialized = JsonSerializer.Serialize(new SaveGameState
         {
@@ -370,6 +381,65 @@ public static class FlowSmokeTest
         yield return $"BLACKSMITH_DISMANTLE_ZERO result={session.DismantleEnhancement(item.Id)} level={item.EnhancementLevel}";
     }
 
+    private static IEnumerable<string> RunBetaContentSmoke()
+    {
+        var equipment = new EquipmentCatalog();
+        var lootProfiles = new DungeonLootProfileCatalog();
+        var exercises = new ExerciseCatalog();
+        var shortQuests = new ShortTermQuestCatalog();
+        var longQuests = new LongTermQuestCatalog();
+        yield return $"BETA_CONTENT equipment={equipment.GetAll().Count} lootProfiles={lootProfiles.GetAll().Count} exercises={exercises.GetAll().Count} shortDaily={shortQuests.GetDailyBoard().Count} longQuests={longQuests.GetAll().Count}";
+
+        foreach (var profile in lootProfiles.GetAll())
+        {
+            yield return $"BETA_LOOT_PROFILE dungeon={profile.DungeonTypeId} definitions={profile.EquipmentDefinitionIds.Count} extras={profile.ExtraModifierCandidates.Count}";
+        }
+
+        foreach (var dungeonTypeId in new[] { "chest", "shoulders", "back", "legs", "core", "arms" })
+        {
+            var dungeonExercises = exercises.GetForDungeon(dungeonTypeId);
+            var complete = dungeonExercises.Count >= 8 &&
+                dungeonExercises.Count(exercise => exercise.IsRecommended) == 1 &&
+                dungeonExercises.All(exercise =>
+                    !string.IsNullOrWhiteSpace(exercise.Name) &&
+                    !string.IsNullOrWhiteSpace(exercise.TrainingType) &&
+                    !string.IsNullOrWhiteSpace(exercise.Summary) &&
+                    !string.IsNullOrWhiteSpace(exercise.SafetyNote));
+            yield return $"BETA_EXERCISES dungeon={dungeonTypeId} count={dungeonExercises.Count} recommended={dungeonExercises.Count(exercise => exercise.IsRecommended)} complete={complete}";
+        }
+    }
+
+    private static IEnumerable<string> RunRunInterruptionSmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+        });
+        var activeRun = session.StartOrGetActiveRun();
+        session.LeaveActiveRoom(7);
+        yield return $"ROOM_INTERRUPT active={session.ActiveRun is not null} hp={session.ActiveRun?.CurrentPlayerHp ?? -1} playerHp={session.Player.CurrentHp} stage={session.ActiveRun?.CurrentStageIndex ?? -1}";
+
+        var stage = activeRun!.CurrentStage;
+        session.RecordStageResult(new RunSummary(
+            "Interrupt Clear",
+            stage.RoomName,
+            stage.TotalSets,
+            stage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 60, null),
+            CompletedResults(stage.TotalSets),
+            ClearedCombatResults(stage.TotalSets),
+            7));
+        var beforeClaim = session.Player.Gold;
+        session.ClaimDailyRewards();
+        var afterFirstClaim = session.Player.Gold;
+        session.ClaimDailyRewards();
+        yield return $"DAILY_CLAIM_GUARD before={beforeClaim} first={afterFirstClaim} second={session.Player.Gold} claimed={session.DailyRewardsClaimed}";
+    }
+
     private static IEnumerable<string> RunChurchSmoke()
     {
         var session = new GameSession(persistenceEnabled: false);
@@ -382,10 +452,10 @@ public static class FlowSmokeTest
 
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
         });
         session.StartOrGetActiveRun();
         for (var index = 0; index < 3; index++)
@@ -404,10 +474,10 @@ public static class FlowSmokeTest
         bossSession.AcceptLongTermQuest("blacksmith_unfinished_blade");
         bossSession.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         bossSession.StartOrGetActiveRun();
         var bossStage = bossSession.ActiveRun!.CurrentStage;
@@ -420,10 +490,10 @@ public static class FlowSmokeTest
         goldSession.AcceptLongTermQuest("herbalist_moondew_research");
         goldSession.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("back", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("back", 4, 12, "chest_quest_01", 90),
         });
         goldSession.StartOrGetActiveRun();
         var goldStage = goldSession.ActiveRun!.CurrentStage;
@@ -440,7 +510,7 @@ public static class FlowSmokeTest
                 QuestId = "priest_faint_faith",
                 Progress = 2,
             },
-            UnlockedTitles = new List<string> { "尋光者" },
+            UnlockedTitles = new List<string> { "鎮民的信任" },
             ClaimedLongTermQuestIds = new List<string> { "mayor_missing_daughter" },
         });
         var restored = JsonSerializer.Deserialize<SaveGameState>(serialized)!;
@@ -487,10 +557,10 @@ public static class FlowSmokeTest
         var roomService = new RoomRunService();
         var route = catalog.CreateDungeonPlanFromRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         var stage = route.Stages[0];
         var attackRoom = roomService.Start(stage, bladeMoon.Player.CombatStats, enemyCatalog.GetForDungeon(stage.DungeonTypeId), bladeMoon.Player.CurrentHp);
@@ -507,10 +577,10 @@ public static class FlowSmokeTest
         var lockedBlessing = new GameSession(persistenceEnabled: false);
         lockedBlessing.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         lockedBlessing.StartOrGetActiveRun();
         yield return $"BLESSING_LOCKED selected={lockedBlessing.SelectDailyBlessing(DailyBlessing.StarlightGold)}";
@@ -534,10 +604,10 @@ public static class FlowSmokeTest
         var hpSession = new GameSession(persistenceEnabled: false);
         hpSession.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         hpSession.StartOrGetActiveRun();
         var hpStage = hpSession.ActiveRun!.CurrentStage;
@@ -582,10 +652,10 @@ public static class FlowSmokeTest
         var session = new GameSession(persistenceEnabled: false);
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot(firstDungeonType, 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot(firstDungeonType, 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         session.StartOrGetActiveRun();
         return session;
@@ -618,10 +688,10 @@ public static class FlowSmokeTest
         var roomService = new RoomRunService();
         var route = catalog.CreateDungeonPlanFromRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         var stage = route.Stages[0];
         var enemy = enemyCatalog.GetForDungeon(stage.DungeonTypeId);
@@ -680,10 +750,10 @@ public static class FlowSmokeTest
         var expSession = new GameSession(persistenceEnabled: false);
         expSession.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         expSession.StartOrGetActiveRun();
         var expStage = expSession.ActiveRun!.CurrentStage;
@@ -740,10 +810,10 @@ public static class FlowSmokeTest
     {
         var route = catalog.CreateDungeonPlanFromRoute(new[]
         {
-            new DungeonRouteSlot(dungeonTypeId, 4, reps, "Training Loop", 90),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot(dungeonTypeId, 4, reps, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
         var stage = route.Stages[0];
         var room = roomService.Start(stage, new PlayerCombatStats(24, 3, 0), enemyCatalog.GetForDungeon(stage.DungeonTypeId), 24);

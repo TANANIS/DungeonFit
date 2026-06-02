@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DungeonFit.Core.Content;
@@ -34,10 +34,10 @@ public static class UiScreenshotTest
         var session = new GameSession(persistenceEnabled: false);
         session.UpdateDungeonRoute(new[]
         {
-            new DungeonRouteSlot("chest", 4, 12, "Training Loop", 90, "chest_push_up"),
-            new DungeonRouteSlot("legs", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("core", 4, 12, "Training Loop", 90),
-            new DungeonRouteSlot("arms", 4, 12, "Training Loop", 90),
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
 
         var town = Load<TownView>(TownScenePath);

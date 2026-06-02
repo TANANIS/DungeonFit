@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using DungeonFit.Core.Content;
@@ -17,11 +16,7 @@ public sealed class ChurchViewModel
         IReadOnlyCollection<string> unlockedTitles,
         string? selectedQuestId)
     {
-        Player = new ChurchCharacterSummary(
-            player.Level,
-            player.Experience,
-            player.ExperienceToNextLevel,
-            player.Gold);
+        Player = new ChurchCharacterSummary(player.Level, player.Experience, player.ExperienceToNextLevel, player.Gold);
         ActiveQuest = activeQuest;
         ClaimedQuestIds = claimedQuestIds.ToArray();
         UnlockedTitles = unlockedTitles.ToArray();
@@ -53,6 +48,10 @@ public sealed class ChurchViewModel
     {
         var candidateIds = _catalog.GetCandidateIds();
         return _catalog.GetAll()
+            .Where(definition =>
+                candidateIds.Contains(definition.Id) ||
+                activeQuest?.QuestId == definition.Id ||
+                claimedQuestIds.Contains(definition.Id))
             .Select(definition =>
             {
                 var isCandidate = candidateIds.Contains(definition.Id);
@@ -83,18 +82,17 @@ public sealed class ChurchViewModel
         var isActive = activeQuest?.QuestId == definition.Id;
         var isCompleted = isActive && activeQuest!.Progress >= definition.RequiredAmount;
         var isClaimed = claimedQuestIds.Contains(definition.Id);
-        var canAccept = card.CanSelect &&
-            activeQuest is null &&
-            !isClaimed;
+        var canAccept = card.CanSelect && activeQuest is null && !isClaimed;
         var canClaim = isCompleted && activeQuest!.IsCompleted && !activeQuest.IsClaimed;
         var canAbandon = isActive && !activeQuest!.IsClaimed;
+
         return new ChurchQuestDetailViewModel(
             definition.Id,
             definition.Title,
             definition.Requester,
             definition.Description,
             BuildRequirementText(definition),
-            Math.Min(card.Progress, definition.RequiredAmount),
+            System.Math.Min(card.Progress, definition.RequiredAmount),
             definition.RequiredAmount,
             definition.RewardGold,
             definition.RewardTitle,
@@ -107,14 +105,12 @@ public sealed class ChurchViewModel
 
     private string ResolveSelectedQuestId(string? selectedQuestId, ActiveLongTermQuest? activeQuest)
     {
-        if (!string.IsNullOrWhiteSpace(selectedQuestId) &&
-            _catalog.GetById(selectedQuestId) is not null)
+        if (!string.IsNullOrWhiteSpace(selectedQuestId) && _catalog.GetById(selectedQuestId) is not null)
         {
             return selectedQuestId;
         }
 
-        if (!string.IsNullOrWhiteSpace(activeQuest?.QuestId) &&
-            _catalog.GetById(activeQuest.QuestId) is not null)
+        if (!string.IsNullOrWhiteSpace(activeQuest?.QuestId) && _catalog.GetById(activeQuest.QuestId) is not null)
         {
             return activeQuest.QuestId;
         }
@@ -160,10 +156,10 @@ public sealed class ChurchViewModel
     {
         return definition.ObjectiveType switch
         {
-            LongTermQuestObjectiveType.DefeatBosses => $"擊敗 Boss {definition.RequiredAmount} 次",
-            LongTermQuestObjectiveType.EarnGold => $"累積獲得 {definition.RequiredAmount} Gold",
-            LongTermQuestObjectiveType.CompleteRooms => $"完成任意房間 {definition.RequiredAmount} 次",
-            LongTermQuestObjectiveType.CompleteDungeonTypeRooms => $"完成指定地城房間 {definition.RequiredAmount} 次",
+            LongTermQuestObjectiveType.DefeatBosses => $"擊破 Boss {definition.RequiredAmount} 次",
+            LongTermQuestObjectiveType.EarnGold => $"累積地城金幣 {definition.RequiredAmount} Gold",
+            LongTermQuestObjectiveType.CompleteRooms => $"完整完成房間 {definition.RequiredAmount} 次",
+            LongTermQuestObjectiveType.CompleteDungeonTypeRooms => $"完整完成指定地城房間 {definition.RequiredAmount} 次",
             _ => $"完成目標 {definition.RequiredAmount} 次",
         };
     }
@@ -175,12 +171,12 @@ public sealed class ChurchViewModel
     {
         if (isClaimed)
         {
-            return "這項誓約已經完成。";
+            return "這項誓約已完成。";
         }
 
         if (card.Status == ChurchQuestStatus.Locked)
         {
-            return "目前尚未解鎖，先完成其他誓約。";
+            return "目前尚未開放，先完成可接受的誓約。";
         }
 
         if (activeQuest is not null && activeQuest.QuestId != card.Id)

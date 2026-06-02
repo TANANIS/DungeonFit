@@ -149,7 +149,7 @@ public partial class TavernView : Control
             {
                 Text = slot.Item is null
                     ? $"{slot.Label}\n{Text.EmptySlot}"
-                    : $"{slot.Label}\n{slot.Item.DisplayName}\n{slot.Item.Rarity} / {Text.Power} {slot.Item.Power}",
+                    : $"{slot.Label}\n{slot.Item.DisplayName}\n{slot.Item.Rarity} / {Text.Power} {slot.Item.EffectivePower}",
                 CustomMinimumSize = new Vector2(0, 110),
             };
             button.AddThemeFontSizeOverride("font_size", 24);
@@ -189,7 +189,7 @@ public partial class TavernView : Control
             var marker = item.IsEquipped ? Text.EquippedMarker : item.IsLocked ? Text.LockedMarker : string.Empty;
             var button = new Button
             {
-                Text = $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity}\n{Text.Power} {item.Power}",
+                Text = $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity}\n{Text.Power} {item.EffectivePower}  {item.LevelRangeText}",
                 CustomMinimumSize = new Vector2(142, 120),
                 ToggleMode = true,
                 ButtonPressed = item.Id == _selectedItemId,
@@ -225,7 +225,11 @@ public partial class TavernView : Control
         }
 
         _detailTitle.Text = item.DisplayName;
-        _detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | {Text.Power} {item.Power}";
+        var powerText = item.EffectivePower == item.Power
+            ? item.Power.ToString()
+            : $"{item.EffectivePower}/{item.Power}";
+        var levelState = item.IsWithinRecommendedLevel ? Text.LevelRangeOk : Text.LevelRangeDecayed;
+        _detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | {Text.Power} {powerText} | {item.LevelRangeText} {levelState}";
         _detailStats.Text = string.Join("\n", item.ModifierLines) + "\n" +
             string.Format(Text.SellPriceFormat, item.SellPrice);
         _detailHint.Text = item.IsEquipped
@@ -472,6 +476,8 @@ public partial class TavernView : Control
         public const string EquippedMarker = "[E] ";
         public const string LockedMarker = "[L] ";
         public const string Power = "\u6230\u529b";
+        public const string LevelRangeOk = "\u6548\u679c\u5b8c\u6574";
+        public const string LevelRangeDecayed = "\u8d85\u51fa\u7b49\u7d1a\u8870\u6e1b";
         public const string Attack = "\u653b\u64ca";
         public const string NoSelection = "\u5c1a\u672a\u9078\u64c7\u88dd\u5099";
         public const string NoSelectionMeta = "\u5f9e\u5009\u5eab\u6216\u5df2\u88dd\u5099\u6b04\u9078\u4e00\u4ef6\u88dd\u5099\u3002";

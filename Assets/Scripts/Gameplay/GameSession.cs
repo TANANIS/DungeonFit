@@ -359,6 +359,16 @@ public sealed class GameSession
         }
     }
 
+    public void LeaveActiveRoom(int currentHp)
+    {
+        RefreshNoticeBoardIfExpired();
+        var clampedHp = Math.Max(0, currentHp);
+        Player.SetCurrentHp(clampedHp);
+        ActiveRun?.RestorePlayerHp(clampedHp);
+        LastSetSummary = null;
+        Save();
+    }
+
     public MoonlightFountainViewModel BuildMoonlightFountainViewModel()
     {
         RefreshNoticeBoardIfExpired();
@@ -678,6 +688,24 @@ public sealed class GameSession
         return changed;
     }
 
+    public bool ExtendEquipmentLevelRange(string itemId)
+    {
+        var item = Player.Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null)
+        {
+            return false;
+        }
+
+        var cost = BlacksmithRules.GetLevelExtensionCost(item.LevelExtension);
+        var changed = Player.ExtendEquipmentLevelRange(itemId, cost, BlacksmithRules.MaxLevelExtension);
+        if (changed)
+        {
+            Save();
+        }
+
+        return changed;
+    }
+
     public bool SellEquipment(string itemId)
     {
         var changed = Player.SellEquipment(itemId);
@@ -967,6 +995,25 @@ public sealed class GameSession
             if (item.EnhancementLevel != normalizedEnhancementLevel)
             {
                 item.EnhancementLevel = normalizedEnhancementLevel;
+                changed = true;
+            }
+
+            var normalizedLevelExtension = BlacksmithRules.ClampLevelExtension(item.LevelExtension);
+            if (item.LevelExtension != normalizedLevelExtension)
+            {
+                item.LevelExtension = normalizedLevelExtension;
+                changed = true;
+            }
+
+            if (item.RecommendedLevelMin <= 0)
+            {
+                item.RecommendedLevelMin = 1;
+                changed = true;
+            }
+
+            if (item.RecommendedLevelMax < item.RecommendedLevelMin)
+            {
+                item.RecommendedLevelMax = item.RecommendedLevelMin + 4;
                 changed = true;
             }
         }

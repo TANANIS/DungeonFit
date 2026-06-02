@@ -10,11 +10,13 @@ public partial class BlacksmithView : Control
     private enum BlacksmithMode
     {
         Enhance,
+        Extend,
         Dismantle,
     }
 
     public event Action? BackToTownRequested;
     public event Action<string>? EnhanceRequested;
+    public event Action<string>? ExtendLevelRangeRequested;
     public event Action<string>? DismantleRequested;
 
     private BlacksmithViewModel _model = null!;
@@ -26,6 +28,7 @@ public partial class BlacksmithView : Control
     private Label _detailMeta = null!;
     private Label _detailStats = null!;
     private Button _enhanceModeButton = null!;
+    private Button _extendModeButton = null!;
     private Button _dismantleModeButton = null!;
     private Label _operationPreview = null!;
     private Label _operationHint = null!;
@@ -71,20 +74,20 @@ public partial class BlacksmithView : Control
         _header.ActionButton.Pressed += () => BackToTownRequested?.Invoke();
         layout.AddChild(header);
 
-        var hero = CreatePanel(250, UiPanelStyle.Main);
+        var hero = CreatePanel(220, UiPanelStyle.Main);
         layout.AddChild(hero);
         var heroLayout = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         heroLayout.AddThemeConstantOverride("separation", 8);
         hero.AddChild(heroLayout);
-        heroLayout.AddChild(CreateCenteredLabel(Text.Title, 62));
-        heroLayout.AddChild(CreateCenteredLabel(Text.Subtitle, 32));
-        heroLayout.AddChild(CreateCenteredLabel(Text.Description, 25));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Title, 58));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Subtitle, 30));
+        heroLayout.AddChild(CreateCenteredLabel(Text.Description, 24));
 
         var middle = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         middle.AddThemeConstantOverride("separation", 18);
         layout.AddChild(middle);
 
-        var inventoryPanel = CreatePanel(430, UiPanelStyle.Card);
+        var inventoryPanel = CreatePanel(410, UiPanelStyle.Card);
         inventoryPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         middle.AddChild(inventoryPanel);
         var inventoryMargin = CreateMargin(18, 16);
@@ -94,8 +97,8 @@ public partial class BlacksmithView : Control
         _inventoryGrid.AddThemeConstantOverride("v_separation", 12);
         inventoryMargin.AddChild(_inventoryGrid);
 
-        var detailPanel = CreatePanel(430, UiPanelStyle.Card);
-        detailPanel.CustomMinimumSize = new Vector2(430, 430);
+        var detailPanel = CreatePanel(410, UiPanelStyle.Card);
+        detailPanel.CustomMinimumSize = new Vector2(430, 410);
         detailPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         middle.AddChild(detailPanel);
         var detailMargin = CreateMargin(22, 20);
@@ -103,57 +106,54 @@ public partial class BlacksmithView : Control
         var detailLayout = new VBoxContainer();
         detailLayout.AddThemeConstantOverride("separation", 14);
         detailMargin.AddChild(detailLayout);
-        _detailTitle = CreateLabel(string.Empty, 36);
+        _detailTitle = CreateLabel(string.Empty, 34);
         detailLayout.AddChild(_detailTitle);
-        _detailMeta = CreateLabel(string.Empty, 27);
+        _detailMeta = CreateLabel(string.Empty, 25);
         detailLayout.AddChild(_detailMeta);
-        _detailStats = CreateLabel(string.Empty, 28);
+        _detailStats = CreateLabel(string.Empty, 25);
         detailLayout.AddChild(_detailStats);
 
         var modeRow = new HBoxContainer();
-        modeRow.AddThemeConstantOverride("separation", 16);
+        modeRow.AddThemeConstantOverride("separation", 12);
         layout.AddChild(modeRow);
-        _enhanceModeButton = CreateButton(Text.EnhanceMode, 0, 82, 34, UiButtonStyle.Primary);
+        _enhanceModeButton = CreateButton(Text.EnhanceMode, 0, 76, 30, UiButtonStyle.Primary);
         _enhanceModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _enhanceModeButton.Pressed += () =>
-        {
-            _mode = BlacksmithMode.Enhance;
-            Refresh();
-        };
+        _enhanceModeButton.Pressed += () => SetMode(BlacksmithMode.Enhance);
         modeRow.AddChild(_enhanceModeButton);
-        _dismantleModeButton = CreateButton(Text.DismantleMode, 0, 82, 34, UiButtonStyle.Secondary);
+        _extendModeButton = CreateButton(Text.ExtendMode, 0, 76, 30, UiButtonStyle.Secondary);
+        _extendModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _extendModeButton.Pressed += () => SetMode(BlacksmithMode.Extend);
+        modeRow.AddChild(_extendModeButton);
+        _dismantleModeButton = CreateButton(Text.DismantleMode, 0, 76, 30, UiButtonStyle.Secondary);
         _dismantleModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _dismantleModeButton.Pressed += () =>
-        {
-            _mode = BlacksmithMode.Dismantle;
-            Refresh();
-        };
+        _dismantleModeButton.Pressed += () => SetMode(BlacksmithMode.Dismantle);
         modeRow.AddChild(_dismantleModeButton);
 
-        var operationPanel = CreatePanel(230, UiPanelStyle.Card);
+        var operationPanel = CreatePanel(220, UiPanelStyle.Card);
         layout.AddChild(operationPanel);
         var operationMargin = CreateMargin(24, 18);
         operationPanel.AddChild(operationMargin);
         var operationLayout = new VBoxContainer();
         operationLayout.AddThemeConstantOverride("separation", 12);
         operationMargin.AddChild(operationLayout);
-        _operationPreview = CreateCenteredLabel(string.Empty, 31);
+        _operationPreview = CreateCenteredLabel(string.Empty, 28);
         operationLayout.AddChild(_operationPreview);
-        _operationHint = CreateCenteredLabel(string.Empty, 24);
+        _operationHint = CreateCenteredLabel(string.Empty, 23);
         operationLayout.AddChild(_operationHint);
-        _actionButton = CreateButton(string.Empty, 0, 92, 38, UiButtonStyle.Primary);
+        _actionButton = CreateButton(string.Empty, 0, 84, 34, UiButtonStyle.Primary);
         _actionButton.Pressed += RunSelectedAction;
         operationLayout.AddChild(_actionButton);
     }
 
+    private void SetMode(BlacksmithMode mode)
+    {
+        _mode = mode;
+        Refresh();
+    }
+
     private void Refresh()
     {
-        HubHeaderBuilder.Refresh(
-            _header,
-            _model.Character.Level,
-            _model.Character.Experience,
-            _model.Character.ExperienceToNextLevel,
-            _model.Character.Gold);
+        HubHeaderBuilder.Refresh(_header, _model.Character.Level, _model.Character.Experience, _model.Character.ExperienceToNextLevel, _model.Character.Gold);
         BuildInventoryGrid();
         RefreshDetail();
         RefreshOperation();
@@ -170,7 +170,7 @@ public partial class BlacksmithView : Control
         {
             _inventoryGrid.Columns = 1;
             var empty = CreateCenteredLabel(Text.EmptyInventory, 30);
-            empty.CustomMinimumSize = new Vector2(0, 360);
+            empty.CustomMinimumSize = new Vector2(0, 340);
             empty.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             empty.SizeFlagsVertical = SizeFlags.ExpandFill;
             empty.VerticalAlignment = VerticalAlignment.Center;
@@ -181,28 +181,17 @@ public partial class BlacksmithView : Control
         _inventoryGrid.Columns = 2;
         foreach (var item in _model.Items)
         {
-            var button = CreateButton(BuildInventoryText(item), 0, 112, 22, UiButtonStyle.Secondary);
+            var button = CreateButton(BuildInventoryText(item), 0, 116, 21, UiButtonStyle.Secondary);
             button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             button.Disabled = item.Id == _selectedItemId;
             var itemId = item.Id;
             button.Pressed += () =>
             {
                 _selectedItemId = itemId;
-                SelectItemLocally();
+                Refresh();
             };
             _inventoryGrid.AddChild(button);
         }
-    }
-
-    private void SelectItemLocally()
-    {
-        var selected = _model.Items.FirstOrDefault(item => item.Id == _selectedItemId);
-        if (selected is null)
-        {
-            return;
-        }
-
-        Refresh();
     }
 
     private void RefreshDetail()
@@ -217,54 +206,71 @@ public partial class BlacksmithView : Control
         }
 
         _detailTitle.Text = $"{item.DisplayName}  +{item.EnhancementLevel}";
-        _detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | Power {item.Power}";
+        _detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | 戰力 {item.EffectivePower}/{item.Power}";
         var markers = item.IsEquipped ? Text.Equipped : Text.NotEquipped;
         if (item.IsLocked)
         {
             markers += $" / {Text.Locked}";
         }
 
+        var levelState = item.IsWithinRecommendedLevel
+            ? Text.LevelRangeOk
+            : Text.LevelRangeDecayed;
         var modifiers = item.ModifierLines.Count == 0
             ? Text.NoModifiers
             : string.Join("\n", item.ModifierLines);
-        _detailStats.Text = $"{markers}\n{Text.EnhancementLevel} {item.EnhancementLevel} / {item.MaxEnhancementLevel}\n{modifiers}";
+        _detailStats.Text = $"{markers}\n{Text.EnhancementLevel} {item.EnhancementLevel} / {item.MaxEnhancementLevel}\n{Text.LevelRange} {item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}  {levelState}\n{modifiers}";
     }
 
     private void RefreshOperation()
     {
         _enhanceModeButton.Disabled = _mode == BlacksmithMode.Enhance;
+        _extendModeButton.Disabled = _mode == BlacksmithMode.Extend;
         _dismantleModeButton.Disabled = _mode == BlacksmithMode.Dismantle;
         var item = SelectedItem;
 
-        if (_mode == BlacksmithMode.Enhance)
+        switch (_mode)
         {
-            _operationPreview.Text = item is null
-                ? Text.SelectItemPrompt
-                : string.Format(Text.EnhancePreviewFormat, item.Power, item.Power + 1);
-            var enhancementCost = item is null ? 0 : BlacksmithRules.GetEnhancementCost(item.EnhancementLevel);
-            var canEnhance = CanEnhanceSelectedItem(item, enhancementCost);
-            _operationHint.Text = item is null
-                ? Text.EnhanceHint
-                : canEnhance
-                    ? string.Format(Text.CostFormat, enhancementCost)
-                    : BuildEnhanceDisabledReason(item, enhancementCost);
-            _actionButton.Text = Text.RunEnhance;
-            _actionButton.Disabled = !canEnhance;
-            return;
+            case BlacksmithMode.Enhance:
+                RefreshEnhanceOperation(item);
+                return;
+            case BlacksmithMode.Extend:
+                RefreshExtendOperation(item);
+                return;
+            default:
+                RefreshDismantleOperation(item);
+                return;
         }
+    }
 
-        var canDismantle = item is not null && item.EnhancementLevel > 0;
+    private void RefreshEnhanceOperation(BlacksmithItemViewModel? item)
+    {
+        var cost = item is null ? 0 : BlacksmithRules.GetEnhancementCost(item.EnhancementLevel);
+        var canRun = item is not null && item.EnhancementLevel < item.MaxEnhancementLevel && _model.Character.Gold >= cost;
+        _operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.EnhancePreviewFormat, item.Power, item.Power + 1);
+        _operationHint.Text = item is null ? Text.EnhanceHint : canRun ? string.Format(Text.CostFormat, cost) : BuildEnhanceDisabledReason(item, cost);
+        _actionButton.Text = Text.RunEnhance;
+        _actionButton.Disabled = !canRun;
+    }
+
+    private void RefreshExtendOperation(BlacksmithItemViewModel? item)
+    {
+        var cost = item is null ? 0 : BlacksmithRules.GetLevelExtensionCost(item.LevelExtension);
+        var canRun = item is not null && item.LevelExtension < item.MaxLevelExtension && _model.Character.Gold >= cost;
+        _operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.ExtendPreviewFormat, item.EffectiveRecommendedLevelMax, item.EffectiveRecommendedLevelMax + 1);
+        _operationHint.Text = item is null ? Text.ExtendHint : canRun ? string.Format(Text.CostFormat, cost) : BuildExtendDisabledReason(item, cost);
+        _actionButton.Text = Text.RunExtend;
+        _actionButton.Disabled = !canRun;
+    }
+
+    private void RefreshDismantleOperation(BlacksmithItemViewModel? item)
+    {
+        var canRun = item is not null && item.EnhancementLevel > 0;
         var refund = item is null ? 0 : BlacksmithRules.GetDismantleRefund(item.EnhancementLevel);
-        _operationPreview.Text = item is null
-            ? Text.SelectItemPrompt
-            : string.Format(Text.DismantlePreviewFormat, item.EnhancementLevel);
-        _operationHint.Text = item is null
-            ? Text.DismantleHint
-            : canDismantle
-                ? string.Format(Text.RefundFormat, refund)
-                : Text.CannotDismantleZero;
+        _operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.DismantlePreviewFormat, item.EnhancementLevel);
+        _operationHint.Text = item is null ? Text.DismantleHint : canRun ? string.Format(Text.RefundFormat, refund) : Text.CannotDismantleZero;
         _actionButton.Text = Text.RunDismantle;
-        _actionButton.Disabled = !canDismantle;
+        _actionButton.Disabled = !canRun;
     }
 
     private BlacksmithItemViewModel? SelectedItem =>
@@ -278,41 +284,44 @@ public partial class BlacksmithView : Control
             return;
         }
 
-        if (_mode == BlacksmithMode.Enhance)
+        switch (_mode)
         {
-            EnhanceRequested?.Invoke(item.Id);
-            return;
+            case BlacksmithMode.Enhance:
+                EnhanceRequested?.Invoke(item.Id);
+                return;
+            case BlacksmithMode.Extend:
+                ExtendLevelRangeRequested?.Invoke(item.Id);
+                return;
+            default:
+                DismantleRequested?.Invoke(item.Id);
+                return;
         }
-
-        DismantleRequested?.Invoke(item.Id);
     }
 
     private static string BuildInventoryText(BlacksmithItemViewModel item)
     {
         var marker = item.IsEquipped ? $"{Text.Equipped} " : string.Empty;
-        return $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity} / +{item.EnhancementLevel}\nPower {item.Power}";
-    }
-
-    private bool CanEnhanceSelectedItem(BlacksmithItemViewModel? item, int cost)
-    {
-        return item is not null &&
-            item.EnhancementLevel < BlacksmithRules.MaxEnhancementLevel &&
-            _model.Character.Gold >= cost;
+        return $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity} / +{item.EnhancementLevel}\n戰力 {item.EffectivePower}  Lv.{item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}";
     }
 
     private string BuildEnhanceDisabledReason(BlacksmithItemViewModel item, int cost)
     {
-        if (item.EnhancementLevel >= BlacksmithRules.MaxEnhancementLevel)
+        if (item.EnhancementLevel >= item.MaxEnhancementLevel)
         {
             return Text.MaxEnhancementReached;
         }
 
-        if (_model.Character.Gold < cost)
+        return _model.Character.Gold < cost ? string.Format(Text.NotEnoughGoldFormat, cost) : string.Empty;
+    }
+
+    private string BuildExtendDisabledReason(BlacksmithItemViewModel item, int cost)
+    {
+        if (item.LevelExtension >= item.MaxLevelExtension)
         {
-            return string.Format(Text.NotEnoughGoldFormat, cost);
+            return Text.MaxExtensionReached;
         }
 
-        return string.Empty;
+        return _model.Character.Gold < cost ? string.Format(Text.NotEnoughGoldFormat, cost) : string.Empty;
     }
 
     private static PanelContainer CreatePanel(int height, UiPanelStyle style)
@@ -362,9 +371,10 @@ public partial class BlacksmithView : Control
     {
         public const string BackShort = "返回";
         public const string Title = "鐵匠鋪";
-        public const string Subtitle = "強化、拆解、調整裝備";
-        public const string Description = "消耗金幣提高裝備 Power，或拆解強化等級取回部分資源。";
+        public const string Subtitle = "強化、延長、拆解裝備";
+        public const string Description = "消耗金幣提高戰力，或延長低階裝備的可用等級。";
         public const string EnhanceMode = "強化";
+        public const string ExtendMode = "延長";
         public const string DismantleMode = "拆解";
         public const string EmptyInventory = "目前沒有可處理的裝備。";
         public const string NoItemTitle = "尚未選擇裝備";
@@ -374,17 +384,24 @@ public partial class BlacksmithView : Control
         public const string Locked = "已鎖定";
         public const string NoModifiers = "沒有額外詞綴。";
         public const string EnhancementLevel = "強化等級";
+        public const string LevelRange = "可用等級";
+        public const string LevelRangeOk = "效果完整";
+        public const string LevelRangeDecayed = "超出等級，效果衰減";
         public const string SelectItemPrompt = "請先選擇裝備";
-        public const string EnhancePreviewFormat = "目前 Power {0}  >>>  強化後 Power {1}";
-        public const string EnhanceHint = "選擇一件裝備後即可查看強化費用。";
-        public const string CostFormat = "消耗：{0} Gold";
+        public const string EnhancePreviewFormat = "目前戰力 {0}  >>>  強化後戰力 {1}";
+        public const string EnhanceHint = "選擇一件裝備後可消耗金幣強化。";
+        public const string ExtendPreviewFormat = "目前可用到 Lv.{0}  >>>  延長後 Lv.{1}";
+        public const string ExtendHint = "延長可用等級可解除高等級時的效果衰減。";
+        public const string CostFormat = "消耗 {0} Gold";
         public const string RunEnhance = "執行強化";
+        public const string RunExtend = "延長等級";
         public const string DismantlePreviewFormat = "目前 +{0}  >>>  拆解後 +0";
-        public const string DismantleHint = "選擇已強化的裝備後即可拆解。";
-        public const string RefundFormat = "返還：{0} Gold";
+        public const string DismantleHint = "拆解強化等級，取回部分強化資源。";
+        public const string RefundFormat = "返還 {0} Gold";
         public const string CannotDismantleZero = "這件裝備尚未強化，無法拆解。";
         public const string RunDismantle = "拆解強化";
         public const string MaxEnhancementReached = "這件裝備已達強化上限。";
+        public const string MaxExtensionReached = "這件裝備已達延長上限。";
         public const string NotEnoughGoldFormat = "金幣不足，需要 {0} Gold。";
     }
 }

@@ -61,7 +61,7 @@ public sealed class LootTable
     {
         if (profile.EquipmentDefinitionIds.Count == 0)
         {
-            return "moon_iron_shortsword";
+            return "chest_vanguard_blade";
         }
 
         var index = StableRoll($"{chest.Id}:{profile.DungeonTypeId}:definition", profile.EquipmentDefinitionIds.Count);

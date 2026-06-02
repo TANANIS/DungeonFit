@@ -28,7 +28,7 @@ public sealed class PlayerState
 
     public EquipmentLoadout Loadout { get; } = new();
 
-    public int EquipmentScore => GetEquippedItems().Sum(item => item.Power);
+    public int EquipmentScore => GetEquippedItems().Sum(item => item.GetEffectivePower(Level));
 
     public int BaseAttack => DefaultBaseAttack + ((Level - 1) / 2);
 
@@ -253,6 +253,21 @@ public sealed class PlayerState
         return true;
     }
 
+    public bool ExtendEquipmentLevelRange(string itemId, int cost, int maxExtension)
+    {
+        var item = Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
+        if (item is null ||
+            item.LevelExtension >= maxExtension ||
+            !SpendGold(cost))
+        {
+            return false;
+        }
+
+        item.LevelExtension++;
+        ClampCurrentHp();
+        return true;
+    }
+
     public bool SellEquipment(string itemId)
     {
         var item = Inventory.FirstOrDefault(equipment => equipment.Id == itemId);
@@ -295,9 +310,13 @@ public sealed class PlayerState
     private int SumEquippedStat(EquipmentStatType statType)
     {
         return GetEquippedItems()
-            .SelectMany(item => item.Modifiers)
-            .Where(modifier => modifier.StatType == statType)
-            .Sum(modifier => modifier.Value);
+            .SelectMany(item => item.Modifiers.Select(modifier => new
+            {
+                Modifier = modifier,
+                Value = item.GetEffectiveModifierValue(modifier, Level),
+            }))
+            .Where(entry => entry.Modifier.StatType == statType)
+            .Sum(entry => entry.Value);
     }
 
     private void RemoveMissingEquippedItems()

@@ -17,6 +17,12 @@ public sealed class EquipmentItem
 
     public string Rarity { get; set; } = "Common";
 
+    public int RecommendedLevelMin { get; set; } = 1;
+
+    public int RecommendedLevelMax { get; set; } = 5;
+
+    public int LevelExtension { get; set; }
+
     public int Power { get; set; }
 
     public int SellPrice { get; set; }
@@ -38,6 +44,8 @@ public sealed class EquipmentItem
         EquipmentSlot slot,
         string sourceDungeonTypeId,
         string rarity,
+        int recommendedLevelMin,
+        int recommendedLevelMax,
         int power,
         int sellPrice,
         IEnumerable<EquipmentModifier> modifiers)
@@ -48,8 +56,31 @@ public sealed class EquipmentItem
         Slot = slot;
         SourceDungeonTypeId = sourceDungeonTypeId;
         Rarity = rarity;
+        RecommendedLevelMin = recommendedLevelMin;
+        RecommendedLevelMax = recommendedLevelMax;
         Power = power;
         SellPrice = sellPrice;
         Modifiers = modifiers.ToList();
+    }
+
+    public int EffectiveRecommendedLevelMax => RecommendedLevelMax + LevelExtension;
+
+    public bool IsWithinRecommendedLevel(int playerLevel)
+    {
+        return playerLevel >= RecommendedLevelMin && playerLevel <= EffectiveRecommendedLevelMax;
+    }
+
+    public int GetEffectivePower(int playerLevel)
+    {
+        return IsWithinRecommendedLevel(playerLevel)
+            ? Power
+            : System.Math.Max(1, (int)System.Math.Ceiling(Power * 0.5));
+    }
+
+    public int GetEffectiveModifierValue(EquipmentModifier modifier, int playerLevel)
+    {
+        return IsWithinRecommendedLevel(playerLevel)
+            ? modifier.Value
+            : System.Math.Max(1, (int)System.Math.Ceiling(modifier.Value * 0.5));
     }
 }

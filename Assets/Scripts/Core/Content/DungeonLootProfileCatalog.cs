@@ -26,7 +26,7 @@ public sealed class DungeonLootProfileCatalog
     {
         new(
             "chest",
-            new[] { "moon_iron_shortsword", "violet_oath_ring" },
+            new[] { "chest_vanguard_blade", "chest_guard_plate", "chest_oath_ring" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -37,7 +37,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "shoulders",
-            new[] { "moon_iron_shortsword", "violet_oath_ring" },
+            new[] { "shoulder_moon_halberd", "shoulder_guard_mantle", "shoulder_captain_medal" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -48,7 +48,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "back",
-            new[] { "moon_iron_shortsword", "training_plate", "guard_captain_medal" },
+            new[] { "back_shadow_axe", "back_watcher_coat", "back_raven_charm" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -59,7 +59,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "legs",
-            new[] { "training_plate", "guard_captain_medal" },
+            new[] { "leg_miner_pick", "leg_deepstride_greaves", "leg_ore_badge" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.MaxHp, 15, string.Empty),
@@ -70,7 +70,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "core",
-            new[] { "training_plate", "violet_oath_ring" },
+            new[] { "core_moon_staff", "core_stability_vest", "core_prayer_beads" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.MaxHp, 12, string.Empty),
@@ -81,7 +81,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "arms",
-            new[] { "moon_iron_shortsword", "violet_oath_ring" },
+            new[] { "arm_courier_sabre", "arm_parcel_guard", "arm_signal_bracelet" },
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 4, "arms"),

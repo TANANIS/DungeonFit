@@ -174,6 +174,11 @@ public partial class Main : Control
             _session.EnhanceEquipment(itemId);
             ShowBlacksmith(itemId);
         };
+        blacksmith.ExtendLevelRangeRequested += itemId =>
+        {
+            _session.ExtendEquipmentLevelRange(itemId);
+            ShowBlacksmith(itemId);
+        };
         blacksmith.DismantleRequested += itemId =>
         {
             _session.DismantleEnhancement(itemId);
@@ -244,7 +249,14 @@ public partial class Main : Control
             activeRun.CurrentPlayerHp,
             _session.BuildRoomSupplyViewModel());
         room.RoomContinueRequested += CompleteRoomAndShowSetSummary;
+        room.ReturnToTownRequested += ReturnTownFromPausedRoom;
         room.SmallPotionRequested += currentHp => _session.UseSmallPotionInRoom(currentHp);
+    }
+
+    private void ReturnTownFromPausedRoom(int currentHp)
+    {
+        _session.LeaveActiveRoom(currentHp);
+        ShowTown();
     }
 
     private void CompleteRoomAndShowSetSummary(RunSummary summary)

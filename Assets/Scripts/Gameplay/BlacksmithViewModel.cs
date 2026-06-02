@@ -19,17 +19,16 @@ public sealed class BlacksmithViewModel
         SelectedItem = SelectItem(Items, selectedItemId);
         SelectedItemId = SelectedItem?.Id;
         var currentLevel = SelectedItem?.EnhancementLevel ?? 0;
-        var nextCost = SelectedItem is null ? 0 : BlacksmithRules.GetEnhancementCost(currentLevel);
-        EnhancementCost = nextCost;
+        EnhancementCost = SelectedItem is null ? 0 : BlacksmithRules.GetEnhancementCost(currentLevel);
         DismantleRefund = SelectedItem is null ? 0 : BlacksmithRules.GetDismantleRefund(currentLevel);
+        LevelExtensionCost = SelectedItem is null ? 0 : BlacksmithRules.GetLevelExtensionCost(SelectedItem.LevelExtension);
         CanEnhance = SelectedItem is not null &&
             currentLevel < BlacksmithRules.MaxEnhancementLevel &&
-            player.Gold >= nextCost;
+            player.Gold >= EnhancementCost;
+        CanExtendLevelRange = SelectedItem is not null &&
+            SelectedItem.LevelExtension < BlacksmithRules.MaxLevelExtension &&
+            player.Gold >= LevelExtensionCost;
         CanDismantleEnhancement = SelectedItem is not null && currentLevel > 0;
-        EnhanceDisabledReason = BuildEnhanceDisabledReason(player.Gold, SelectedItem, nextCost);
-        DismantleDisabledReason = SelectedItem is null
-            ? "請先選擇一件裝備。"
-            : currentLevel <= 0 ? "這件裝備尚未強化。" : string.Empty;
     }
 
     public BlacksmithCharacterSummary Character { get; }
@@ -42,21 +41,21 @@ public sealed class BlacksmithViewModel
 
     public int EnhancementCost { get; }
 
+    public int LevelExtensionCost { get; }
+
     public int DismantleRefund { get; }
 
     public bool CanEnhance { get; }
 
+    public bool CanExtendLevelRange { get; }
+
     public bool CanDismantleEnhancement { get; }
-
-    public string EnhanceDisabledReason { get; }
-
-    public string DismantleDisabledReason { get; }
 
     private static IReadOnlyList<BlacksmithItemViewModel> BuildItems(PlayerState player)
     {
         return player.Inventory
             .OrderBy(item => GetRarityRank(item.Rarity))
-            .ThenByDescending(item => item.Power)
+            .ThenByDescending(item => item.GetEffectivePower(player.Level))
             .ThenBy(item => item.DisplayName)
             .Select(item => BuildItem(player, item))
             .ToArray();
@@ -64,17 +63,25 @@ public sealed class BlacksmithViewModel
 
     private static BlacksmithItemViewModel BuildItem(PlayerState player, EquipmentItem item)
     {
+        var effectivePower = item.GetEffectivePower(player.Level);
         return new BlacksmithItemViewModel(
             item.Id,
             item.DisplayName,
             GetSlotLabel(item.Slot),
             item.Rarity,
             item.Power,
+            effectivePower,
             item.EnhancementLevel,
             BlacksmithRules.MaxEnhancementLevel,
+            item.RecommendedLevelMin,
+            item.RecommendedLevelMax,
+            item.EffectiveRecommendedLevelMax,
+            item.LevelExtension,
+            BlacksmithRules.MaxLevelExtension,
+            item.IsWithinRecommendedLevel(player.Level),
             player.IsEquipped(item.Id),
             item.IsLocked,
-            item.Modifiers.Select(FormatModifier).ToArray());
+            item.Modifiers.Select(modifier => FormatModifier(item, modifier, player.Level)).ToArray());
     }
 
     private static BlacksmithItemViewModel? SelectItem(
@@ -84,42 +91,21 @@ public sealed class BlacksmithViewModel
         return items.FirstOrDefault(item => item.Id == selectedItemId) ?? items.FirstOrDefault();
     }
 
-    private static string BuildEnhanceDisabledReason(
-        int gold,
-        BlacksmithItemViewModel? selectedItem,
-        int cost)
-    {
-        if (selectedItem is null)
-        {
-            return "請先選擇一件裝備。";
-        }
-
-        if (selectedItem.EnhancementLevel >= BlacksmithRules.MaxEnhancementLevel)
-        {
-            return "這件裝備已達強化上限。";
-        }
-
-        if (gold < cost)
-        {
-            return $"金幣不足，需要 {cost} Gold。";
-        }
-
-        return string.Empty;
-    }
-
-    private static string FormatModifier(EquipmentModifier modifier)
+    private static string FormatModifier(EquipmentItem item, EquipmentModifier modifier, int playerLevel)
     {
         var scope = string.IsNullOrWhiteSpace(modifier.Scope)
             ? string.Empty
             : $"{GetDungeonLabel(modifier.Scope)} ";
+        var value = item.GetEffectiveModifierValue(modifier, playerLevel);
+        var decayLabel = value == modifier.Value ? string.Empty : $"（原 +{modifier.Value}）";
 
         return modifier.StatType switch
         {
-            EquipmentStatType.Attack => $"攻擊 +{modifier.Value}",
-            EquipmentStatType.MaxHp => $"HP +{modifier.Value}",
-            EquipmentStatType.DungeonGoldBonusPercent => $"{scope}Gold +{modifier.Value}%",
-            EquipmentStatType.QuestRewardBonusPercent => $"支線任務獎勵 +{modifier.Value}%",
-            _ => $"+{modifier.Value}",
+            EquipmentStatType.Attack => $"攻擊 +{value}{decayLabel}",
+            EquipmentStatType.MaxHp => $"HP +{value}{decayLabel}",
+            EquipmentStatType.DungeonGoldBonusPercent => $"{scope}Gold +{value}%{decayLabel}",
+            EquipmentStatType.QuestRewardBonusPercent => $"支線任務獎勵 +{value}%{decayLabel}",
+            _ => $"+{value}{decayLabel}",
         };
     }
 
@@ -174,8 +160,15 @@ public sealed record BlacksmithItemViewModel(
     string SlotLabel,
     string Rarity,
     int Power,
+    int EffectivePower,
     int EnhancementLevel,
     int MaxEnhancementLevel,
+    int RecommendedLevelMin,
+    int RecommendedLevelMax,
+    int EffectiveRecommendedLevelMax,
+    int LevelExtension,
+    int MaxLevelExtension,
+    bool IsWithinRecommendedLevel,
     bool IsEquipped,
     bool IsLocked,
     IReadOnlyList<string> ModifierLines);

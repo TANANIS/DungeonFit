@@ -93,10 +93,10 @@ public sealed class TavernEquipmentViewModel
 
         items = sort switch
         {
-            EquipmentInventorySort.Power => items.OrderByDescending(item => item.Power).ThenBy(item => item.DisplayName),
+            EquipmentInventorySort.Power => items.OrderByDescending(item => item.GetEffectivePower(player.Level)).ThenBy(item => item.DisplayName),
             EquipmentInventorySort.SellPrice => items.OrderByDescending(item => item.SellPrice).ThenBy(item => item.DisplayName),
-            EquipmentInventorySort.Type => items.OrderBy(item => item.Slot).ThenByDescending(item => item.Power),
-            _ => items.OrderBy(item => GetRarityRank(item.Rarity)).ThenByDescending(item => item.Power),
+            EquipmentInventorySort.Type => items.OrderBy(item => item.Slot).ThenByDescending(item => item.GetEffectivePower(player.Level)),
+            _ => items.OrderBy(item => GetRarityRank(item.Rarity)).ThenByDescending(item => item.GetEffectivePower(player.Level)),
         };
 
         return items
@@ -114,6 +114,9 @@ public sealed class TavernEquipmentViewModel
             GetSlotLabel(item.Slot),
             item.Rarity,
             item.Power,
+            item.GetEffectivePower(player.Level),
+            $"Lv.{item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}",
+            item.IsWithinRecommendedLevel(player.Level),
             item.SellPrice,
             item.IsLocked,
             isEquipped,
@@ -225,6 +228,9 @@ public sealed record TavernInventoryItemViewModel(
     string SlotLabel,
     string Rarity,
     int Power,
+    int EffectivePower,
+    string LevelRangeText,
+    bool IsWithinRecommendedLevel,
     int SellPrice,
     bool IsLocked,
     bool IsEquipped,

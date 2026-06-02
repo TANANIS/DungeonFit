@@ -1,0 +1,43 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Assets/Scripts/UI/DungeonRouteSlotRowView.cs" id="1_row"]
+
+[node name="DungeonRouteSlotRow" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 52)
+script = ExtResource("1_row")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="Row" type="HBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="IndexLabel" type="Label" parent="Margin/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(34, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 23
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RouteLabel" type="Label" parent="Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "胸地城 / 伏地挺身"
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="RemoveButton" type="Button" parent="Margin/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 40)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "X"

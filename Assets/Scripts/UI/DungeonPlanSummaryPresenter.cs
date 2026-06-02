@@ -33,7 +33,7 @@ public sealed class DungeonPlanSummaryPresenter
             ? BuildEditableRouteStatus(selectedDungeonRoute.Count, selectedSets)
             : string.Format(Text.LockedRouteStatus, completedStages, plan.Stages.Count, plan.TotalSets);
 
-        _planSummary.Text = $"{BuildActiveQuestLine(activeQuests)}\n{routeLine}";
+        _planSummary.Text = routeLine;
         _primaryButton.Text = GetPrimaryButtonText(run, selectedDungeonRoute.Count);
         _primaryButton.Disabled = canEditPlan && !routeRules.CanStartRoute(selectedDungeonRoute);
     }
@@ -80,17 +80,15 @@ public sealed class DungeonPlanSummaryPresenter
     {
         if (selectedCount < DungeonRouteRules.MinRouteSlots)
         {
-            var remaining = DungeonRouteRules.MinRouteSlots - selectedCount;
-            return string.Format(Text.RouteNeedsMoreSlots, selectedCount, DungeonRouteRules.MaxRouteSlots, remaining, selectedSets);
+            return string.Format(Text.RouteNeedsMoreSlots, selectedCount, DungeonRouteRules.MinRouteSlots);
         }
 
         if (selectedCount >= DungeonRouteRules.MaxRouteSlots)
         {
-            return string.Format(Text.RouteFull, selectedCount, DungeonRouteRules.MaxRouteSlots, selectedSets);
+            return string.Format(Text.RouteFull, selectedCount, DungeonRouteRules.MaxRouteSlots);
         }
 
-        var optionalSlots = DungeonRouteRules.MaxRouteSlots - selectedCount;
-        return string.Format(Text.RouteReady, selectedCount, DungeonRouteRules.MaxRouteSlots, optionalSlots, selectedSets);
+        return string.Format(Text.RouteReady, selectedCount, DungeonRouteRules.MinRouteSlots);
     }
 
     private static string GetPrimaryButtonText(DungeonRun? run, int selectedRouteCount)
@@ -117,9 +115,9 @@ public sealed class DungeonPlanSummaryPresenter
         public const string ActiveQuestWithCompletedFormat = "\u4efb\u52d9\u52a0\u6210\uff1a{0} \u500b\u9032\u884c\u4e2d / {1} \u500b\u53ef\u56de\u5831";
         public const string ActiveQuestClaimedFormat = "\u4efb\u52d9\u52a0\u6210\uff1a{0} \u500b\u5df2\u5b8c\u6210";
         public const string LockedRouteStatus = "\u5df2\u5b8c\u6210 {0} / {1} \u623f\u9593 / \u9810\u8a08 {2} \u7d44";
-        public const string RouteNeedsMoreSlots = "\u5df2\u9078 {0} / {1} \u8a0e\u4f10\u5340\u57df / \u9084\u9700 {2} \u500b / \u9810\u8a08 {3} \u7d44";
-        public const string RouteReady = "\u5df2\u53ef\u51fa\u767c\uff1a{0} / {1} \u8a0e\u4f10\u5340\u57df / \u53ef\u8ffd\u52a0 {2} \u500b / \u9810\u8a08 {3} \u7d44";
-        public const string RouteFull = "\u8def\u7dda\u5df2\u6eff\uff1a{0} / {1} \u8a0e\u4f10\u5340\u57df / \u9810\u8a08 {2} \u7d44";
+        public const string RouteNeedsMoreSlots = "\u2727 \u5df2\u9078 {0} / {1} \u2727";
+        public const string RouteReady = "\u2727 \u5df2\u9078 {0} / {1} \u2727";
+        public const string RouteFull = "\u2727 \u5df2\u9078 {0} / {1} \u2727";
         public const string ViewSummary = "\u67e5\u770b\u7e3d\u7d50";
         public const string ContinueAdventure = "\u7e7c\u7e8c\u8a0e\u4f10";
         public const string NeedSlotsButton = "\u81f3\u5c11\u9078 {0} \u500b";

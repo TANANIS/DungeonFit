@@ -25,121 +25,119 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 42.0
-offset_top = 56.0
-offset_right = -42.0
-offset_bottom = -56.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Layout" type="VBoxContainer" parent="SafeMargin"]
 layout_mode = 2
-theme_override_constants/separation = 22
+theme_override_constants/separation = 14
 
 [node name="Header" type="PanelContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 150)
+custom_minimum_size = Vector2(0, 134)
 layout_mode = 2
 
 [node name="HeaderMargin" type="MarginContainer" parent="SafeMargin/Layout/Header"]
 layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
 
 [node name="HeaderText" type="VBoxContainer" parent="SafeMargin/Layout/Header/HeaderMargin"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 5
 
 [node name="PlanTitle" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 44
 text = "選擇地城"
 horizontal_alignment = 1
 
 [node name="PlanSubtitle" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderText"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
-text = "選擇 4-6 個討伐區域，相同地城可以重複選取。"
+theme_override_font_sizes/font_size = 24
+text = "選擇 4-6 個討伐區域"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="PlanSummary" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderText"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 25
+text = "已選 0 / 4"
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="RoutePanel" type="PanelContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 850)
 layout_mode = 2
-size_flags_vertical = 3
 
 [node name="RouteMargin" type="MarginContainer" parent="SafeMargin/Layout/RoutePanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 28
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 28
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
 
 [node name="RouteLayout" type="VBoxContainer" parent="SafeMargin/Layout/RoutePanel/RouteMargin"]
 layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="PlanSummary" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 30
-text = "任務加成：無\n已選 4 / 6 討伐區域"
-horizontal_alignment = 1
-autowrap_mode = 3
+theme_override_constants/separation = 12
 
 [node name="DungeonPickerTitle" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 29
 text = "討伐區域"
 horizontal_alignment = 1
 
 [node name="DungeonTypeGrid" type="GridContainer" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 300)
+custom_minimum_size = Vector2(0, 246)
 layout_mode = 2
 columns = 3
-theme_override_constants/h_separation = 18
-theme_override_constants/v_separation = 18
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 14
 
 [node name="RouteTitle" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 30
 text = "今日討伐路線"
 horizontal_alignment = 1
 
 [node name="StageList" type="VBoxContainer" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 214)
 layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="PlanHint" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-text = "點擊上方地城可加入路線；點 X 可移除該討伐 slot。"
+theme_override_font_sizes/font_size = 20
+text = "點擊地城加入路線，X 可移除討伐 slot。"
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="ButtonRow" type="HBoxContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 110)
+custom_minimum_size = Vector2(0, 82)
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 12
 
 [node name="BackTownButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 96)
+custom_minimum_size = Vector2(0, 76)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 28
 text = "返回城鎮"
 
 [node name="StartAdventureButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 96)
+custom_minimum_size = Vector2(0, 76)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 32
-text = "前往討伐"
+theme_override_font_sizes/font_size = 28
+text = "至少選 4 個"

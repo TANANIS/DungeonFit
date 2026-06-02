@@ -24,7 +24,7 @@ public partial class RouteSlotDialogView : Control
     private OptionButton _musicSelector = null!;
     private OptionButton _restSelector = null!;
     private Label _exerciseDetail = null!;
-    private VBoxContainer _exerciseList = null!;
+    private GridContainer _exerciseGrid = null!;
 
     public override void _Ready()
     {
@@ -66,7 +66,7 @@ public partial class RouteSlotDialogView : Control
 
         var sheet = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(500, 780),
+            CustomMinimumSize = new Vector2(500, 820),
         };
         DungeonFitUi.ApplyPanel(sheet, UiPanelStyle.Overlay);
         center.AddChild(sheet);
@@ -78,56 +78,104 @@ public partial class RouteSlotDialogView : Control
         margin.AddThemeConstantOverride("margin_bottom", 24);
         sheet.AddChild(margin);
 
-        var layout = new VBoxContainer();
-        layout.AddThemeConstantOverride("separation", 16);
+        var layout = new VBoxContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        layout.AddThemeConstantOverride("separation", 10);
         margin.AddChild(layout);
 
-        _title = CreateLabel(Text.RouteSettings, 34, HorizontalAlignment.Center);
+        _title = CreateLabel(Text.RouteSettings, 32, HorizontalAlignment.Center);
         layout.AddChild(_title);
 
-        var scroll = new ScrollContainer
+        var settingsPanel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(0, 560),
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            CustomMinimumSize = new Vector2(0, 228),
         };
-        layout.AddChild(scroll);
+        DungeonFitUi.ApplyPanel(settingsPanel, UiPanelStyle.Card);
+        layout.AddChild(settingsPanel);
 
-        var content = new VBoxContainer();
-        content.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        content.AddThemeConstantOverride("separation", 16);
-        scroll.AddChild(content);
+        var settingsMargin = new MarginContainer();
+        settingsMargin.AddThemeConstantOverride("margin_left", 18);
+        settingsMargin.AddThemeConstantOverride("margin_top", 14);
+        settingsMargin.AddThemeConstantOverride("margin_right", 18);
+        settingsMargin.AddThemeConstantOverride("margin_bottom", 14);
+        settingsPanel.AddChild(settingsMargin);
+
+        var settingsLayout = new VBoxContainer();
+        settingsLayout.AddThemeConstantOverride("separation", 12);
+        settingsMargin.AddChild(settingsLayout);
+
+        var counterGrid = new GridContainer
+        {
+            Columns = 3,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        counterGrid.AddThemeConstantOverride("h_separation", 12);
+        settingsLayout.AddChild(counterGrid);
 
         _setSpinBox = CreateSpinBox(DungeonRouteRules.MinSets, DungeonRouteRules.MaxSets, DungeonRouteRules.DefaultSets);
-        content.AddChild(CreateLabeledControl(Text.SetCount, _setSpinBox));
+        counterGrid.AddChild(CreateStackedControl(Text.SetCount, _setSpinBox));
 
         _repSpinBox = CreateSpinBox(DungeonRouteRules.MinReps, DungeonRouteRules.MaxReps, DungeonRouteRules.DefaultReps);
-        content.AddChild(CreateLabeledControl(Text.RepCount, _repSpinBox));
-
-        _musicSelector = CreateMusicSelector();
-        content.AddChild(CreateLabeledControl(Text.Music, _musicSelector));
+        counterGrid.AddChild(CreateStackedControl(Text.RepCount, _repSpinBox));
 
         _restSelector = CreateRestSelector();
-        content.AddChild(CreateLabeledControl(Text.RestSeconds, _restSelector));
+        counterGrid.AddChild(CreateStackedControl(Text.RestSeconds, _restSelector));
+
+        _musicSelector = CreateMusicSelector();
+        settingsLayout.AddChild(CreateLabeledControl(Text.Music, _musicSelector));
+
+        var exerciseHeader = new HBoxContainer();
+        layout.AddChild(exerciseHeader);
 
         var exerciseTitle = CreateLabel(Text.ExerciseTitle, 28, HorizontalAlignment.Left);
-        content.AddChild(exerciseTitle);
+        exerciseTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        exerciseHeader.AddChild(exerciseTitle);
+
+        var exerciseHint = CreateLabel(Text.ExerciseHint, 20, HorizontalAlignment.Right);
+        exerciseHint.VerticalAlignment = VerticalAlignment.Center;
+        exerciseHeader.AddChild(exerciseHint);
+
+        var detailPanel = new PanelContainer
+        {
+            CustomMinimumSize = new Vector2(0, 86),
+        };
+        DungeonFitUi.ApplyPanel(detailPanel, UiPanelStyle.Card);
+        layout.AddChild(detailPanel);
+
+        var detailMargin = new MarginContainer();
+        detailMargin.AddThemeConstantOverride("margin_left", 16);
+        detailMargin.AddThemeConstantOverride("margin_top", 12);
+        detailMargin.AddThemeConstantOverride("margin_right", 16);
+        detailMargin.AddThemeConstantOverride("margin_bottom", 12);
+        detailPanel.AddChild(detailMargin);
 
         _exerciseDetail = CreateLabel(string.Empty, 21, HorizontalAlignment.Left);
         _exerciseDetail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        content.AddChild(_exerciseDetail);
+        detailMargin.AddChild(_exerciseDetail);
 
-        _exerciseList = new VBoxContainer();
-        _exerciseList.AddThemeConstantOverride("separation", 10);
-        content.AddChild(_exerciseList);
+        var exerciseScroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(0, 162),
+            SizeFlagsVertical = SizeFlags.Fill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        layout.AddChild(exerciseScroll);
 
-        var hint = CreateLabel(Text.DialogHint, 21, HorizontalAlignment.Left);
-        hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        content.AddChild(hint);
+        _exerciseGrid = new GridContainer
+        {
+            Columns = 2,
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        _exerciseGrid.AddThemeConstantOverride("h_separation", 10);
+        _exerciseGrid.AddThemeConstantOverride("v_separation", 10);
+        exerciseScroll.AddChild(_exerciseGrid);
 
         var buttonRow = new HBoxContainer
         {
-            CustomMinimumSize = new Vector2(0, 76),
+            CustomMinimumSize = new Vector2(0, 70),
         };
         buttonRow.AddThemeConstantOverride("separation", 16);
         layout.AddChild(buttonRow);
@@ -155,7 +203,7 @@ public partial class RouteSlotDialogView : Control
 
     private void RefreshExerciseChoices()
     {
-        ClearChildren(_exerciseList);
+        ClearChildren(_exerciseGrid);
         _exerciseButtons.Clear();
 
         foreach (var exercise in _exerciseCatalog.GetForDungeon(_category.Id))
@@ -166,11 +214,11 @@ public partial class RouteSlotDialogView : Control
                 CustomMinimumSize = new Vector2(0, 76),
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
             };
-            button.AddThemeFontSizeOverride("font_size", 23);
+            button.AddThemeFontSizeOverride("font_size", 20);
             button.SetMeta(Meta.ExerciseId, exercise.Id);
             button.Pressed += () => SelectExercise(exercise.Id);
             _exerciseButtons.Add(button);
-            _exerciseList.AddChild(button);
+            _exerciseGrid.AddChild(button);
         }
 
         RefreshExerciseButtonStyles();
@@ -249,7 +297,8 @@ public partial class RouteSlotDialogView : Control
             MaxValue = max,
             Step = 1,
             Value = value,
-            CustomMinimumSize = new Vector2(132, 62),
+            CustomMinimumSize = new Vector2(0, 58),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
     }
 
@@ -268,7 +317,7 @@ public partial class RouteSlotDialogView : Control
     {
         var row = new HBoxContainer
         {
-            CustomMinimumSize = new Vector2(0, 70),
+            CustomMinimumSize = new Vector2(0, 66),
         };
         var label = new Label
         {
@@ -276,17 +325,36 @@ public partial class RouteSlotDialogView : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        label.AddThemeFontSizeOverride("font_size", 27);
+        label.AddThemeFontSizeOverride("font_size", 25);
         row.AddChild(label);
         row.AddChild(control);
         return row;
+    }
+
+    private static VBoxContainer CreateStackedControl(string labelText, Control control)
+    {
+        var stack = new VBoxContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        stack.AddThemeConstantOverride("separation", 4);
+
+        var label = new Label
+        {
+            Text = labelText,
+        };
+        label.AddThemeFontSizeOverride("font_size", 22);
+        stack.AddChild(label);
+        stack.AddChild(control);
+        return stack;
     }
 
     private OptionButton CreateMusicSelector()
     {
         var selector = new OptionButton
         {
-            CustomMinimumSize = new Vector2(210, 62),
+            CustomMinimumSize = new Vector2(248, 58),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         foreach (var music in _musicCatalog.GetAll())
         {
@@ -301,7 +369,8 @@ public partial class RouteSlotDialogView : Control
     {
         var selector = new OptionButton
         {
-            CustomMinimumSize = new Vector2(132, 62),
+            CustomMinimumSize = new Vector2(0, 58),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
         foreach (var seconds in DungeonRouteRules.RestSecondOptions)
         {
@@ -332,10 +401,10 @@ public partial class RouteSlotDialogView : Control
         public const string SetCount = "\u7d44\u6578";
         public const string RepCount = "\u6b21\u6578";
         public const string Music = "\u97f3\u6a02";
-        public const string RestSeconds = "\u7d44\u9593\u4f11\u606f";
+        public const string RestSeconds = "\u4f11\u606f";
         public const string ExerciseTitle = "\u672c\u6b21\u52d5\u4f5c";
+        public const string ExerciseHint = "\u9810\u8a2d\u5df2\u9078";
         public const string Recommended = "\u63a8\u85a6";
-        public const string DialogHint = "\u9810\u8a2d\u5df2\u9078\u597d\u63a8\u85a6\u52d5\u4f5c\uff0c\u53ef\u76f4\u63a5\u52a0\u5165\u8def\u7dda\uff1b\u5982\u6709\u4e0d\u9069\u8acb\u6539\u9078\u8f03\u719f\u6089\u7684\u52d5\u4f5c\u3002";
         public const string AddToRoute = "\u52a0\u5165\u8def\u7dda";
         public const string Cancel = "\u53d6\u6d88";
     }

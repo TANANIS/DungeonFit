@@ -9,10 +9,12 @@ namespace DungeonFit.UI;
 
 public sealed class DungeonRouteListView
 {
+    private const string RowScenePath = "res://Assets/Scenes/UI/DungeonRouteSlotRow.tscn";
+
     private readonly VBoxContainer _routeList;
     private readonly DungeonCategoryCatalog _categoryCatalog;
-    private readonly MusicCatalog _musicCatalog;
     private readonly ExerciseCatalog _exerciseCatalog = new();
+    private readonly PackedScene _rowScene;
 
     public DungeonRouteListView(
         VBoxContainer routeList,
@@ -21,7 +23,7 @@ public sealed class DungeonRouteListView
     {
         _routeList = routeList;
         _categoryCatalog = categoryCatalog;
-        _musicCatalog = musicCatalog;
+        _rowScene = GD.Load<PackedScene>(RowScenePath);
     }
 
     public void Refresh(
@@ -42,44 +44,20 @@ public sealed class DungeonRouteListView
             var hasRouteSlot = canEditPlan
                 ? index < selectedDungeonRoute.Count
                 : index < plan.Stages.Count;
-            var row = new HBoxContainer
-            {
-                CustomMinimumSize = new Vector2(0, 76),
-            };
-            var rowPanel = new PanelContainer
-            {
-                CustomMinimumSize = new Vector2(0, 76),
-            };
-            DungeonFitUi.ApplyPanel(rowPanel, UiPanelStyle.Card);
-
-            var label = new Label
-            {
-                Text = hasRouteSlot
+            var row = _rowScene.Instantiate<DungeonRouteSlotRowView>();
+            row.Initialize(
+                index + 1,
+                hasRouteSlot
                     ? BuildRouteText(canEditPlan, selectedDungeonRoute, plan, run, index)
-                    : $"{index + 1}. {Text.PendingSelection}",
-                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-                VerticalAlignment = VerticalAlignment.Center,
-                AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            };
-            label.AddThemeFontSizeOverride("font_size", hasRouteSlot ? 25 : 26);
-            row.AddChild(label);
-
+                    : Text.PendingSelection,
+                canEditPlan && hasRouteSlot);
             if (canEditPlan && hasRouteSlot)
             {
                 var routeIndex = index;
-                var removeButton = new Button
-                {
-                    Text = "X",
-                    CustomMinimumSize = new Vector2(72, 60),
-                };
-                removeButton.AddThemeFontSizeOverride("font_size", 28);
-                DungeonFitUi.ApplyButton(removeButton, UiButtonStyle.Danger);
-                removeButton.Pressed += () => onRemove(routeIndex);
-                row.AddChild(removeButton);
+                row.RemoveRequested += () => onRemove(routeIndex);
             }
 
-            rowPanel.AddChild(row);
-            _routeList.AddChild(rowPanel);
+            _routeList.AddChild(row);
         }
     }
 
@@ -95,12 +73,12 @@ public sealed class DungeonRouteListView
             var slot = selectedDungeonRoute[index];
             var category = _categoryCatalog.GetById(slot.DungeonTypeId);
             var exercise = _exerciseCatalog.GetById(slot.DungeonTypeId, slot.ExerciseId);
-            return $"{index + 1}. {category.ShortName}{Text.DungeonSuffix} / {exercise.Name}  {slot.TargetSets} x {slot.TargetReps}  {GetMusicName(slot.MusicId)}  休息 {slot.RestSeconds}s";
+            return $"{category.ShortName}{Text.DungeonSuffix} / {exercise.Name}";
         }
 
         var stage = plan.Stages[index];
         var lockedCategory = _categoryCatalog.GetById(stage.DungeonTypeId);
-        return $"{GetStageMarker(run, canEditPlan, index)} {index + 1}. {lockedCategory.ShortName}{Text.DungeonSuffix} / {stage.ActionName}  {stage.TotalSets} x {stage.TargetReps}  {GetMusicName(stage.MusicId)}  休息 {stage.RestSeconds}s";
+        return $"{GetStageMarker(run, canEditPlan, index)} {lockedCategory.ShortName}{Text.DungeonSuffix} / {stage.ActionName}";
     }
 
     private static string GetStageMarker(DungeonRun? run, bool canEditPlan, int index)
@@ -116,11 +94,6 @@ public sealed class DungeonRouteListView
         }
 
         return index == run.CurrentStageIndex && !run.IsComplete ? "[>]" : "[ ]";
-    }
-
-    private string GetMusicName(string musicId)
-    {
-        return _musicCatalog.GetById(musicId).DisplayName;
     }
 
     private static void ClearChildren(Container container)

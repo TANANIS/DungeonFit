@@ -109,7 +109,7 @@ public partial class DungeonPlanView : Control
     {
         _planTitle.Text = _canEditPlan ? Text.SelectDungeon : _plan.DisplayName;
         _planSubtitle.Text = _canEditPlan ? Text.SelectDungeonSubtitle : Text.RouteLocked;
-        _dungeonTypeGridView.Refresh(_canEditPlan, _selectedDungeonRoute.Count, OpenRouteSlotDialog);
+        _dungeonTypeGridView.Refresh(_canEditPlan, _selectedDungeonRoute.Count, _selectedDungeonRoute, OpenRouteSlotDialog);
         _routeListView.Refresh(_canEditPlan, _selectedDungeonRoute, _plan, _run, RemoveRouteSlot);
         _summaryPresenter.Refresh(_canEditPlan, _selectedDungeonRoute, _plan, _run, _routeRules, _activeQuests);
     }

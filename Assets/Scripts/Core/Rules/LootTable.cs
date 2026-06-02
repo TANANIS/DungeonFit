@@ -37,7 +37,7 @@ public sealed class LootTable
 
     private EquipmentItem RollEquipment(DungeonLootProfile profile, DungeonChestLootRule rule, DungeonChest chest)
     {
-        var definitionId = RollEquipmentDefinitionId(profile, chest);
+        var definitionId = RollEquipmentDefinitionId(profile, chest, _equipmentCatalog);
         var definition = _equipmentCatalog.GetById(definitionId);
         var rarity = RollRarity(rule.RarityTable, chest);
         var modifiers = RollExtraModifiers(profile, rule, rarity, chest);
@@ -57,15 +57,29 @@ public sealed class LootTable
             : profile.BossChest;
     }
 
-    private static string RollEquipmentDefinitionId(DungeonLootProfile profile, DungeonChest chest)
+    private static string RollEquipmentDefinitionId(DungeonLootProfile profile, DungeonChest chest, EquipmentCatalog equipmentCatalog)
     {
-        if (profile.EquipmentDefinitionIds.Count == 0)
+        var candidates = equipmentCatalog.GetForDungeon(profile.DungeonTypeId);
+        if (candidates.Count == 0)
         {
-            return "chest_vanguard_blade";
+            return equipmentCatalog.GetAll()[0].Id;
         }
 
-        var index = StableRoll($"{chest.Id}:{profile.DungeonTypeId}:definition", profile.EquipmentDefinitionIds.Count);
-        return profile.EquipmentDefinitionIds[index];
+        var slotOffset = chest.SetNumber % 3;
+        var slot = slotOffset switch
+        {
+            1 => EquipmentSlot.Weapon,
+            2 => EquipmentSlot.Armor,
+            _ => EquipmentSlot.Accessory,
+        };
+        var slotCandidates = candidates.Where(definition => definition.Slot == slot).ToArray();
+        if (slotCandidates.Length == 0)
+        {
+            slotCandidates = candidates.ToArray();
+        }
+
+        var index = StableRoll($"{chest.Id}:{profile.DungeonTypeId}:definition:{slot}", slotCandidates.Length);
+        return slotCandidates[index].Id;
     }
 
     private static EquipmentRarity RollRarity(RarityDropTable table, DungeonChest chest)

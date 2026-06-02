@@ -31,6 +31,8 @@ public static class FlowSmokeUiLoader
             new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
             new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
         });
+        session.UpdatePlayerProfile(172, FitnessGoal.GeneralHealth);
+        session.RecordTodayWeight(72.4);
 
         var town = Load<TownView>(TownScenePath);
         town.Initialize(
@@ -38,7 +40,8 @@ public static class FlowSmokeUiLoader
             session.SelectedPlan,
             session.LastRunSummary,
             session.BuildIdleRewardViewModel(),
-            session.GetSaveStatus());
+            session.GetSaveStatus(),
+            session.BuildBodyProfileViewModel());
         parent.AddChild(town);
         yield return "TOWN_UI_LOADED";
         Release(parent, town);

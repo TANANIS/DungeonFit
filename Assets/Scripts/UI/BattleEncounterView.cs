@@ -11,12 +11,14 @@ public sealed class BattleEncounterView
 
     private readonly BattleActorView _player;
     private readonly BattleActorView _enemy;
+    private readonly ActorVisualCatalog _actorVisualCatalog = new();
     private readonly Control _stage;
     private readonly Label _enemyName;
     private readonly ProgressBar _bossHealth;
     private Tween? _attackTween;
     private EnemyDefinition _enemyDefinition = new("training_dummy", "\u8a13\u7df4\u5047\u4eba", "\u8a13\u7df4\u6559\u5b98", 24, 2, 54, 4);
     private int _enemyLevel = 1;
+    private string _currentEnemyVisualId = string.Empty;
 
     public BattleEncounterView(
         PanelContainer playerToken,
@@ -50,10 +52,12 @@ public sealed class BattleEncounterView
         _enemyDefinition = enemyDefinition;
         _enemyLevel = Math.Max(1, enemyLevel);
         _enemy.SetDisplayName(enemyDefinition.DisplayName);
+        ApplyEnemyVisual(new RoomProgress(1, 4, false, false, false));
     }
 
     public void ShowActiveWave(RoomProgress progress, ActiveSetCombatState state)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         var enemyLabel = progress.IsBossWave
             ? $"{_enemyDefinition.BossName} Lv.{_enemyLevel}"
@@ -69,6 +73,7 @@ public sealed class BattleEncounterView
 
     public void ShowWaveAttackWindup(RoomProgress progress, ActiveSetCombatState state)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         _attackTween?.Kill();
         if (state.EnemyDefeated)
@@ -84,6 +89,7 @@ public sealed class BattleEncounterView
 
     public void ShowWavePeakHit(RoomProgress progress, CombatRepResult? result, ActiveSetCombatState state)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         _attackTween?.Kill();
         if (result is null)
@@ -130,6 +136,7 @@ public sealed class BattleEncounterView
 
     public void ShowRest(RoomProgress progress, ActiveSetCombatState state)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         _attackTween?.Kill();
         _enemyName.Text = progress.IsBossWave
@@ -142,6 +149,7 @@ public sealed class BattleEncounterView
 
     public void ShowSetReported(RoomProgress progress, CombatSetResult result)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         _attackTween?.Kill();
         _player.SetState(result.WasEvading
@@ -161,11 +169,13 @@ public sealed class BattleEncounterView
 
     public void RefreshActiveHealth(RoomProgress progress, ActiveSetCombatState state)
     {
+        ApplyEnemyVisual(progress);
         RefreshHealth(progress, state);
     }
 
     public void ShowResult(RoomProgress progress, CombatSetResult? finalResult)
     {
+        ApplyEnemyVisual(progress);
         PositionActors();
         _attackTween?.Kill();
         if (progress.IsSkipped)
@@ -193,6 +203,7 @@ public sealed class BattleEncounterView
 
     private void ShowEnemyCounterWindup(RoomProgress progress, CombatRepResult result)
     {
+        ApplyEnemyVisual(progress);
         _player.SetState(result.WasEvading ? BattleActorState.Evading : BattleActorState.Active);
         _enemy.SetState(BattleActorState.Active);
         RefreshHealthForRep(progress, result, showPlayerAfterHit: false);
@@ -280,6 +291,32 @@ public sealed class BattleEncounterView
 
         _bossHealth.Visible = false;
         _enemy.ShowHp(state.EnemyHp, state.EnemyMaxHp, isPlayer: false, isEvading: false);
+    }
+
+    public static string ResolveEnemyVisualId(EnemyDefinition enemyDefinition, RoomProgress progress)
+    {
+        if (progress.IsBossWave)
+        {
+            return enemyDefinition.BossVisualId;
+        }
+
+        return progress.TotalSets >= 3 && progress.CurrentSet == progress.TotalSets - 1
+            ? enemyDefinition.EliteVisualId
+            : enemyDefinition.NormalVisualId;
+    }
+
+    private void ApplyEnemyVisual(RoomProgress progress)
+    {
+        var visualId = ResolveEnemyVisualId(_enemyDefinition, progress);
+
+        if (_currentEnemyVisualId == visualId)
+        {
+            return;
+        }
+
+        var visual = _actorVisualCatalog.Get(visualId);
+        _currentEnemyVisualId = visual.Id;
+        _enemy.SetAnimationSet(visual.ToAnimationSet(), visual.DisplayScale, visual.AnchorYOffset);
     }
 
     private void RefreshHealthForRep(RoomProgress progress, CombatRepResult result, bool showPlayerAfterHit)

@@ -31,6 +31,7 @@ public partial class TavernView : Control
     private Label _detailMeta = null!;
     private Label _detailStats = null!;
     private Label _detailHint = null!;
+    private PanelContainer _detailIconPanel = null!;
     private Button _equipButton = null!;
     private Button _sellButton = null!;
     private Button _lockButton = null!;
@@ -83,6 +84,7 @@ public partial class TavernView : Control
         _detailMeta = GetNode<Label>("%DetailMeta");
         _detailStats = GetNode<Label>("%DetailStats");
         _detailHint = GetNode<Label>("%DetailHint");
+        _detailIconPanel = GetNode<PanelContainer>("SafeMargin/Layout/DetailPanel/DetailMargin/DetailRow/ItemIcon");
         _equipButton = GetNode<Button>("%EquipButton");
         _sellButton = GetNode<Button>("%SellButton");
         _lockButton = GetNode<Button>("%LockButton");
@@ -215,6 +217,7 @@ public partial class TavernView : Control
             _detailMeta.Text = Text.NoSelectionMeta;
             _detailStats.Text = string.Empty;
             _detailHint.Text = Text.NoSelectionHint;
+            RefreshDetailIcon(string.Empty);
             _equipButton.Disabled = true;
             _sellButton.Disabled = true;
             _lockButton.Disabled = true;
@@ -225,6 +228,7 @@ public partial class TavernView : Control
         }
 
         _detailTitle.Text = item.DisplayName;
+        RefreshDetailIcon(item.IconPath);
         var powerText = item.EffectivePower == item.Power
             ? item.Power.ToString()
             : $"{item.EffectivePower}/{item.Power}";
@@ -242,6 +246,26 @@ public partial class TavernView : Control
         _sellButton.Disabled = !item.CanSell;
         _lockButton.Disabled = item.IsEquipped;
         _lockButton.Text = item.IsLocked ? Text.Unlock : Text.Lock;
+    }
+
+    private void RefreshDetailIcon(string iconPath)
+    {
+        ClearChildren(_detailIconPanel);
+        DungeonFitUi.ApplyPanel(_detailIconPanel, UiPanelStyle.Token);
+
+        var center = new CenterContainer();
+        center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        _detailIconPanel.AddChild(center);
+
+        if (string.IsNullOrWhiteSpace(iconPath))
+        {
+            var label = CreateLabel(Text.ItemIconFallback, 26, HorizontalAlignment.Center);
+            label.VerticalAlignment = VerticalAlignment.Center;
+            center.AddChild(label);
+            return;
+        }
+
+        center.AddChild(DungeonFitUi.CreateIcon(iconPath, 128));
     }
 
     private TavernInventoryItemViewModel? SelectedItem =>
@@ -482,6 +506,7 @@ public partial class TavernView : Control
         public const string NoSelection = "\u5c1a\u672a\u9078\u64c7\u88dd\u5099";
         public const string NoSelectionMeta = "\u5f9e\u5009\u5eab\u6216\u5df2\u88dd\u5099\u6b04\u9078\u4e00\u4ef6\u88dd\u5099\u3002";
         public const string NoSelectionHint = "\u9078\u4e2d\u5f8c\u53ef\u4ee5\u88dd\u5099\u3001\u51fa\u552e\u6216\u9396\u5b9a\u3002";
+        public const string ItemIconFallback = "\u88dd\u5099";
         public const string SellPriceFormat = "\u552e\u50f9\uff1a{0} Gold";
         public const string EquippedHint = "\u76ee\u524d\u5df2\u88dd\u5099\u3002";
         public const string LockedHint = "\u5df2\u9396\u5b9a\uff0c\u4e0d\u6703\u88ab\u51fa\u552e\u3002";

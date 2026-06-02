@@ -12,6 +12,9 @@ public sealed class BattleActorView
     private readonly ProgressBar _hpBar;
     private readonly Label _hpLabel;
     private string _displayName;
+    private float _displayScale = 1.0f;
+    private float _anchorYOffset;
+    private BattleActorState _state = BattleActorState.Idle;
 
     public Vector2 TokenSize => _token.Size;
 
@@ -76,11 +79,22 @@ public sealed class BattleActorView
     public void SetDisplayName(string displayName)
     {
         _displayName = displayName;
-        RefreshLabel(BattleActorState.Idle);
+        RefreshLabel(_state);
+    }
+
+    public void SetAnimationSet(BattleActorAnimationSet animationSet, float displayScale = 1.0f, float anchorYOffset = 0.0f)
+    {
+        _displayScale = Mathf.Max(0.1f, displayScale);
+        _anchorYOffset = anchorYOffset;
+        _sprite.SpriteFrames = SpriteSheetFramesBuilder.Build(animationSet);
+        _sprite.Animation = GetAnimationName(_state);
+        _sprite.Play();
+        CenterSprite();
     }
 
     public void SetState(BattleActorState state)
     {
+        _state = state;
         RefreshLabel(state);
         PlayAnimationForState(state);
 
@@ -135,13 +149,7 @@ public sealed class BattleActorView
 
     private void PlayAnimationForState(BattleActorState state)
     {
-        var animationName = state switch
-        {
-            BattleActorState.Active => "attack",
-            BattleActorState.Hit => "hurt",
-            BattleActorState.Defeated => "death",
-            _ => "idle",
-        };
+        var animationName = GetAnimationName(state);
 
         if (_sprite.Animation != animationName)
         {
@@ -153,14 +161,25 @@ public sealed class BattleActorView
         }
     }
 
+    private static string GetAnimationName(BattleActorState state)
+    {
+        return state switch
+        {
+            BattleActorState.Active => "attack",
+            BattleActorState.Hit => "hurt",
+            BattleActorState.Defeated => "death",
+            _ => "idle",
+        };
+    }
+
     private Vector2 GetSpriteScale(BattleActorState state)
     {
-        return Vector2.One * BaseSpriteScale;
+        return Vector2.One * BaseSpriteScale * _displayScale;
     }
 
     private void CenterSprite()
     {
-        _sprite.Position = new Vector2(_token.Size.X * 0.5f, _token.Size.Y * 0.58f);
+        _sprite.Position = new Vector2(_token.Size.X * 0.5f, _token.Size.Y * (0.58f + _anchorYOffset));
         var hpWidth = Mathf.Min(138, Mathf.Max(90, _token.Size.X * 0.72f));
         _hpBar.Size = new Vector2(hpWidth, 12);
         _hpBar.Position = new Vector2((_token.Size.X - hpWidth) * 0.5f, _token.Size.Y * 0.78f);

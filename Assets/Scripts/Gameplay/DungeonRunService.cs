@@ -40,7 +40,9 @@ public sealed class DungeonRunService
                 result,
                 set);
             var reward = combatResult is null
-                ? BuildLegacyReward(summary, set, rewardKind)
+                ? rewardKind == BankedRewardKind.Chest
+                    ? RollChestReward(chest, CalculateLegacyGold(summary, set))
+                    : BuildLegacyReward(summary, set, rewardKind)
                 : rewardKind == BankedRewardKind.Chest
                     ? RollChestReward(chest, combatResult.Gold)
                     : new RewardBundle(RewardSource.DungeonRoom, combatResult.Gold, null);
@@ -63,6 +65,11 @@ public sealed class DungeonRunService
             return BankedRewardKind.GoldOnly;
         }
 
+        if (summary.GetSetResult(set) != CompletionResult.Skipped)
+        {
+            return BankedRewardKind.Chest;
+        }
+
         return summary.Reward.Equipment is not null && set == summary.TotalSets
             ? BankedRewardKind.Chest
             : BankedRewardKind.GoldOnly;
@@ -70,15 +77,20 @@ public sealed class DungeonRunService
 
     private static RewardBundle BuildLegacyReward(RunSummary summary, int set, BankedRewardKind rewardKind)
     {
-        var completedSets = System.Math.Max(1, summary.CompletedSets);
-        var baseGold = summary.Reward.Gold / completedSets;
-        var remainder = summary.Reward.Gold % completedSets;
-        var gold = baseGold + (set <= remainder ? 1 : 0);
+        var gold = CalculateLegacyGold(summary, set);
         var equipment = rewardKind == BankedRewardKind.Chest && set == summary.TotalSets
             ? summary.Reward.Equipment
             : null;
 
         return new RewardBundle(RewardSource.DungeonRoom, gold, equipment);
+    }
+
+    private static int CalculateLegacyGold(RunSummary summary, int set)
+    {
+        var completedSets = System.Math.Max(1, summary.CompletedSets);
+        var baseGold = summary.Reward.Gold / completedSets;
+        var remainder = summary.Reward.Gold % completedSets;
+        return baseGold + (set <= remainder ? 1 : 0);
     }
 
     private RewardBundle RollChestReward(DungeonChest chest, int gold)

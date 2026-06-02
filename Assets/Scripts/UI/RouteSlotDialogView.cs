@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using DungeonFit.Core.Content;
 using DungeonFit.Core.Models;
@@ -11,40 +12,71 @@ public partial class RouteSlotDialogView : Control
 {
     public event Action<DungeonRouteSlot>? RouteSlotConfirmed;
 
+    private static readonly int[] RepCycle = { 8, 10, 12, 15, 20 };
+
     private readonly ExerciseCatalog _exerciseCatalog = new();
     private readonly MusicCatalog _musicCatalog = new();
     private readonly DungeonRouteRules _routeRules = new();
     private readonly List<Button> _exerciseButtons = new();
+    private readonly List<Button> _filterButtons = new();
+    private readonly List<Button> _restButtons = new();
+    private readonly List<Button> _musicButtons = new();
 
     private DungeonCategory _category = null!;
     private string _selectedExerciseId = string.Empty;
+    private int _selectedSets = DungeonRouteRules.DefaultSets;
+    private int _selectedReps = DungeonRouteRules.DefaultReps;
+    private int _selectedRestSeconds = DungeonRouteRules.DefaultRestSeconds;
+    private int _selectedMusicIndex;
+    private ExerciseFilter _activeFilter = ExerciseFilter.All;
+
     private Label _title = null!;
-    private SpinBox _setSpinBox = null!;
-    private SpinBox _repSpinBox = null!;
-    private OptionButton _musicSelector = null!;
-    private OptionButton _restSelector = null!;
-    private Label _exerciseDetail = null!;
-    private GridContainer _exerciseGrid = null!;
+    private Label _subtitle = null!;
+    private Button _setCard = null!;
+    private Button _repCard = null!;
+    private Label _musicText = null!;
+    private Label _currentExerciseName = null!;
+    private Label _currentExerciseTags = null!;
+    private Label _currentExerciseDetail = null!;
+    private VBoxContainer _exerciseList = null!;
+    private Control _musicPopup = null!;
+    private VBoxContainer _musicList = null!;
+    private Label _musicPopupTitle = null!;
+    private AudioStreamPlayer _previewPlayer = null!;
 
     public override void _Ready()
     {
         BuildMobileOverlay();
+        BuildMusicPopup();
         Visible = false;
     }
 
     public void OpenForDungeon(DungeonCategory category)
     {
         _category = category;
-        _title.Text = $"{category.ShortName} {Text.RouteSettings}";
-        _setSpinBox.Value = DungeonRouteRules.DefaultSets;
-        _repSpinBox.Value = DungeonRouteRules.DefaultReps;
-        _musicSelector.Select(0);
-        SelectRestSeconds(DungeonRouteRules.DefaultRestSeconds);
+        _title.Text = $"{category.ShortName}地城・討伐契約";
+        _subtitle.Text = GetCategorySubtitle(category.Id);
+        _selectedSets = DungeonRouteRules.DefaultSets;
+        _selectedReps = DungeonRouteRules.DefaultReps;
+        _selectedRestSeconds = DungeonRouteRules.DefaultRestSeconds;
+        _selectedMusicIndex = 0;
+        _activeFilter = ExerciseFilter.All;
 
         var defaultExercise = _exerciseCatalog.GetDefaultForDungeon(category.Id);
         _selectedExerciseId = defaultExercise.Id;
-        RefreshExerciseChoices();
+        RefreshAll();
         Visible = true;
+    }
+
+    public bool SmokeOpenMusicPopup()
+    {
+        if (!Visible)
+        {
+            return false;
+        }
+
+        OpenMusicPopup();
+        return _musicPopup.Visible;
     }
 
     private void BuildMobileOverlay()
@@ -54,28 +86,33 @@ public partial class RouteSlotDialogView : Control
 
         var scrim = new ColorRect
         {
-            Color = new Color(0, 0, 0, 0.62f),
+            Color = new Color(0, 0, 0, 0.66f),
             MouseFilter = MouseFilterEnum.Stop,
         };
         scrim.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(scrim);
 
-        var center = new CenterContainer();
-        center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(center);
+        var dialogMargin = new MarginContainer();
+        dialogMargin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        dialogMargin.AddThemeConstantOverride("margin_left", 28);
+        dialogMargin.AddThemeConstantOverride("margin_top", 118);
+        dialogMargin.AddThemeConstantOverride("margin_right", 28);
+        dialogMargin.AddThemeConstantOverride("margin_bottom", 90);
+        AddChild(dialogMargin);
 
         var sheet = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(500, 820),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
         };
         DungeonFitUi.ApplyPanel(sheet, UiPanelStyle.Overlay);
-        center.AddChild(sheet);
+        dialogMargin.AddChild(sheet);
 
         var margin = new MarginContainer();
-        margin.AddThemeConstantOverride("margin_left", 24);
-        margin.AddThemeConstantOverride("margin_top", 24);
-        margin.AddThemeConstantOverride("margin_right", 24);
-        margin.AddThemeConstantOverride("margin_bottom", 24);
+        margin.AddThemeConstantOverride("margin_left", 22);
+        margin.AddThemeConstantOverride("margin_top", 20);
+        margin.AddThemeConstantOverride("margin_right", 22);
+        margin.AddThemeConstantOverride("margin_bottom", 20);
         sheet.AddChild(margin);
 
         var layout = new VBoxContainer
@@ -86,99 +123,249 @@ public partial class RouteSlotDialogView : Control
         layout.AddThemeConstantOverride("separation", 10);
         margin.AddChild(layout);
 
-        _title = CreateLabel(Text.RouteSettings, 32, HorizontalAlignment.Center);
-        layout.AddChild(_title);
+        layout.AddChild(BuildHeader());
+        layout.AddChild(BuildParameterPanel());
+        layout.AddChild(BuildCurrentExercisePanel());
+        layout.AddChild(BuildFilterRow());
+        layout.AddChild(BuildExerciseScroll());
+        layout.AddChild(BuildActionRow());
 
-        var settingsPanel = new PanelContainer
+        _previewPlayer = new AudioStreamPlayer
         {
-            CustomMinimumSize = new Vector2(0, 228),
+            Name = "MusicPreviewPlayer",
         };
-        DungeonFitUi.ApplyPanel(settingsPanel, UiPanelStyle.Card);
-        layout.AddChild(settingsPanel);
+        AddChild(_previewPlayer);
+    }
 
-        var settingsMargin = new MarginContainer();
-        settingsMargin.AddThemeConstantOverride("margin_left", 18);
-        settingsMargin.AddThemeConstantOverride("margin_top", 14);
-        settingsMargin.AddThemeConstantOverride("margin_right", 18);
-        settingsMargin.AddThemeConstantOverride("margin_bottom", 14);
-        settingsPanel.AddChild(settingsMargin);
-
-        var settingsLayout = new VBoxContainer();
-        settingsLayout.AddThemeConstantOverride("separation", 12);
-        settingsMargin.AddChild(settingsLayout);
-
-        var counterGrid = new GridContainer
+    private Control BuildHeader()
+    {
+        var row = new HBoxContainer
         {
-            Columns = 3,
+            CustomMinimumSize = new Vector2(0, 84),
+        };
+        row.AddThemeConstantOverride("separation", 14);
+
+        var icon = CreateToken("盾");
+        row.AddChild(icon);
+
+        var titleStack = new VBoxContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            Alignment = BoxContainer.AlignmentMode.Center,
+        };
+        _title = CreateLabel(Text.RouteSettings, 34, HorizontalAlignment.Left);
+        _subtitle = CreateLabel(string.Empty, 20, HorizontalAlignment.Left);
+        _subtitle.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        titleStack.AddChild(_title);
+        titleStack.AddChild(_subtitle);
+        row.AddChild(titleStack);
+
+        var closeButton = new Button
+        {
+            Text = "X",
+            CustomMinimumSize = new Vector2(62, 62),
+        };
+        closeButton.AddThemeFontSizeOverride("font_size", 30);
+        DungeonFitUi.ApplyButton(closeButton, UiButtonStyle.Danger);
+        closeButton.Pressed += Close;
+        row.AddChild(closeButton);
+
+        return row;
+    }
+
+    private Control BuildParameterPanel()
+    {
+        var panel = new PanelContainer
+        {
+            CustomMinimumSize = new Vector2(0, 184),
+        };
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Card);
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 14);
+        margin.AddThemeConstantOverride("margin_top", 12);
+        margin.AddThemeConstantOverride("margin_right", 14);
+        margin.AddThemeConstantOverride("margin_bottom", 12);
+        panel.AddChild(margin);
+
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 8);
+        margin.AddChild(layout);
+
+        var title = CreateLabel(Text.TrainingParams, 21, HorizontalAlignment.Left);
+        layout.AddChild(title);
+
+        var cards = new HBoxContainer
+        {
+            CustomMinimumSize = new Vector2(0, 66),
+        };
+        cards.AddThemeConstantOverride("separation", 8);
+        layout.AddChild(cards);
+
+        _setCard = CreateParameterCard();
+        _setCard.Pressed += CycleSets;
+        cards.AddChild(_setCard);
+
+        _repCard = CreateParameterCard();
+        _repCard.Pressed += CycleReps;
+        cards.AddChild(_repCard);
+
+        var restGroup = new HBoxContainer
+        {
+            CustomMinimumSize = new Vector2(0, 52),
+        };
+        restGroup.AddThemeConstantOverride("separation", 6);
+        layout.AddChild(restGroup);
+
+        foreach (var seconds in DungeonRouteRules.RestSecondOptions)
+        {
+            var restButton = new Button
+            {
+                Text = $"{seconds}s",
+                CustomMinimumSize = new Vector2(0, 50),
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            };
+            restButton.AddThemeFontSizeOverride("font_size", 20);
+            restButton.Pressed += () =>
+            {
+                _selectedRestSeconds = seconds;
+                RefreshRestButtons();
+            };
+            _restButtons.Add(restButton);
+            restGroup.AddChild(restButton);
+        }
+
+        layout.AddChild(BuildMusicRow());
+        return panel;
+    }
+
+    private Button CreateParameterCard()
+    {
+        var button = new Button
+        {
+            CustomMinimumSize = new Vector2(0, 66),
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
-        counterGrid.AddThemeConstantOverride("h_separation", 12);
-        settingsLayout.AddChild(counterGrid);
+        button.AddThemeFontSizeOverride("font_size", 22);
+        DungeonFitUi.ApplyButton(button, UiButtonStyle.Secondary);
+        return button;
+    }
 
-        _setSpinBox = CreateSpinBox(DungeonRouteRules.MinSets, DungeonRouteRules.MaxSets, DungeonRouteRules.DefaultSets);
-        counterGrid.AddChild(CreateStackedControl(Text.SetCount, _setSpinBox));
-
-        _repSpinBox = CreateSpinBox(DungeonRouteRules.MinReps, DungeonRouteRules.MaxReps, DungeonRouteRules.DefaultReps);
-        counterGrid.AddChild(CreateStackedControl(Text.RepCount, _repSpinBox));
-
-        _restSelector = CreateRestSelector();
-        counterGrid.AddChild(CreateStackedControl(Text.RestSeconds, _restSelector));
-
-        _musicSelector = CreateMusicSelector();
-        settingsLayout.AddChild(CreateLabeledControl(Text.Music, _musicSelector));
-
-        var exerciseHeader = new HBoxContainer();
-        layout.AddChild(exerciseHeader);
-
-        var exerciseTitle = CreateLabel(Text.ExerciseTitle, 28, HorizontalAlignment.Left);
-        exerciseTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        exerciseHeader.AddChild(exerciseTitle);
-
-        var exerciseHint = CreateLabel(Text.ExerciseHint, 20, HorizontalAlignment.Right);
-        exerciseHint.VerticalAlignment = VerticalAlignment.Center;
-        exerciseHeader.AddChild(exerciseHint);
-
-        var detailPanel = new PanelContainer
+    private Button BuildMusicRow()
+    {
+        var button = new Button
         {
-            CustomMinimumSize = new Vector2(0, 86),
+            CustomMinimumSize = new Vector2(0, 56),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
-        DungeonFitUi.ApplyPanel(detailPanel, UiPanelStyle.Card);
-        layout.AddChild(detailPanel);
+        DungeonFitUi.ApplyButton(button, UiButtonStyle.Secondary);
+        button.Pressed += OpenMusicPopup;
 
-        var detailMargin = new MarginContainer();
-        detailMargin.AddThemeConstantOverride("margin_left", 16);
-        detailMargin.AddThemeConstantOverride("margin_top", 12);
-        detailMargin.AddThemeConstantOverride("margin_right", 16);
-        detailMargin.AddThemeConstantOverride("margin_bottom", 12);
-        detailPanel.AddChild(detailMargin);
-
-        _exerciseDetail = CreateLabel(string.Empty, 21, HorizontalAlignment.Left);
-        _exerciseDetail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        detailMargin.AddChild(_exerciseDetail);
-
-        var exerciseScroll = new ScrollContainer
+        _musicText = new Label
         {
-            CustomMinimumSize = new Vector2(0, 162),
-            SizeFlagsVertical = SizeFlags.Fill,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            ClipText = true,
+        };
+        _musicText.AddThemeFontSizeOverride("font_size", 21);
+        button.AddChild(_musicText);
+        _musicText.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, margin: 12);
+
+        return button;
+    }
+
+    private Control BuildCurrentExercisePanel()
+    {
+        var panel = new PanelContainer
+        {
+            CustomMinimumSize = new Vector2(0, 110),
+        };
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Card);
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 16);
+        margin.AddThemeConstantOverride("margin_top", 12);
+        margin.AddThemeConstantOverride("margin_right", 16);
+        margin.AddThemeConstantOverride("margin_bottom", 12);
+        panel.AddChild(margin);
+
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 5);
+        margin.AddChild(layout);
+
+        var header = new HBoxContainer();
+        layout.AddChild(header);
+        var title = CreateLabel(Text.CurrentExercise, 21, HorizontalAlignment.Left);
+        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        header.AddChild(title);
+        header.AddChild(CreateLabel(Text.CollapseHint, 18, HorizontalAlignment.Right));
+
+        _currentExerciseName = CreateLabel(string.Empty, 28, HorizontalAlignment.Left);
+        layout.AddChild(_currentExerciseName);
+        _currentExerciseTags = CreateLabel(string.Empty, 18, HorizontalAlignment.Left);
+        layout.AddChild(_currentExerciseTags);
+        _currentExerciseDetail = CreateLabel(string.Empty, 17, HorizontalAlignment.Left);
+        _currentExerciseDetail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        layout.AddChild(_currentExerciseDetail);
+        return panel;
+    }
+
+    private Control BuildFilterRow()
+    {
+        var row = new HBoxContainer
+        {
+            CustomMinimumSize = new Vector2(0, 48),
+        };
+        row.AddThemeConstantOverride("separation", 6);
+
+        foreach (var filter in new[] { ExerciseFilter.All, ExerciseFilter.Recommended, ExerciseFilter.Machine, ExerciseFilter.Dumbbell, ExerciseFilter.Bodyweight })
+        {
+            var button = new Button
+            {
+                Text = GetFilterLabel(filter),
+                CustomMinimumSize = new Vector2(0, 46),
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            };
+            button.AddThemeFontSizeOverride("font_size", 18);
+            button.SetMeta(Meta.Filter, (int)filter);
+            button.Pressed += () =>
+            {
+                _activeFilter = filter;
+                RefreshExerciseChoices();
+                RefreshFilterButtons();
+            };
+            _filterButtons.Add(button);
+            row.AddChild(button);
+        }
+
+        return row;
+    }
+
+    private Control BuildExerciseScroll()
+    {
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(0, 248),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
         };
-        layout.AddChild(exerciseScroll);
 
-        _exerciseGrid = new GridContainer
+        _exerciseList = new VBoxContainer
         {
-            Columns = 2,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         };
-        _exerciseGrid.AddThemeConstantOverride("h_separation", 10);
-        _exerciseGrid.AddThemeConstantOverride("v_separation", 10);
-        exerciseScroll.AddChild(_exerciseGrid);
+        _exerciseList.AddThemeConstantOverride("separation", 8);
+        scroll.AddChild(_exerciseList);
+        return scroll;
+    }
 
-        var buttonRow = new HBoxContainer
+    private Control BuildActionRow()
+    {
+        var row = new HBoxContainer
         {
-            CustomMinimumSize = new Vector2(0, 70),
+            CustomMinimumSize = new Vector2(0, 74),
         };
-        buttonRow.AddThemeConstantOverride("separation", 16);
-        layout.AddChild(buttonRow);
+        row.AddThemeConstantOverride("separation", 14);
 
         var cancelButton = new Button
         {
@@ -188,7 +375,7 @@ public partial class RouteSlotDialogView : Control
         cancelButton.AddThemeFontSizeOverride("font_size", 28);
         DungeonFitUi.ApplyButton(cancelButton, UiButtonStyle.Secondary);
         cancelButton.Pressed += Close;
-        buttonRow.AddChild(cancelButton);
+        row.AddChild(cancelButton);
 
         var confirmButton = new Button
         {
@@ -198,66 +385,332 @@ public partial class RouteSlotDialogView : Control
         confirmButton.AddThemeFontSizeOverride("font_size", 28);
         DungeonFitUi.ApplyButton(confirmButton, UiButtonStyle.Primary);
         confirmButton.Pressed += Confirm;
-        buttonRow.AddChild(confirmButton);
+        row.AddChild(confirmButton);
+
+        return row;
+    }
+
+    private void BuildMusicPopup()
+    {
+        _musicPopup = new Control
+        {
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        _musicPopup.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(_musicPopup);
+
+        var scrim = new ColorRect
+        {
+            Color = new Color(0, 0, 0, 0.74f),
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        scrim.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        _musicPopup.AddChild(scrim);
+
+        var dialogMargin = new MarginContainer();
+        dialogMargin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        dialogMargin.AddThemeConstantOverride("margin_left", 28);
+        dialogMargin.AddThemeConstantOverride("margin_top", 150);
+        dialogMargin.AddThemeConstantOverride("margin_right", 28);
+        dialogMargin.AddThemeConstantOverride("margin_bottom", 130);
+        _musicPopup.AddChild(dialogMargin);
+
+        var sheet = new PanelContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        DungeonFitUi.ApplyPanel(sheet, UiPanelStyle.Overlay);
+        dialogMargin.AddChild(sheet);
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 20);
+        margin.AddThemeConstantOverride("margin_top", 18);
+        margin.AddThemeConstantOverride("margin_right", 20);
+        margin.AddThemeConstantOverride("margin_bottom", 18);
+        sheet.AddChild(margin);
+
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 12);
+        margin.AddChild(layout);
+
+        var header = new HBoxContainer
+        {
+            CustomMinimumSize = new Vector2(0, 58),
+        };
+        layout.AddChild(header);
+        _musicPopupTitle = CreateLabel(Text.MusicPopupTitle, 30, HorizontalAlignment.Left);
+        _musicPopupTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        header.AddChild(_musicPopupTitle);
+
+        var closeButton = new Button
+        {
+            Text = "X",
+            CustomMinimumSize = new Vector2(58, 58),
+        };
+        DungeonFitUi.ApplyButton(closeButton, UiButtonStyle.Danger);
+        closeButton.Pressed += CloseMusicPopup;
+        header.AddChild(closeButton);
+
+        var scroll = new ScrollContainer
+        {
+            CustomMinimumSize = new Vector2(0, 530),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        layout.AddChild(scroll);
+
+        _musicList = new VBoxContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        _musicList.AddThemeConstantOverride("separation", 8);
+        scroll.AddChild(_musicList);
+
+        var doneButton = new Button
+        {
+            Text = Text.ConfirmMusic,
+            CustomMinimumSize = new Vector2(0, 68),
+        };
+        doneButton.AddThemeFontSizeOverride("font_size", 28);
+        DungeonFitUi.ApplyButton(doneButton, UiButtonStyle.Primary);
+        doneButton.Pressed += CloseMusicPopup;
+        layout.AddChild(doneButton);
+    }
+
+    private void RefreshAll()
+    {
+        RefreshParameterCards();
+        RefreshRestButtons();
+        RefreshMusicRow();
+        RefreshCurrentExercise();
+        RefreshFilterButtons();
+        RefreshExerciseChoices();
+    }
+
+    private void RefreshParameterCards()
+    {
+        _setCard.Text = $"{Text.SetCount}\n{_selectedSets}";
+        _repCard.Text = $"{Text.RepCount}\n{_selectedReps}";
+    }
+
+    private void RefreshRestButtons()
+    {
+        foreach (var button in _restButtons)
+        {
+            var secondsText = button.Text.TrimEnd('s');
+            var seconds = int.TryParse(secondsText, out var parsed) ? parsed : 0;
+            DungeonFitUi.ApplyButton(button, seconds == _selectedRestSeconds ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+        }
+    }
+
+    private void RefreshMusicRow()
+    {
+        var track = GetSelectedTrack();
+        _musicText.Text = $"{Text.Music}   {GetCompactTrackName(track)}  /  {track.Bpm} BPM     >";
+    }
+
+    private void RefreshCurrentExercise()
+    {
+        var selectedExercise = _exerciseCatalog.GetById(_category.Id, _selectedExerciseId);
+        _currentExerciseName.Text = selectedExercise.Name;
+        _currentExerciseTags.Text = BuildExerciseTags(selectedExercise);
+        _currentExerciseDetail.Text = $"{selectedExercise.Summary}\n注意：{selectedExercise.SafetyNote}";
+    }
+
+    private void RefreshFilterButtons()
+    {
+        foreach (var button in _filterButtons)
+        {
+            var filter = (ExerciseFilter)button.GetMeta(Meta.Filter).AsInt32();
+            DungeonFitUi.ApplyButton(button, filter == _activeFilter ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+        }
     }
 
     private void RefreshExerciseChoices()
     {
-        ClearChildren(_exerciseGrid);
+        ClearChildren(_exerciseList);
         _exerciseButtons.Clear();
 
-        foreach (var exercise in _exerciseCatalog.GetForDungeon(_category.Id))
+        foreach (var exercise in GetFilteredExercises())
         {
             var button = new Button
             {
                 Text = BuildExerciseButtonText(exercise),
-                CustomMinimumSize = new Vector2(0, 76),
+                CustomMinimumSize = new Vector2(0, 72),
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
             };
             button.AddThemeFontSizeOverride("font_size", 20);
             button.SetMeta(Meta.ExerciseId, exercise.Id);
             button.Pressed += () => SelectExercise(exercise.Id);
             _exerciseButtons.Add(button);
-            _exerciseGrid.AddChild(button);
+            _exerciseList.AddChild(button);
         }
 
         RefreshExerciseButtonStyles();
+    }
+
+    private IEnumerable<ExerciseDefinition> GetFilteredExercises()
+    {
+        return _exerciseCatalog.GetForDungeon(_category.Id)
+            .Where(exercise => _activeFilter switch
+            {
+                ExerciseFilter.Recommended => exercise.IsRecommended,
+                ExerciseFilter.Machine => exercise.TrainingType == Text.Machine,
+                ExerciseFilter.Dumbbell => exercise.TrainingType == Text.Dumbbell,
+                ExerciseFilter.Bodyweight => exercise.TrainingType == Text.Bodyweight,
+                _ => true,
+            });
     }
 
     private void SelectExercise(string exerciseId)
     {
         _selectedExerciseId = exerciseId;
+        RefreshCurrentExercise();
         RefreshExerciseButtonStyles();
     }
 
     private void RefreshExerciseButtonStyles()
     {
-        var selectedExercise = _exerciseCatalog.GetById(_category.Id, _selectedExerciseId);
-        _exerciseDetail.Text = $"{selectedExercise.Summary}\n注意：{selectedExercise.SafetyNote}";
-
         foreach (var button in _exerciseButtons)
         {
             var id = button.GetMeta(Meta.ExerciseId, string.Empty).AsString();
-            DungeonFitUi.ApplyButton(
-                button,
-                id == _selectedExerciseId ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+            DungeonFitUi.ApplyButton(button, id == _selectedExerciseId ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
         }
     }
 
     private static string BuildExerciseButtonText(ExerciseDefinition exercise)
     {
-        var recommended = exercise.IsRecommended ? $" {Text.Recommended}" : string.Empty;
-        return $"{exercise.Name}{recommended}\n{exercise.TrainingType}";
+        var selectedMark = exercise.IsRecommended ? "  ★推薦" : string.Empty;
+        return $"{exercise.Name}{selectedMark}\n{exercise.TrainingType} · {exercise.Summary}";
+    }
+
+    private static string BuildExerciseTags(ExerciseDefinition exercise)
+    {
+        var recommended = exercise.IsRecommended ? " / 推薦" : string.Empty;
+        return $"{exercise.TrainingType}{recommended}";
+    }
+
+    private void CycleSets()
+    {
+        _selectedSets = _selectedSets >= DungeonRouteRules.MaxSets
+            ? DungeonRouteRules.MinSets
+            : _selectedSets + 1;
+        RefreshParameterCards();
+    }
+
+    private void CycleReps()
+    {
+        var index = Array.IndexOf(RepCycle, _selectedReps);
+        _selectedReps = RepCycle[(index + 1) % RepCycle.Length];
+        RefreshParameterCards();
+    }
+
+    private void OpenMusicPopup()
+    {
+        StopPreview();
+        RefreshMusicPopup();
+        _musicPopup.Visible = true;
+        _musicPopup.MoveToFront();
+    }
+
+    private void RefreshMusicPopup()
+    {
+        ClearChildren(_musicList);
+        _musicButtons.Clear();
+        var tracks = _musicCatalog.GetAll();
+
+        for (var index = 0; index < tracks.Count; index++)
+        {
+            var track = tracks[index];
+            var row = new HBoxContainer
+            {
+                CustomMinimumSize = new Vector2(0, 70),
+            };
+            row.AddThemeConstantOverride("separation", 8);
+
+            var selectButton = new Button
+            {
+                Text = $"{(index == _selectedMusicIndex ? "✓ " : string.Empty)}{GetCompactTrackName(track)}\n{track.Bpm} BPM",
+                SizeFlagsHorizontal = SizeFlags.ExpandFill,
+                CustomMinimumSize = new Vector2(0, 70),
+            };
+            selectButton.AddThemeFontSizeOverride("font_size", 20);
+            selectButton.SetMeta(Meta.MusicIndex, index);
+            selectButton.Pressed += () =>
+            {
+                _selectedMusicIndex = index;
+                StopPreview();
+                RefreshMusicRow();
+                RefreshMusicPopup();
+            };
+            DungeonFitUi.ApplyButton(selectButton, index == _selectedMusicIndex ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+            _musicButtons.Add(selectButton);
+            row.AddChild(selectButton);
+
+            var previewButton = new Button
+            {
+                Text = Text.Preview,
+                CustomMinimumSize = new Vector2(104, 70),
+            };
+            previewButton.AddThemeFontSizeOverride("font_size", 20);
+            DungeonFitUi.ApplyButton(previewButton, UiButtonStyle.Secondary);
+            previewButton.Disabled = !ResourceLoader.Exists(track.ResourcePath);
+            previewButton.Pressed += () => PreviewTrack(track);
+            row.AddChild(previewButton);
+
+            _musicList.AddChild(row);
+        }
+    }
+
+    private void PreviewTrack(MusicTrack track)
+    {
+        StopPreview();
+        if (!ResourceLoader.Exists(track.ResourcePath))
+        {
+            GD.PushWarning($"Music stream not found: {track.ResourcePath}");
+            return;
+        }
+
+        _previewPlayer.Stream = GD.Load<AudioStream>(track.ResourcePath);
+        _previewPlayer.Play();
+    }
+
+    private void CloseMusicPopup()
+    {
+        StopPreview();
+        _musicPopup.Visible = false;
+    }
+
+    private void StopPreview()
+    {
+        if (_previewPlayer is null)
+        {
+            return;
+        }
+
+        _previewPlayer.Stop();
+        _previewPlayer.Stream = null;
+    }
+
+    private MusicTrack GetSelectedTrack()
+    {
+        var tracks = _musicCatalog.GetAll();
+        return _selectedMusicIndex >= 0 && _selectedMusicIndex < tracks.Count
+            ? tracks[_selectedMusicIndex]
+            : tracks[0];
     }
 
     private void Confirm()
     {
         var slot = new DungeonRouteSlot(
             _category.Id,
-            (int)_setSpinBox.Value,
-            (int)_repSpinBox.Value,
-            GetSelectedMusicId(),
-            GetSelectedRestSeconds(),
+            _selectedSets,
+            _selectedReps,
+            GetSelectedTrack().Id,
+            _selectedRestSeconds,
             _selectedExerciseId);
         RouteSlotConfirmed?.Invoke(_routeRules.Normalize(slot));
         Close();
@@ -265,41 +718,9 @@ public partial class RouteSlotDialogView : Control
 
     private void Close()
     {
+        StopPreview();
+        _musicPopup.Visible = false;
         Visible = false;
-    }
-
-    private string GetSelectedMusicId()
-    {
-        var selected = _musicSelector.Selected;
-        var tracks = _musicCatalog.GetAll();
-        return selected >= 0 && selected < tracks.Count ? tracks[selected].Id : tracks[0].Id;
-    }
-
-    private int GetSelectedRestSeconds()
-    {
-        var selected = _restSelector.Selected;
-        return selected >= 0 && selected < DungeonRouteRules.RestSecondOptions.Length
-            ? DungeonRouteRules.RestSecondOptions[selected]
-            : DungeonRouteRules.DefaultRestSeconds;
-    }
-
-    private void SelectRestSeconds(int restSeconds)
-    {
-        var index = Array.IndexOf(DungeonRouteRules.RestSecondOptions, restSeconds);
-        _restSelector.Select(index < 0 ? 1 : index);
-    }
-
-    private static SpinBox CreateSpinBox(double min, double max, double value)
-    {
-        return new SpinBox
-        {
-            MinValue = min,
-            MaxValue = max,
-            Step = 1,
-            Value = value,
-            CustomMinimumSize = new Vector2(0, 58),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        };
     }
 
     private static Label CreateLabel(string text, int fontSize, HorizontalAlignment alignment)
@@ -313,72 +734,49 @@ public partial class RouteSlotDialogView : Control
         return label;
     }
 
-    private static HBoxContainer CreateLabeledControl(string labelText, Control control)
+    private static PanelContainer CreateToken(string text)
     {
-        var row = new HBoxContainer
+        var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2(0, 66),
+            CustomMinimumSize = new Vector2(74, 74),
         };
-        var label = new Label
-        {
-            Text = labelText,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        label.AddThemeFontSizeOverride("font_size", 25);
-        row.AddChild(label);
-        row.AddChild(control);
-        return row;
+        DungeonFitUi.ApplyPanel(panel, UiPanelStyle.Token);
+
+        var label = CreateLabel(text, 30, HorizontalAlignment.Center);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        panel.AddChild(label);
+        return panel;
     }
 
-    private static VBoxContainer CreateStackedControl(string labelText, Control control)
+    private static string GetFilterLabel(ExerciseFilter filter)
     {
-        var stack = new VBoxContainer
+        return filter switch
         {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            ExerciseFilter.Recommended => Text.Recommended,
+            ExerciseFilter.Machine => Text.Machine,
+            ExerciseFilter.Dumbbell => Text.Dumbbell,
+            ExerciseFilter.Bodyweight => Text.Bodyweight,
+            _ => Text.All,
         };
-        stack.AddThemeConstantOverride("separation", 4);
-
-        var label = new Label
-        {
-            Text = labelText,
-        };
-        label.AddThemeFontSizeOverride("font_size", 22);
-        stack.AddChild(label);
-        stack.AddChild(control);
-        return stack;
     }
 
-    private OptionButton CreateMusicSelector()
+    private static string GetCategorySubtitle(string categoryId)
     {
-        var selector = new OptionButton
+        return categoryId switch
         {
-            CustomMinimumSize = new Vector2(248, 58),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            "chest" => "穩定訓練，適合作為起始房間。",
+            "shoulders" => "垂直推舉與肩部控制訓練。",
+            "back" => "划船與下拉路線，建立背部穩定。",
+            "legs" => "下肢推蹬與單腳控制訓練。",
+            "core" => "核心穩定與呼吸節奏訓練。",
+            "arms" => "手臂彎舉與下壓的短回合訓練。",
+            _ => "選擇熟悉且可穩定完成的訓練動作。",
         };
-        foreach (var music in _musicCatalog.GetAll())
-        {
-            selector.AddItem(music.DisplayName);
-        }
-
-        selector.Select(0);
-        return selector;
     }
 
-    private static OptionButton CreateRestSelector()
+    private static string GetCompactTrackName(MusicTrack track)
     {
-        var selector = new OptionButton
-        {
-            CustomMinimumSize = new Vector2(0, 58),
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        };
-        foreach (var seconds in DungeonRouteRules.RestSecondOptions)
-        {
-            selector.AddItem($"{seconds}s");
-        }
-
-        selector.Select(1);
-        return selector;
+        return track.DisplayName.Replace($" ({track.Bpm} BPM)", string.Empty);
     }
 
     private static void ClearChildren(Container container)
@@ -390,22 +788,40 @@ public partial class RouteSlotDialogView : Control
         }
     }
 
+    private enum ExerciseFilter
+    {
+        All,
+        Recommended,
+        Machine,
+        Dumbbell,
+        Bodyweight,
+    }
+
     private static class Meta
     {
         public const string ExerciseId = "exercise_id";
+        public const string Filter = "filter";
+        public const string MusicIndex = "music_index";
     }
 
     private static class Text
     {
-        public const string RouteSettings = "\u8a0e\u4f10\u8a2d\u5b9a";
-        public const string SetCount = "\u7d44\u6578";
-        public const string RepCount = "\u6b21\u6578";
-        public const string Music = "\u97f3\u6a02";
-        public const string RestSeconds = "\u4f11\u606f";
-        public const string ExerciseTitle = "\u672c\u6b21\u52d5\u4f5c";
-        public const string ExerciseHint = "\u9810\u8a2d\u5df2\u9078";
-        public const string Recommended = "\u63a8\u85a6";
-        public const string AddToRoute = "\u52a0\u5165\u8def\u7dda";
-        public const string Cancel = "\u53d6\u6d88";
+        public const string RouteSettings = "討伐設定";
+        public const string TrainingParams = "訓練參數";
+        public const string SetCount = "組數";
+        public const string RepCount = "次數";
+        public const string Music = "音樂";
+        public const string CurrentExercise = "當前動作";
+        public const string CollapseHint = "收合動作 ▲";
+        public const string Recommended = "推薦";
+        public const string All = "全部";
+        public const string Machine = "器械";
+        public const string Dumbbell = "啞鈴";
+        public const string Bodyweight = "徒手";
+        public const string AddToRoute = "加入今日路線";
+        public const string Cancel = "取消";
+        public const string MusicPopupTitle = "選擇音樂";
+        public const string Preview = "試聽";
+        public const string ConfirmMusic = "套用音樂";
     }
 }

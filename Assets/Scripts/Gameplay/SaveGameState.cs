@@ -5,7 +5,7 @@ namespace DungeonFit.Gameplay;
 
 public sealed class SaveGameState
 {
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 12;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -18,6 +18,12 @@ public sealed class SaveGameState
     public int Gold { get; set; }
 
     public int? CurrentHp { get; set; }
+
+    public PlayerProfile? Profile { get; set; }
+
+    public List<BodyMetricEntry>? BodyMetrics { get; set; } = new();
+
+    public List<DungeonProgressEntry>? DungeonProgress { get; set; } = new();
 
     public string DailyStateKey { get; set; } = string.Empty;
 

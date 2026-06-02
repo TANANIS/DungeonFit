@@ -1,6 +1,8 @@
 # DungeonFit MVP Implementation Plan
 
 > Historical Note: This document records the early first-slice implementation plan. It is useful for understanding why the first playable loop was built in its original order, but it is no longer the source of truth for current product rules. Use `Assets/doc/DungeonFit_Document.md` for the latest combat, reward, loot, Town building, and MVP system direction.
+>
+> MVP Completion Note: As of 2026-06-02, the internal DungeonFit MVP is considered complete and ready to be uploaded to Git. Remaining work is public-test readiness, Android package discipline, balance, polish, and longer device validation.
 
 ## Purpose
 
@@ -249,7 +251,7 @@ Town interaction rules:
 
 ## Current Progress
 
-Recorded on May 23, 2026. Updated on May 25, 2026:
+Recorded on May 23, 2026. Updated on May 25, 2026. MVP completion snapshot added on June 2, 2026:
 
 - The project baseline is Godot 4.6.2 .NET with Android-first portrait settings.
 - C# core models exist for player state, task templates, room runs, room progress, rewards, reward source, completion results, and equipment items.
@@ -283,10 +285,14 @@ Recorded on May 23, 2026. Updated on May 25, 2026:
 - MVP save/load now persists player gold, inventory, selected route, active run stage results, banked rewards, daily claim state, and the last run summary to `user://save.json`.
 - Town settings now includes player-facing save management: manual save, delete current save, and a current save status summary. Deleting the save resets the active session.
 - Route music now uses stable `MusicId` values instead of display names, while UI text is resolved from `MusicCatalog`.
-- Full route reordering, custom workout creation, category filters, quest bonus selection, and JSON content loading remain deferred.
+- Full route reordering, custom workout creation, advanced category filters, quest bonus selection, and JSON content loading remain deferred to post-MVP expansion.
 - The product target is now documented as Town -> dungeon planning -> 4 to 6 ordered workout stages -> per-set chest banking -> daily summary -> concentrated chest opening -> Town.
 - The Beat Flow panel now has a first Wave indicator prototype: a BPM-driven target wave, a current rhythm marker, and automatic Break after the rep-count wave cycles finish.
-- The current UI uses placeholder fighters. Final art, Spine animation, action-specific Wave shapes, and exact audio sync are not integrated.
-- The current playable loop is Town -> Dungeon Plan -> current stage Room Challenge -> result -> Set Summary -> Dungeon Plan with updated route progress -> Daily Summary -> Open All -> Town. MVP per-set chest banking exists; full chest-opening animation is not implemented yet.
+- The current UI now uses the player Knight plus expanded enemy sprite sets for core combat readability. Final Spine animation, action-specific Wave shapes, and exact audio sync remain post-MVP work.
+- The current playable loop is Town -> Dungeon Plan -> current stage Room Challenge -> result -> Set Summary -> Dungeon Plan with updated route progress -> Daily Summary -> Open All -> Town. MVP per-set reward banking exists; full chest-opening animation remains post-MVP polish.
 - Ending training from Set Summary now routes into Daily Summary first. Town gold only changes after `Open All`, so players cannot accidentally bypass reward claim by returning to Town early.
-- JSON content loading, analytics, full chest tables, affix rerolls, music unlocks, and fatigue rules remain deferred. Idle gold, healing shop, potion supply, Blacksmith, Church, and Notice Board now exist as MVP systems but still need balancing and presentation polish.
+- Idle gold, healing shop, potion supply, Blacksmith, Church, Notice Board, Tavern equipment management, body profile, dungeon growth, combat rewards, expanded actor visuals, and screenshot QA now exist as MVP systems.
+- Current validated content breadth includes 6 dungeon categories, 48 exercises, 16 music tracks, 12 enemy visual sets plus the player Knight, 288 equipment definitions, 6 dungeon loot profiles, 6 short-term daily quests, and 12 Church oath quests.
+- Repeatable validation now covers `dotnet build`, `--flow-smoke-test`, and `--ui-screenshot-test`.
+- JSON content loading, analytics, full chest-opening animation, affix rerolls, music unlocks, fatigue rules, Android store metadata, release signing, and long device-play validation remain deferred to public-test and post-MVP readiness.
+- Internal MVP completion is accepted as of June 2, 2026. The next project phase is to make the MVP feel public-ready rather than to prove the core loop again.

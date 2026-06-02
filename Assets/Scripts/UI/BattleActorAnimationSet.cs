@@ -4,7 +4,8 @@ public sealed record BattleActorAnimationSet(
     string IdlePath,
     string AttackPath,
     string HurtPath,
-    string DeathPath)
+    string DeathPath,
+    string? BlockPath = null)
 {
     public static BattleActorAnimationSet PlayerKnight { get; } = new(
         "res://Assets/Art/Actors/Player/Knight/Knight-Idle.png",

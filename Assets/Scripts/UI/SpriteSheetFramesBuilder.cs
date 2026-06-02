@@ -14,6 +14,7 @@ public static class SpriteSheetFramesBuilder
         ReplaceAnimation(frames, "attack", animationSet.AttackPath, loop: false, framesPerSecond: 12);
         ReplaceAnimation(frames, "hurt", animationSet.HurtPath, loop: false, framesPerSecond: 8);
         ReplaceAnimation(frames, "death", animationSet.DeathPath, loop: false, framesPerSecond: 7);
+        ReplaceAnimation(frames, "block", animationSet.BlockPath ?? animationSet.HurtPath, loop: false, framesPerSecond: 8);
 
         return frames;
     }

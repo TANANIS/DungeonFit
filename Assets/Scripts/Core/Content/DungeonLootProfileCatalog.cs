@@ -6,9 +6,11 @@ namespace DungeonFit.Core.Content;
 
 public sealed class DungeonLootProfileCatalog
 {
+    private static readonly EquipmentCatalog Equipment = new();
+
     private static readonly DungeonChestLootRule NormalChest = new(
         Gold: 10,
-        DropsEquipment: false,
+        DropsEquipment: true,
         RarityTable: new RarityDropTable(100, 0, 0));
 
     private static readonly DungeonChestLootRule BossChest = new(
@@ -26,7 +28,7 @@ public sealed class DungeonLootProfileCatalog
     {
         new(
             "chest",
-            new[] { "chest_vanguard_blade", "chest_guard_plate", "chest_oath_ring" },
+            Equipment.GetDefinitionIdsForDungeon("chest"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -37,7 +39,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "shoulders",
-            new[] { "shoulder_moon_halberd", "shoulder_guard_mantle", "shoulder_captain_medal" },
+            Equipment.GetDefinitionIdsForDungeon("shoulders"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -48,7 +50,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "back",
-            new[] { "back_shadow_axe", "back_watcher_coat", "back_raven_charm" },
+            Equipment.GetDefinitionIdsForDungeon("back"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty),
@@ -59,7 +61,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "legs",
-            new[] { "leg_miner_pick", "leg_deepstride_greaves", "leg_ore_badge" },
+            Equipment.GetDefinitionIdsForDungeon("legs"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.MaxHp, 15, string.Empty),
@@ -70,7 +72,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "core",
-            new[] { "core_moon_staff", "core_stability_vest", "core_prayer_beads" },
+            Equipment.GetDefinitionIdsForDungeon("core"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.MaxHp, 12, string.Empty),
@@ -81,7 +83,7 @@ public sealed class DungeonLootProfileCatalog
             PartialBossChest),
         new(
             "arms",
-            new[] { "arm_courier_sabre", "arm_parcel_guard", "arm_signal_bracelet" },
+            Equipment.GetDefinitionIdsForDungeon("arms"),
             new[]
             {
                 new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 4, "arms"),

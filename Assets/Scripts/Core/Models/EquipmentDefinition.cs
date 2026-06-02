@@ -6,6 +6,7 @@ public sealed record EquipmentDefinition(
     string Id,
     string DisplayName,
     EquipmentSlot Slot,
+    string IconPath,
     int RecommendedLevelMin,
     int RecommendedLevelMax,
     int BasePower,

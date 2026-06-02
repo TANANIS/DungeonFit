@@ -205,6 +205,32 @@ public partial class RoomChallengeView : Control
         return !_isPaused && !_pausePanel.Visible;
     }
 
+    public bool SmokeShowEnemyVisual(string dungeonTypeId, int currentSet, int totalSets, bool isBossWave)
+    {
+        if (!IsNodeReady())
+        {
+            return false;
+        }
+
+        var enemy = _enemyCatalog.GetForDungeon(dungeonTypeId);
+        _battleEncounter.SetEnemy(enemy, 1);
+        _battleEncounter.ShowActiveWave(
+            new RoomProgress(currentSet, totalSets, isBossWave, false, false),
+            new ActiveSetCombatState(
+                currentSet,
+                isBossWave,
+                _player.CurrentHp,
+                _player.MaxHp,
+                isBossWave ? enemy.GetBossMaxHp(1) : enemy.GetNormalMaxHp(1),
+                isBossWave ? enemy.GetBossMaxHp(1) : enemy.GetNormalMaxHp(1),
+                0,
+                0,
+                0,
+                false,
+                false));
+        return true;
+    }
+
     private void StartRoom()
     {
         var enemy = _enemyCatalog.GetForDungeon(_task.DungeonTypeId);
@@ -418,7 +444,7 @@ public partial class RoomChallengeView : Control
             _room.SetResults.ToArray(),
             _room.CombatResults.ToArray(),
             _room.CurrentPlayerHp,
-            CalculateExperienceGained(_room.CombatResults));
+            TrainingExperienceRules.Calculate(_room.Progress.CompletedSets, _task.TotalSets, _room.CombatResults));
         _battleEncounter.ShowResult(_room.Progress, _room.CombatResults.LastOrDefault());
         _resultPresenter.Show(_lastSummary);
         _supplyPanel.Visible = false;
@@ -507,26 +533,6 @@ public partial class RoomChallengeView : Control
         return result.EnemyDefeated
             ? string.Format(Text.EnemyDefeatedSet, result.DamageDealt, result.PlayerHpAfter, result.Gold)
             : string.Format(Text.EnemySurvivedSet, result.DamageDealt, result.DamageTaken, result.PlayerHpAfter, result.Gold);
-    }
-
-    private static int CalculateExperienceGained(System.Collections.Generic.IReadOnlyList<CombatSetResult> results)
-    {
-        var experience = 0;
-        foreach (var result in results)
-        {
-            experience += 8;
-            if (result.RewardKind == BankedRewardKind.Chest)
-            {
-                experience += 4;
-            }
-
-            if (result.IsBoss && result.RewardKind == BankedRewardKind.Chest)
-            {
-                experience += 12;
-            }
-        }
-
-        return experience;
     }
 
     private static string BuildWaveMarkers(RoomProgress progress)

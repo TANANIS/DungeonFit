@@ -1,5 +1,7 @@
 using Godot;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
 
@@ -17,20 +19,33 @@ public partial class TownView : Control
     public event Action? IdleRewardClaimed;
     public event Action? ManualSaveRequested;
     public event Action? DeleteSaveRequested;
+    public event Action<int, string, double?>? ProfileSaved;
+    public event Action<double>? TodayWeightSaved;
 
     private PlayerState _player = new();
     private DungeonPlan _todayPlan = null!;
     private RunSummary? _lastRunSummary;
     private IdleRewardViewModel _idleReward = new(0, 72, 10, false, string.Empty);
+    private BodyProfileViewModel _bodyProfile = BodyProfileViewModel.Empty;
     private SaveStatus? _saveStatus;
     private Label _levelLabel = null!;
     private Label _goldLabel = null!;
     private Label _todayChallenge = null!;
+    private Label _bodyStatus = null!;
     private Label _idleStatus = null!;
     private Button _idleClaimButton = null!;
     private Label _lastReward = null!;
     private Label _saveStatusLabel = null!;
     private PanelContainer _settingsPanel = null!;
+    private PanelContainer _bodyPanel = null!;
+    private Label _bodyDialogError = null!;
+    private Label _bodyDialogAdvice = null!;
+    private LineEdit _heightInput = null!;
+    private LineEdit _weightInput = null!;
+    private string _selectedGoalId = FitnessGoal.GeneralHealth;
+    private readonly List<Button> _goalButtons = new();
+    private bool _hasInitialized;
+    private bool _onboardingPromptShown;
 
     public override void _Ready()
     {
@@ -42,7 +57,10 @@ public partial class TownView : Control
         _idleStatus = GetNode<Label>("%IdleStatus");
         _lastReward = GetNode<Label>("%LastReward");
         _idleClaimButton = CreateIdleClaimButton();
-        GetNode<VBoxContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText").AddChild(_idleClaimButton);
+        _bodyStatus = CreateBodyStatusLabel();
+        var idleText = GetNode<VBoxContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleText");
+        idleText.AddChild(_bodyStatus);
+        idleText.AddChild(_idleClaimButton);
 
         GetNode<Button>("%EnterDungeonButton").Pressed += RequestEnterDungeon;
         GetNode<Button>("%SettingsButton").Pressed += ShowSettings;
@@ -74,6 +92,7 @@ public partial class TownView : Control
         BuildTownMap(townGrid, herbShop, tavern, blacksmith, noticeBoard, fountain, church);
         ApplyArtStyles();
         BuildSettingsPanel();
+        BuildBodyPanel();
         Refresh();
     }
 
@@ -82,13 +101,16 @@ public partial class TownView : Control
         DungeonPlan todayPlan,
         RunSummary? lastRunSummary,
         IdleRewardViewModel idleReward,
-        SaveStatus saveStatus)
+        SaveStatus saveStatus,
+        BodyProfileViewModel? bodyProfile = null)
     {
         _player = player;
         _todayPlan = todayPlan;
         _lastRunSummary = lastRunSummary;
         _idleReward = idleReward;
         _saveStatus = saveStatus;
+        _bodyProfile = bodyProfile ?? BodyProfileViewModel.Empty;
+        _hasInitialized = true;
 
         if (IsNodeReady())
         {
@@ -118,6 +140,7 @@ public partial class TownView : Control
                 ? Text.RouteEmpty
                 : string.Format(Text.RouteSummaryFormat, _todayPlan.DisplayName, _todayPlan.Stages.Count, _todayPlan.TotalSets);
         RefreshIdleReward();
+        RefreshBodyStatus();
         _lastReward.Text = _lastRunSummary is null
             ? Text.NoBankedReward
             : string.Format(
@@ -129,6 +152,29 @@ public partial class TownView : Control
                 _lastRunSummary.TotalSets,
                 _lastRunSummary.ExperienceGained);
         RefreshSaveStatus();
+        MaybeShowOnboarding();
+    }
+
+    public bool SmokeOpenProfileOnboarding()
+    {
+        if (!IsNodeReady())
+        {
+            return false;
+        }
+
+        ShowProfileDialog(onboarding: true);
+        return _bodyPanel.Visible;
+    }
+
+    public bool SmokeOpenBodyMetricsDialog()
+    {
+        if (!IsNodeReady())
+        {
+            return false;
+        }
+
+        ShowBodyMetricsDialog();
+        return _bodyPanel.Visible;
     }
 
     private void RefreshIdleReward()
@@ -146,6 +192,34 @@ public partial class TownView : Control
         _idleClaimButton.Text = _idleReward.CanClaim
             ? string.Format(Text.ClaimIdleRewardFormat, _idleReward.UnclaimedGold)
             : string.Format(Text.IdleRewardEmptyFormat, _idleReward.RewardIntervalMinutes);
+    }
+
+    private void RefreshBodyStatus()
+    {
+        if (_bodyStatus is null)
+        {
+            return;
+        }
+
+        _bodyStatus.Text = string.IsNullOrWhiteSpace(_bodyProfile.TodayStatusText)
+            ? Text.TodayWeightMissing
+            : _bodyProfile.TodayStatusText;
+    }
+
+    private void MaybeShowOnboarding()
+    {
+        if (_bodyPanel is null ||
+            !_hasInitialized ||
+            _onboardingPromptShown ||
+            _bodyProfile.HasCompletedOnboarding ||
+            _settingsPanel.Visible ||
+            _bodyPanel.Visible)
+        {
+            return;
+        }
+
+        _onboardingPromptShown = true;
+        ShowProfileDialog(onboarding: true);
     }
 
     private void RefreshSaveStatus()
@@ -228,6 +302,14 @@ public partial class TownView : Control
         _saveStatusLabel.AddThemeFontSizeOverride("font_size", 28);
         layout.AddChild(_saveStatusLabel);
 
+        var profileButton = CreateSettingsButton(Text.ProfileSettings);
+        profileButton.Pressed += () => ShowProfileDialog(onboarding: false);
+        layout.AddChild(profileButton);
+
+        var weightButton = CreateSettingsButton(Text.TodayWeightSettings);
+        weightButton.Pressed += ShowBodyMetricsDialog;
+        layout.AddChild(weightButton);
+
         var saveButton = CreateSettingsButton(Text.ManualSave);
         saveButton.Pressed += () => ManualSaveRequested?.Invoke();
         layout.AddChild(saveButton);
@@ -251,6 +333,325 @@ public partial class TownView : Control
         button.AddThemeFontSizeOverride("font_size", 30);
         DungeonFitUi.ApplyButton(button, text == Text.DeleteSave ? UiButtonStyle.Danger : UiButtonStyle.Secondary);
         return button;
+    }
+
+    private void BuildBodyPanel()
+    {
+        _bodyPanel = new PanelContainer
+        {
+            Name = "BodyProfilePanel",
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        _bodyPanel.SetAnchorsPreset(LayoutPreset.FullRect);
+        DungeonFitUi.ApplyPanel(_bodyPanel, UiPanelStyle.Overlay);
+        AddChild(_bodyPanel);
+        _bodyPanel.MoveToFront();
+    }
+
+    private void ShowProfileDialog(bool onboarding)
+    {
+        HideSettings();
+        _selectedGoalId = FitnessGoal.Normalize(_bodyProfile.GoalId);
+        _goalButtons.Clear();
+        ClearChildren(_bodyPanel);
+
+        var layout = CreateBodyDialogLayout();
+        _bodyPanel.AddChild(layout.Root);
+        layout.Content.AddChild(CreateDialogTitle(onboarding ? Text.OnboardingTitle : Text.ProfileTitle));
+        layout.Content.AddChild(CreateDialogDescription(onboarding ? Text.OnboardingDescription : Text.ProfileDescription));
+
+        _heightInput = CreateDialogInput(Text.HeightPlaceholder, _bodyProfile.HeightCm > 0 ? _bodyProfile.HeightCm.ToString(CultureInfo.InvariantCulture) : string.Empty);
+        layout.Content.AddChild(CreateField(Text.HeightLabel, _heightInput));
+
+        if (onboarding)
+        {
+            _weightInput = CreateDialogInput(Text.InitialWeightPlaceholder, _bodyProfile.TodayWeightKg.HasValue ? _bodyProfile.TodayWeightKg.Value.ToString("0.0", CultureInfo.InvariantCulture) : string.Empty);
+            layout.Content.AddChild(CreateField(Text.InitialWeightLabel, _weightInput));
+        }
+
+        layout.Content.AddChild(CreateGoalSelector());
+        _bodyDialogAdvice = CreateDialogDescription(FitnessGoal.GetAdvice(_selectedGoalId));
+        layout.Content.AddChild(_bodyDialogAdvice);
+        _bodyDialogError = CreateDialogError();
+        layout.Content.AddChild(_bodyDialogError);
+
+        var actions = CreateDialogActions();
+        var cancelButton = CreateDialogButton(onboarding ? Text.Later : Text.Cancel, UiButtonStyle.Secondary);
+        cancelButton.Pressed += HideBodyPanel;
+        actions.AddChild(cancelButton);
+
+        var saveButton = CreateDialogButton(onboarding ? Text.StartProfile : Text.SaveProfile, UiButtonStyle.Primary);
+        saveButton.Pressed += () => SubmitProfile(onboarding);
+        actions.AddChild(saveButton);
+        layout.Content.AddChild(actions);
+
+        _bodyPanel.Visible = true;
+        _bodyPanel.MoveToFront();
+    }
+
+    private void ShowBodyMetricsDialog()
+    {
+        HideSettings();
+        ClearChildren(_bodyPanel);
+
+        var layout = CreateBodyDialogLayout();
+        _bodyPanel.AddChild(layout.Root);
+        layout.Content.AddChild(CreateDialogTitle(Text.TodayWeightTitle));
+        layout.Content.AddChild(CreateDialogDescription(Text.TodayWeightDescription));
+
+        _weightInput = CreateDialogInput(Text.TodayWeightPlaceholder, _bodyProfile.TodayWeightKg.HasValue ? _bodyProfile.TodayWeightKg.Value.ToString("0.0", CultureInfo.InvariantCulture) : string.Empty);
+        layout.Content.AddChild(CreateField(Text.TodayWeightInputLabel, _weightInput));
+        layout.Content.AddChild(CreateDialogDescription(_bodyProfile.GoalAdvice));
+        _bodyDialogError = CreateDialogError();
+        layout.Content.AddChild(_bodyDialogError);
+
+        var actions = CreateDialogActions();
+        var cancelButton = CreateDialogButton(Text.Cancel, UiButtonStyle.Secondary);
+        cancelButton.Pressed += HideBodyPanel;
+        actions.AddChild(cancelButton);
+
+        var saveButton = CreateDialogButton(Text.SaveTodayWeight, UiButtonStyle.Primary);
+        saveButton.Pressed += SubmitTodayWeight;
+        actions.AddChild(saveButton);
+        layout.Content.AddChild(actions);
+
+        _bodyPanel.Visible = true;
+        _bodyPanel.MoveToFront();
+    }
+
+    private static (MarginContainer Root, VBoxContainer Content) CreateBodyDialogLayout()
+    {
+        var root = new MarginContainer();
+        root.AddThemeConstantOverride("margin_left", 44);
+        root.AddThemeConstantOverride("margin_top", 104);
+        root.AddThemeConstantOverride("margin_right", 44);
+        root.AddThemeConstantOverride("margin_bottom", 104);
+
+        var content = new VBoxContainer();
+        content.AddThemeConstantOverride("separation", 18);
+        root.AddChild(content);
+        return (root, content);
+    }
+
+    private static Label CreateDialogTitle(string text)
+    {
+        var title = new Label
+        {
+            Text = text,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        title.AddThemeFontSizeOverride("font_size", 42);
+        return title;
+    }
+
+    private static Label CreateDialogDescription(string text)
+    {
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 25);
+        return label;
+    }
+
+    private static Label CreateDialogError()
+    {
+        var label = new Label
+        {
+            Text = string.Empty,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 24);
+        label.AddThemeColorOverride("font_color", new Color(1f, 0.72f, 0.72f));
+        return label;
+    }
+
+    private static Control CreateField(string labelText, LineEdit input)
+    {
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 8);
+        var label = new Label
+        {
+            Text = labelText,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 25);
+        layout.AddChild(label);
+        layout.AddChild(input);
+        return layout;
+    }
+
+    private static LineEdit CreateDialogInput(string placeholder, string text)
+    {
+        var input = new LineEdit
+        {
+            Text = text,
+            PlaceholderText = placeholder,
+            CustomMinimumSize = new Vector2(0, 76),
+            VirtualKeyboardType = LineEdit.VirtualKeyboardTypeEnum.NumberDecimal,
+            Alignment = HorizontalAlignment.Center,
+        };
+        input.AddThemeFontSizeOverride("font_size", 32);
+        return input;
+    }
+
+    private Control CreateGoalSelector()
+    {
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 10);
+        var label = new Label
+        {
+            Text = Text.GoalLabel,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 25);
+        layout.AddChild(label);
+
+        var grid = new GridContainer
+        {
+            Columns = 2,
+        };
+        grid.AddThemeConstantOverride("h_separation", 12);
+        grid.AddThemeConstantOverride("v_separation", 12);
+        layout.AddChild(grid);
+
+        foreach (var goalId in FitnessGoal.AllIds)
+        {
+            var button = CreateDialogButton(FitnessGoal.GetLabel(goalId), UiButtonStyle.Secondary);
+            button.CustomMinimumSize = new Vector2(0, 74);
+            button.Pressed += () => SelectGoal(goalId);
+            _goalButtons.Add(button);
+            grid.AddChild(button);
+        }
+
+        RefreshGoalButtons();
+        return layout;
+    }
+
+    private void SelectGoal(string goalId)
+    {
+        _selectedGoalId = FitnessGoal.Normalize(goalId);
+        RefreshGoalButtons();
+
+        if (_bodyDialogAdvice is not null)
+        {
+            _bodyDialogAdvice.Text = FitnessGoal.GetAdvice(_selectedGoalId);
+        }
+    }
+
+    private void RefreshGoalButtons()
+    {
+        foreach (var button in _goalButtons)
+        {
+            var goalId = FitnessGoal.AllIds[_goalButtons.IndexOf(button)];
+            button.Text = goalId == _selectedGoalId
+                ? $"✓ {FitnessGoal.GetLabel(goalId)}"
+                : FitnessGoal.GetLabel(goalId);
+        }
+    }
+
+    private static HBoxContainer CreateDialogActions()
+    {
+        var actions = new HBoxContainer();
+        actions.AddThemeConstantOverride("separation", 14);
+        return actions;
+    }
+
+    private static Button CreateDialogButton(string text, UiButtonStyle style)
+    {
+        var button = new Button
+        {
+            Text = text,
+            CustomMinimumSize = new Vector2(0, 84),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        button.AddThemeFontSizeOverride("font_size", 29);
+        DungeonFitUi.ApplyButton(button, style);
+        return button;
+    }
+
+    private static Label CreateBodyStatusLabel()
+    {
+        var label = new Label
+        {
+            Text = Text.TodayWeightMissing,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", 24);
+        label.AddThemeColorOverride("font_color", new Color(0.92f, 0.84f, 1f));
+        return label;
+    }
+
+    private void SubmitProfile(bool onboarding)
+    {
+        if (!TryParseHeight(_heightInput.Text, out var heightCm))
+        {
+            _bodyDialogError.Text = Text.HeightError;
+            return;
+        }
+
+        double? weightKg = null;
+        if (onboarding && !string.IsNullOrWhiteSpace(_weightInput.Text))
+        {
+            if (!TryParseWeight(_weightInput.Text, out var parsedWeight))
+            {
+                _bodyDialogError.Text = Text.WeightError;
+                return;
+            }
+
+            weightKg = parsedWeight;
+        }
+
+        HideBodyPanel();
+        ProfileSaved?.Invoke(heightCm, _selectedGoalId, weightKg);
+    }
+
+    private void SubmitTodayWeight()
+    {
+        if (!TryParseWeight(_weightInput.Text, out var weightKg))
+        {
+            _bodyDialogError.Text = Text.WeightError;
+            return;
+        }
+
+        HideBodyPanel();
+        TodayWeightSaved?.Invoke(weightKg);
+    }
+
+    private static bool TryParseHeight(string text, out int heightCm)
+    {
+        heightCm = 0;
+        return int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out heightCm) &&
+            heightCm >= PlayerProfile.MinHeightCm &&
+            heightCm <= PlayerProfile.MaxHeightCm;
+    }
+
+    private static bool TryParseWeight(string text, out double weightKg)
+    {
+        weightKg = 0;
+        return double.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out weightKg) &&
+            weightKg >= BodyMetricEntry.MinWeightKg &&
+            weightKg <= BodyMetricEntry.MaxWeightKg;
+    }
+
+    private void HideBodyPanel()
+    {
+        _bodyPanel.Visible = false;
+    }
+
+    private static void ClearChildren(Node node)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            node.RemoveChild(child);
+            child.QueueFree();
+        }
     }
 
     private Button CreateIdleClaimButton()
@@ -430,14 +831,37 @@ public partial class TownView : Control
         public const string LastRewardFormat = "{0}\uff1a{1}\n{2}  \u7d44\u6578 {3} / {4}  EXP +{5}";
         public const string SettingsTitle = "\u8a2d\u5b9a";
         public const string SettingsDescription = "\u904a\u6232\u6703\u5728\u8def\u7dda\u3001\u623f\u9593\u7d50\u679c\u8207\u9818\u53d6\u734e\u52f5\u6642\u81ea\u52d5\u5132\u5b58\u3002";
+        public const string TodayWeightMissing = "\u4eca\u65e5\u5c1a\u672a\u8a18\u9304\u9ad4\u91cd";
         public const string SaveStatusUnknown = "\u5b58\u6a94\u72c0\u614b\uff1a\u672a\u77e5";
         public const string NoSaveFile = "\u5b58\u6a94\u72c0\u614b\uff1a\u76ee\u524d\u6c92\u6709\u5b58\u6a94";
         public const string SaveStatusFormat = "\u5b58\u6a94\u72c0\u614b\uff1a\u5df2\u5b58\u5728\n\u91d1\u5e63 {0} / \u8def\u7dda {1} / \u5df2\u5b8c\u6210 {2} / \u66ab\u5b58\u734e\u52f5 {3} / \u5bf6\u7bb1 {4}\n\u4eca\u65e5\u734e\u52f5\uff1a{5}";
         public const string Claimed = "\u5df2\u9818\u53d6";
         public const string Unclaimed = "\u672a\u9818\u53d6";
         public const string ManualSave = "\u624b\u52d5\u5132\u5b58";
+        public const string ProfileSettings = "\u500b\u4eba\u6a94\u6848";
+        public const string TodayWeightSettings = "\u4eca\u65e5\u9ad4\u91cd";
         public const string DeleteSave = "\u522a\u9664\u7576\u524d\u5b58\u6a94";
         public const string Close = "\u95dc\u9589";
+        public const string OnboardingTitle = "\u5efa\u7acb\u500b\u4eba\u6a94\u6848";
+        public const string OnboardingDescription = "\u586b\u5165\u8eab\u9ad8\u3001\u521d\u59cb\u9ad4\u91cd\u8207\u76ee\u6a19\uff0c\u7528\u4f86\u986f\u793a\u8a13\u7df4\u5efa\u8b70\u3002";
+        public const string ProfileTitle = "\u500b\u4eba\u6a94\u6848";
+        public const string ProfileDescription = "\u4fee\u6539\u8eab\u9ad8\u8207\u76ee\u6a19\uff0c\u4e0d\u6703\u6539\u8b8a\u6230\u9b25\u6216\u734e\u52f5\u6578\u503c\u3002";
+        public const string TodayWeightTitle = "\u4eca\u65e5\u9ad4\u91cd";
+        public const string TodayWeightDescription = "\u6bcf\u5929\u4fdd\u7559\u4e00\u7b46\u9ad4\u91cd\uff0c\u91cd\u65b0\u586b\u5beb\u6703\u8986\u84cb\u4eca\u5929\u7684\u7d00\u9304\u3002";
+        public const string HeightLabel = "\u8eab\u9ad8 cm";
+        public const string HeightPlaceholder = "100-230";
+        public const string InitialWeightLabel = "\u521d\u59cb\u9ad4\u91cd kg\uff08\u53ef\u7565\uff09";
+        public const string InitialWeightPlaceholder = "30.0-250.0";
+        public const string TodayWeightInputLabel = "\u9ad4\u91cd kg";
+        public const string TodayWeightPlaceholder = "30.0-250.0";
+        public const string GoalLabel = "\u76ee\u6a19";
+        public const string HeightError = "\u8eab\u9ad8\u9700\u8981\u5728 100-230 cm \u4e4b\u9593\u3002";
+        public const string WeightError = "\u9ad4\u91cd\u9700\u8981\u5728 30.0-250.0 kg \u4e4b\u9593\u3002";
+        public const string Later = "\u7a0d\u5f8c";
+        public const string Cancel = "\u53d6\u6d88";
+        public const string StartProfile = "\u958b\u59cb\u8a18\u9304";
+        public const string SaveProfile = "\u5132\u5b58\u6a94\u6848";
+        public const string SaveTodayWeight = "\u5132\u5b58\u4eca\u65e5\u9ad4\u91cd";
         public const string BossCleared = "Boss \u64ca\u7834";
         public const string RoomWithdrawn = "\u623f\u9593\u64a4\u9000";
         public const string NoticeBoard = "\u544a\u793a\u677f";

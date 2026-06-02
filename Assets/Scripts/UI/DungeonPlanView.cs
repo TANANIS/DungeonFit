@@ -105,6 +105,16 @@ public partial class DungeonPlanView : Control
         return true;
     }
 
+    public bool SmokeOpenFirstDungeonMusicDialog()
+    {
+        if (!SmokeOpenFirstDungeonDialog())
+        {
+            return false;
+        }
+
+        return _slotDialog.SmokeOpenMusicPopup();
+    }
+
     private void Refresh()
     {
         _planTitle.Text = _canEditPlan ? Text.SelectDungeon : _plan.DisplayName;

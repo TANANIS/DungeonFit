@@ -1,11 +1,11 @@
 # DungeonFit Design Document
 
-> Last updated: 2026-05-26
+> Last updated: 2026-06-02
 > Encoding: UTF-8
 
 ## Project Direction
 
-DungeonFit is an Android-first Godot 4 .NET / C# workout RPG MVP.
+DungeonFit is an Android-first Godot 4 .NET / C# workout RPG. The internal MVP is now considered complete as of 2026-06-02; the next phase is public-test readiness, Android store preparation, tuning, and polish.
 
 The current product loop is:
 
@@ -484,9 +484,13 @@ Main views should use C# events:
 
 `WaveIndicatorView.SetWaveCompleted` may remain a Godot signal for now because it is an internal Control component signal.
 
-## Current Implementation Status
+## MVP Completion Status
 
-Implemented:
+MVP status: Complete for internal build and Git upload.
+
+The MVP completion decision is based on a working end-to-end loop, persistent player progression, route planning, combat, rewards, equipment, Town support systems, and repeatable build/smoke/screenshot validation.
+
+Implemented MVP scope:
 
 - Town -> Dungeon Plan -> Room Challenge -> Set Summary -> Daily Summary -> Town loop.
 - Dungeon route selection with repeated target-area dungeons.
@@ -499,45 +503,59 @@ Implemented:
 - Room audio bridge split.
 - Battle actor / encounter display split.
 - Tavern equipment MVP with character summary, loadout slots, inventory filters/sort, equip, unequip, sell, lock, and save-management panel.
-- Notice Board MVP skeleton with six short-term quest cards, detail panel, optional multi-quest acceptance, room-completion progress updates, ready-to-report state, direct gold reward claiming, claimed state persistence, local-date 24-hour refresh, and Dungeon Plan active quest bonus display.
+- Notice Board with six short-term quest cards, detail panel, optional multi-quest acceptance, room-completion progress updates, ready-to-report state, direct gold reward claiming, claimed state persistence, local-date refresh, and Dungeon Plan active quest bonus display.
 - Dungeon Plan helper presenters for grid, route list, and summary state.
 - Banked rewards with Open All claim timing.
 - Save/load service for MVP progression.
 - Music metadata through `MusicId`.
-- Flow smoke test for route progression and reward claim timing.
-
-Implemented MVP systems that still need tuning or presentation polish:
-
 - Moonlight Fountain daily recovery and blessing.
 - Herb Shop paid healing and room potion supply.
 - Blacksmith equipment enhancement and usable-level extension.
 - Idle reward accumulation and offline catch-up.
 - Church long-term oath quest implementation.
-- Notice Board short-term quest claiming, persistence, and daily refresh.
+- Body profile and daily weight tracking.
+- Dungeon progress and dungeon-level growth.
+- Exercise catalog coverage across chest, shoulders, back, legs, core, and arms.
+- Expanded enemy visuals, item icons, music tracks, loot profiles, and screenshot QA.
+- Flow smoke test for route progression, reward claim timing, save migration, equipment, combat, Church, Notice Board, recovery, supply, body profile, and UI scene loading.
+- UI screenshot smoke for the major MVP screens.
 
-Still MVP / placeholder:
+Current MVP content breadth:
 
-- Visual art and final mobile polish.
-- Full loot table balancing.
+- 6 target-area dungeon categories.
+- 48 exercise definitions.
+- 16 music tracks.
+- 12 enemy visual sets plus the player Knight.
+- 288 generated equipment definitions.
+- 6 dungeon loot profiles.
+- 6 short-term daily board quests.
+- 12 long-term Church oath quests.
+
+Post-MVP / public-test readiness work:
+
+- Final mobile visual polish, especially Town, Dungeon Plan, Church density, and reward presentation.
+- Full loot table and economy balancing.
 - Equipment affix expansion and rerolling.
-- Chest-opening animation.
+- Full chest-opening animation.
 - Notice Board final visual polish, visible refresh countdown, and broader reward variety.
-- Android export/device verification.
-- Precise music loop points and latency calibration.
+- Android package identity, launcher icons, release signing, and device verification.
+- Precise music loop points, beat offsets, and latency calibration.
+- JSON content loading, analytics, fatigue rules, music unlocks, store/billing decisions, and broader retention tuning.
 
 ## Current Risks
 
 High:
 
-1. Save/load needs real editor/device verification after longer play sessions.
-2. Loot is structured but still simple; balancing and chest presentation are incomplete.
-3. Music metadata exists, but loop points and beat offsets are not fully curated.
-4. Android export and device playback have not been validated in this pass.
-5. Notice Board refresh currently uses local device date. Future online versions may need server time or anti-clock-tampering handling.
+1. Public-test readiness should not be confused with internal MVP completion. The MVP is complete, but store-facing polish and release discipline still matter.
+2. Save/load needs real editor/device verification after longer play sessions.
+3. Loot is structured but still simple; balancing and chest presentation are incomplete.
+4. Music metadata exists, but loop points and beat offsets are not fully curated.
+5. Android package identity and device playback need final validation before any public upload.
+6. Notice Board refresh currently uses local device date. Future online versions may need server time or anti-clock-tampering handling.
 
 Medium:
 
-1. Some scene default text is still engineering UI and English.
+1. Some scene default text and compact controls still feel like engineering UI.
 2. Dungeon Plan and Route Slot dialog are split enough for MVP, but final mobile visuals still need art-driven layout.
 3. Reward grouping in save data assumes one reward packet per completed set; keep chest eligibility separate from gold-only rewards as future rewards become more variable.
 4. `WaveIndicatorView` still uses a Godot signal by design; revisit only if event debugging becomes painful.
@@ -547,17 +565,26 @@ Medium:
 
 ## Recommended Next Steps
 
-1. Manually test save/load in the Godot editor:
+1. Treat the current branch as the internal MVP-complete build.
+2. Manually test save/load in the Godot editor and on Android:
    - build a route,
    - complete one stage,
    - restart,
    - continue the next stage,
    - open all rewards,
    - confirm gold cannot be claimed twice.
-2. Replace remaining engineering English with Traditional Chinese MVP copy.
-3. Add a small save/load diagnostic path or unit-style test.
-4. Start curating actual music loop metadata track by track.
-5. Begin reward table expansion only after save/load is trusted.
-6. Polish Notice Board short-term quest loop:
+3. Finalize Android package metadata:
+   - production package id,
+   - app name,
+   - version name,
+   - launcher icons,
+   - release signing,
+   - install/run verification on a real device.
+4. Replace remaining engineering English with final Traditional Chinese public-test copy.
+5. Add or keep a small save/load diagnostic path for regression checks.
+6. Start curating actual music loop metadata track by track.
+7. Begin reward table expansion only after save/load is trusted.
+8. Polish Notice Board short-term quest loop:
    - decide full-room vs partial-completion progress rules,
    - add a visible refresh countdown or next-refresh timestamp.
+9. Prepare the first public-test checklist after the MVP-complete commit is on Git.

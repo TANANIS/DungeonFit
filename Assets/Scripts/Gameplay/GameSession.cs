@@ -38,6 +38,9 @@ public sealed class GameSession
     private int _herbShopPotionPurchasesToday;
     private DateTime _idleLastCalculatedAtUtc;
     private int _unclaimedIdleGold;
+    private PlayerProfile _profile = CreateIncompleteProfile();
+    private readonly List<BodyMetricEntry> _bodyMetrics = new();
+    private readonly List<DungeonProgressEntry> _dungeonProgress = new();
 
     public GameSession(bool persistenceEnabled = true)
     {
@@ -82,6 +85,12 @@ public sealed class GameSession
 
     public bool CanEditPlan => ActiveRun is null;
 
+    public PlayerProfile Profile => _profile;
+
+    public IReadOnlyList<BodyMetricEntry> BodyMetrics => _bodyMetrics;
+
+    public IReadOnlyList<DungeonProgressEntry> DungeonProgress => _dungeonProgress;
+
     public SaveStatus GetSaveStatus()
     {
         return new SaveStatus(
@@ -121,6 +130,9 @@ public sealed class GameSession
         ActiveLongTermQuest = null;
         ClaimedLongTermQuestIds = new List<string>();
         UnlockedTitles = new List<string>();
+        _profile = CreateIncompleteProfile();
+        _bodyMetrics.Clear();
+        _dungeonProgress.Clear();
         _noticeBoardRefreshKey = GetTodayRefreshKey();
         _dailyStateKey = GetTodayRefreshKey();
         _moonlightRecoveryUsed = false;
@@ -305,7 +317,7 @@ public sealed class GameSession
         }
 
         SelectedDungeonRoute = route;
-        SelectedPlan = _taskCatalog.CreateDungeonPlanFromRoute(SelectedDungeonRoute);
+        SelectedPlan = CreateLeveledPlan(SelectedDungeonRoute);
         Save();
     }
 
@@ -334,29 +346,103 @@ public sealed class GameSession
     public void RecordStageResult(RunSummary summary)
     {
         RefreshNoticeBoardIfExpired();
-        LastRunSummary = summary;
+        var appliedSummary = EnsureTrainingExperience(summary);
+        LastRunSummary = appliedSummary;
 
         if (ActiveRun is not null)
         {
             var completedStage = ActiveRun.CurrentStage;
-            LastSetSummary = _dungeonRunService.RecordStageResult(ActiveRun, summary);
-            var levelsGained = Player.AddExperience(summary.ExperienceGained);
+            LastSetSummary = _dungeonRunService.RecordStageResult(ActiveRun, appliedSummary);
+            var levelsGained = Player.AddExperience(appliedSummary.ExperienceGained);
             if (levelsGained > 0)
             {
-                var updatedRun = summary with { LevelsGained = levelsGained };
+                var updatedRun = appliedSummary with { LevelsGained = levelsGained };
                 LastRunSummary = updatedRun;
                 LastSetSummary = LastSetSummary with { Run = updatedRun };
+                appliedSummary = updatedRun;
             }
 
-            if (summary.RemainingPlayerHp.HasValue)
+            if (appliedSummary.RemainingPlayerHp.HasValue)
             {
-                Player.SetCurrentHp(summary.RemainingPlayerHp.Value);
+                Player.SetCurrentHp(appliedSummary.RemainingPlayerHp.Value);
             }
 
-            UpdateShortTermQuestProgress(completedStage, summary);
-            UpdateLongTermQuestProgress(completedStage, summary);
+            UpdateShortTermQuestProgress(completedStage, appliedSummary);
+            UpdateLongTermQuestProgress(completedStage, appliedSummary);
+            UpdateDungeonProgress(completedStage, appliedSummary);
             Save();
         }
+    }
+
+    private void UpdateDungeonProgress(TaskTemplate completedStage, RunSummary summary)
+    {
+        var entry = GetOrCreateDungeonProgress(completedStage.DungeonTypeId);
+        entry.CompletedRooms++;
+        if (summary.CombatResults?.Any(result => result.IsBoss && result.EnemyDefeated) == true)
+        {
+            entry.BossClears++;
+        }
+
+        DungeonProgressRules.AddExperience(entry, DungeonProgressRules.CalculateExperience(summary));
+        if (SelectedDungeonRoute.Count > 0 && ActiveRun is null)
+        {
+            SelectedPlan = CreateLeveledPlan(SelectedDungeonRoute);
+        }
+    }
+
+    private static RunSummary EnsureTrainingExperience(RunSummary summary)
+    {
+        if (summary.ExperienceGained > 0)
+        {
+            return summary;
+        }
+
+        return summary with
+        {
+            ExperienceGained = TrainingExperienceRules.Calculate(
+                summary.CompletedSets,
+                summary.TotalSets,
+                summary.CombatResults),
+        };
+    }
+
+    private DungeonPlan CreateLeveledPlan(IEnumerable<DungeonRouteSlot> route)
+    {
+        var plan = _taskCatalog.CreateDungeonPlanFromRoute(route);
+        if (plan.Stages.Count == 0)
+        {
+            return plan;
+        }
+
+        var stages = plan.Stages
+            .Select(stage => stage with { DungeonLevel = GetDungeonLevel(stage.DungeonTypeId) })
+            .ToArray();
+        return new DungeonPlan(plan.Id, plan.DisplayName, stages);
+    }
+
+    private int GetDungeonLevel(string dungeonTypeId)
+    {
+        return _dungeonProgress.FirstOrDefault(entry => entry.DungeonTypeId == dungeonTypeId)?.Level ?? 1;
+    }
+
+    private DungeonProgressEntry GetOrCreateDungeonProgress(string dungeonTypeId)
+    {
+        var normalizedId = string.IsNullOrWhiteSpace(dungeonTypeId) ? "chest" : dungeonTypeId;
+        var entry = _dungeonProgress.FirstOrDefault(progress => progress.DungeonTypeId == normalizedId);
+        if (entry is not null)
+        {
+            return entry;
+        }
+
+        entry = new DungeonProgressEntry
+        {
+            DungeonTypeId = normalizedId,
+            Level = 1,
+            Experience = 0,
+            ExperienceToNextLevel = DungeonProgressEntry.GetExperienceToNextLevel(1),
+        };
+        _dungeonProgress.Add(entry);
+        return entry;
     }
 
     public void LeaveActiveRoom(int currentHp)
@@ -420,6 +506,71 @@ public sealed class GameSession
             IdleRewardIntervalMinutes,
             _unclaimedIdleGold > 0,
             BuildIdleRewardStatusText());
+    }
+
+    public BodyProfileViewModel BuildBodyProfileViewModel(DateTime? localNow = null)
+    {
+        var goalId = FitnessGoal.Normalize(_profile.GoalId);
+        var todayKey = GetBodyMetricDateKey(localNow);
+        var todayWeight = _bodyMetrics.FirstOrDefault(metric => metric.DateKey == todayKey)?.WeightKg;
+        var status = todayWeight.HasValue
+            ? string.Format(
+                CultureInfo.InvariantCulture,
+                "今日體重 {0:0.0} kg / 目標 {1}",
+                todayWeight.Value,
+                FitnessGoal.GetLabel(goalId))
+            : "今日尚未記錄體重";
+
+        return new BodyProfileViewModel(
+            _profile.HasCompletedOnboarding,
+            _profile.HeightCm,
+            goalId,
+            FitnessGoal.GetLabel(goalId),
+            FitnessGoal.GetAdvice(goalId),
+            todayWeight,
+            status);
+    }
+
+    public bool UpdatePlayerProfile(int heightCm, string goalId)
+    {
+        if (heightCm < PlayerProfile.MinHeightCm || heightCm > PlayerProfile.MaxHeightCm)
+        {
+            return false;
+        }
+
+        var now = GetUtcNow();
+        if (_profile.CreatedAtUtc == default)
+        {
+            _profile.CreatedAtUtc = now;
+        }
+
+        _profile.HeightCm = heightCm;
+        _profile.GoalId = FitnessGoal.Normalize(goalId);
+        _profile.UpdatedAtUtc = now;
+        _profile.HasCompletedOnboarding = true;
+        Save();
+        return true;
+    }
+
+    public bool RecordTodayWeight(double weightKg, DateTime? localNow = null)
+    {
+        if (weightKg < BodyMetricEntry.MinWeightKg || weightKg > BodyMetricEntry.MaxWeightKg)
+        {
+            return false;
+        }
+
+        var roundedWeight = Math.Round(weightKg, 1, MidpointRounding.AwayFromZero);
+        var todayKey = GetBodyMetricDateKey(localNow);
+        var now = GetUtcNow();
+        _bodyMetrics.RemoveAll(metric => metric.DateKey == todayKey);
+        _bodyMetrics.Add(new BodyMetricEntry
+        {
+            DateKey = todayKey,
+            WeightKg = roundedWeight,
+            RecordedAtUtc = now,
+        });
+        Save();
+        return true;
     }
 
     public bool RefreshIdleRewards(DateTime? nowUtc = null, bool persist = true)
@@ -765,6 +916,11 @@ public sealed class GameSession
         _herbShopPotionPurchasesToday = Math.Max(0, state.HerbShopPotionPurchasesToday);
         _idleLastCalculatedAtUtc = NormalizeUtc(state.IdleLastCalculatedAtUtc ?? GetUtcNow());
         _unclaimedIdleGold = Math.Clamp(state.UnclaimedIdleGold, 0, IdleRewardMaxUnclaimedGold);
+        _profile = state.Profile!;
+        _bodyMetrics.Clear();
+        _bodyMetrics.AddRange(state.BodyMetrics!);
+        _dungeonProgress.Clear();
+        _dungeonProgress.AddRange(state.DungeonProgress!);
         var idleChanged = RefreshIdleRewards(persist: false);
         var hasActiveRun = state.HasActiveRun || state.ActiveStageResults!.Count > 0;
         SelectedDungeonRoute = hasActiveRun
@@ -772,7 +928,7 @@ public sealed class GameSession
             : new List<DungeonRouteSlot>();
         SelectedPlan = SelectedDungeonRoute.Count == 0
             ? DungeonPlan.Empty
-            : _taskCatalog.CreateDungeonPlanFromRoute(SelectedDungeonRoute);
+            : CreateLeveledPlan(SelectedDungeonRoute);
         LastRunSummary = state.LastRunSummary;
         DailyRewardsClaimed = state.DailyRewardsClaimed;
         ActiveShortTermQuests = RestoreShortTermQuests(state);
@@ -928,6 +1084,8 @@ public sealed class GameSession
             changed = true;
         }
 
+        changed = NormalizeBodyProfileState(state) || changed;
+        changed = NormalizeDungeonProgressState(state) || changed;
         changed = NormalizeInventory(state.Inventory) || changed;
         changed = NormalizeLoadout(state.Inventory, state.EquipmentLoadout) || changed;
         changed = NormalizeLongTermQuestState(state) || changed;
@@ -964,6 +1122,7 @@ public sealed class GameSession
     {
         var changed = false;
         var seenIds = new HashSet<string>();
+        var equipmentCatalog = new EquipmentCatalog();
 
         for (var index = inventory.Count - 1; index >= 0; index--)
         {
@@ -1016,9 +1175,171 @@ public sealed class GameSession
                 item.RecommendedLevelMax = item.RecommendedLevelMin + 4;
                 changed = true;
             }
+
+            if (string.IsNullOrWhiteSpace(item.IconPath))
+            {
+                item.IconPath = ResolveMigratedIconPath(equipmentCatalog, item);
+                changed = true;
+            }
         }
 
         return changed;
+    }
+
+    private static string ResolveMigratedIconPath(EquipmentCatalog equipmentCatalog, EquipmentItem item)
+    {
+        var definition = equipmentCatalog.GetById(item.DefinitionId);
+        if (definition.Id == item.DefinitionId)
+        {
+            return definition.IconPath;
+        }
+
+        return item.Slot switch
+        {
+            EquipmentSlot.Armor => "res://Assets/Art/Items/Armor/guard_plate.png",
+            EquipmentSlot.Accessory => "res://Assets/Art/Items/Accessories/oath_charm.png",
+            _ => "res://Assets/Art/Items/Weapons/moon_blade.png",
+        };
+    }
+
+    private static bool NormalizeBodyProfileState(SaveGameState state)
+    {
+        var changed = false;
+
+        if (state.Profile is null)
+        {
+            state.Profile = CreateIncompleteProfile();
+            changed = true;
+        }
+
+        var profile = state.Profile;
+        var normalizedGoal = FitnessGoal.Normalize(profile.GoalId);
+        if (profile.GoalId != normalizedGoal)
+        {
+            profile.GoalId = normalizedGoal;
+            changed = true;
+        }
+
+        if (profile.HasCompletedOnboarding &&
+            (profile.HeightCm < PlayerProfile.MinHeightCm || profile.HeightCm > PlayerProfile.MaxHeightCm))
+        {
+            profile.HeightCm = 0;
+            profile.HasCompletedOnboarding = false;
+            changed = true;
+        }
+
+        if (!profile.HasCompletedOnboarding && profile.HeightCm != 0)
+        {
+            profile.HeightCm = 0;
+            changed = true;
+        }
+
+        if (profile.CreatedAtUtc != default)
+        {
+            var normalizedCreated = NormalizeUtc(profile.CreatedAtUtc);
+            if (normalizedCreated != profile.CreatedAtUtc)
+            {
+                profile.CreatedAtUtc = normalizedCreated;
+                changed = true;
+            }
+        }
+
+        if (profile.UpdatedAtUtc != default)
+        {
+            var normalizedUpdated = NormalizeUtc(profile.UpdatedAtUtc);
+            if (normalizedUpdated != profile.UpdatedAtUtc)
+            {
+                profile.UpdatedAtUtc = normalizedUpdated;
+                changed = true;
+            }
+        }
+
+        if (state.BodyMetrics is null)
+        {
+            state.BodyMetrics = new List<BodyMetricEntry>();
+            return true;
+        }
+
+        var normalizedMetrics = state.BodyMetrics
+            .Where(IsValidBodyMetric)
+            .Select(metric => new BodyMetricEntry
+            {
+                DateKey = metric.DateKey,
+                WeightKg = Math.Round(metric.WeightKg, 1, MidpointRounding.AwayFromZero),
+                RecordedAtUtc = NormalizeUtc(metric.RecordedAtUtc == default ? GetUtcNow() : metric.RecordedAtUtc),
+            })
+            .GroupBy(metric => metric.DateKey)
+            .Select(group => group.OrderByDescending(metric => metric.RecordedAtUtc).First())
+            .OrderBy(metric => metric.DateKey, StringComparer.Ordinal)
+            .ToList();
+
+        if (normalizedMetrics.Count != state.BodyMetrics.Count ||
+            normalizedMetrics.Zip(state.BodyMetrics).Any(pair =>
+                pair.First.DateKey != pair.Second.DateKey ||
+                Math.Abs(pair.First.WeightKg - pair.Second.WeightKg) > 0.001 ||
+                pair.First.RecordedAtUtc != pair.Second.RecordedAtUtc))
+        {
+            state.BodyMetrics = normalizedMetrics;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static bool IsValidBodyMetric(BodyMetricEntry? metric)
+    {
+        return metric is not null &&
+            !string.IsNullOrWhiteSpace(metric.DateKey) &&
+            metric.DateKey.Length == 10 &&
+            metric.WeightKg >= BodyMetricEntry.MinWeightKg &&
+            metric.WeightKg <= BodyMetricEntry.MaxWeightKg;
+    }
+
+    private static bool NormalizeDungeonProgressState(SaveGameState state)
+    {
+        if (state.DungeonProgress is null)
+        {
+            state.DungeonProgress = new List<DungeonProgressEntry>();
+            return true;
+        }
+
+        var normalized = state.DungeonProgress
+            .Where(entry => entry is not null && !string.IsNullOrWhiteSpace(entry.DungeonTypeId))
+            .GroupBy(entry => entry.DungeonTypeId)
+            .Select(group =>
+            {
+                var source = group.OrderByDescending(entry => entry.Level).First();
+                var level = Math.Max(1, source.Level);
+                var experienceToNext = source.ExperienceToNextLevel <= 0
+                    ? DungeonProgressEntry.GetExperienceToNextLevel(level)
+                    : source.ExperienceToNextLevel;
+                return new DungeonProgressEntry
+                {
+                    DungeonTypeId = source.DungeonTypeId,
+                    Level = level,
+                    Experience = Math.Max(0, source.Experience),
+                    ExperienceToNextLevel = experienceToNext,
+                    CompletedRooms = Math.Max(0, source.CompletedRooms),
+                    BossClears = Math.Max(0, source.BossClears),
+                };
+            })
+            .OrderBy(entry => entry.DungeonTypeId, StringComparer.Ordinal)
+            .ToList();
+
+        if (normalized.Count != state.DungeonProgress.Count ||
+            normalized.Zip(state.DungeonProgress).Any(pair =>
+                pair.First.DungeonTypeId != pair.Second.DungeonTypeId ||
+                pair.First.Level != pair.Second.Level ||
+                pair.First.Experience != pair.Second.Experience ||
+                pair.First.ExperienceToNextLevel != pair.Second.ExperienceToNextLevel ||
+                pair.First.CompletedRooms != pair.Second.CompletedRooms ||
+                pair.First.BossClears != pair.Second.BossClears))
+        {
+            state.DungeonProgress = normalized;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool NormalizeLoadout(List<EquipmentItem> inventory, EquipmentLoadout loadout)
@@ -1069,6 +1390,13 @@ public sealed class GameSession
             ExperienceToNextLevel = Player.ExperienceToNextLevel,
             Gold = Player.Gold,
             CurrentHp = Player.CurrentHp,
+            Profile = CloneProfile(_profile),
+            BodyMetrics = _bodyMetrics
+                .Select(CloneBodyMetric)
+                .ToList(),
+            DungeonProgress = _dungeonProgress
+                .Select(CloneDungeonProgress)
+                .ToList(),
             DailyStateKey = _dailyStateKey,
             MoonlightRecoveryUsed = _moonlightRecoveryUsed,
             DailyBlessingId = Player.DailyBlessingId,
@@ -1285,6 +1613,55 @@ public sealed class GameSession
     private static string GetTodayRefreshKey()
     {
         return DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
+    private static string GetBodyMetricDateKey(DateTime? localNow = null)
+    {
+        return (localNow ?? DateTime.Now).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+
+    private static PlayerProfile CreateIncompleteProfile()
+    {
+        return new PlayerProfile
+        {
+            GoalId = FitnessGoal.GeneralHealth,
+            HasCompletedOnboarding = false,
+        };
+    }
+
+    private static PlayerProfile CloneProfile(PlayerProfile profile)
+    {
+        return new PlayerProfile
+        {
+            HeightCm = profile.HeightCm,
+            GoalId = FitnessGoal.Normalize(profile.GoalId),
+            CreatedAtUtc = profile.CreatedAtUtc,
+            UpdatedAtUtc = profile.UpdatedAtUtc,
+            HasCompletedOnboarding = profile.HasCompletedOnboarding,
+        };
+    }
+
+    private static BodyMetricEntry CloneBodyMetric(BodyMetricEntry metric)
+    {
+        return new BodyMetricEntry
+        {
+            DateKey = metric.DateKey,
+            WeightKg = metric.WeightKg,
+            RecordedAtUtc = metric.RecordedAtUtc,
+        };
+    }
+
+    private static DungeonProgressEntry CloneDungeonProgress(DungeonProgressEntry entry)
+    {
+        return new DungeonProgressEntry
+        {
+            DungeonTypeId = entry.DungeonTypeId,
+            Level = entry.Level,
+            Experience = entry.Experience,
+            ExperienceToNextLevel = entry.ExperienceToNextLevel,
+            CompletedRooms = entry.CompletedRooms,
+            BossClears = entry.BossClears,
+        };
     }
 
     private string BuildIdleRewardStatusText()

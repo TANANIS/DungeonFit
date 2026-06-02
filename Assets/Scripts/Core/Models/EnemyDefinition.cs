@@ -7,7 +7,10 @@ public sealed record EnemyDefinition(
     int NormalMaxHp,
     int NormalAttack,
     int BossMaxHp,
-    int BossAttack)
+    int BossAttack,
+    string NormalVisualId = ActorVisualIds.EnemySkeleton,
+    string BossVisualId = ActorVisualIds.EnemySkeleton,
+    string EliteVisualId = ActorVisualIds.EnemySkeleton)
 {
     public int GetNormalMaxHp(int level)
     {

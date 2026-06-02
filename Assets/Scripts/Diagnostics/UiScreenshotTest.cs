@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DungeonFit.Core.Content;
 using DungeonFit.Core.Models;
+using DungeonFit.Core.Rules;
 using DungeonFit.Gameplay;
 using DungeonFit.UI;
 using Godot;
@@ -32,6 +33,8 @@ public static class UiScreenshotTest
         EnsureOutputDirectory();
 
         var session = new GameSession(persistenceEnabled: false);
+        session.UpdatePlayerProfile(172, FitnessGoal.FatLoss);
+        session.RecordTodayWeight(72.4);
         session.UpdateDungeonRoute(new[]
         {
             new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
@@ -46,8 +49,11 @@ public static class UiScreenshotTest
             session.SelectedPlan,
             session.LastRunSummary,
             session.BuildIdleRewardViewModel(),
-            session.GetSaveStatus());
+            session.GetSaveStatus(),
+            session.BuildBodyProfileViewModel());
         lines.Add(await TryCapture(parent, town, "Town"));
+        lines.Add(await TryCaptureTownProfileOnboarding(parent, session));
+        lines.Add(await TryCaptureTownBodyMetricsDialog(parent, session));
 
         var plan = Load<DungeonPlanView>(DungeonPlanScenePath);
         plan.Initialize(
@@ -59,6 +65,7 @@ public static class UiScreenshotTest
         lines.Add(await TryCapture(parent, plan, "DungeonPlan"));
 
         lines.Add(await TryCaptureDungeonPlanDialog(parent, session));
+        lines.Add(await TryCaptureDungeonPlanMusicDialog(parent, session));
 
         var activeRun = session.StartOrGetActiveRun();
         if (activeRun is null)
@@ -76,6 +83,10 @@ public static class UiScreenshotTest
             activeRun.CurrentPlayerHp,
             session.BuildRoomSupplyViewModel());
         lines.Add(await TryCapture(parent, room, "RoomChallenge"));
+        lines.Add(await TryCaptureRoomVisual(parent, "core", 1, 4, isBossWave: false, "RoomChallengeSlime"));
+        lines.Add(await TryCaptureRoomVisual(parent, "chest", 3, 4, isBossWave: false, "RoomChallengeElite"));
+        lines.Add(await TryCaptureRoomVisual(parent, "chest", 1, 1, isBossWave: true, "RoomChallengeBoss"));
+        lines.Add(await TryCaptureActorVisualGrid(parent));
 
         session.RecordStageResult(new RunSummary(
             "Smoke Cleared",
@@ -104,6 +115,14 @@ public static class UiScreenshotTest
         }
 
         var tavern = Load<TavernView>(TavernScenePath);
+        session.Player.Apply(new LootTable().RollDungeonChest(new DungeonChest(
+            "ui_tavern_item_icon",
+            "Boss",
+            "ui_tavern_stage",
+            "chest",
+            "ui_tavern_stage_set_4",
+            CompletionResult.Completed,
+            4)));
         tavern.Initialize(session.BuildTavernEquipmentViewModel(), session.GetSaveStatus());
         lines.Add(await TryCapture(parent, tavern, "Tavern"));
 
@@ -234,6 +253,251 @@ public static class UiScreenshotTest
 
             plan.Free();
             return $"UI_SCREENSHOT_FAILED DungeonPlanExerciseDialog {exception.GetType().Name}";
+        }
+    }
+
+    private static async Task<string> TryCaptureRoomVisual(
+        Control parent,
+        string dungeonTypeId,
+        int currentSet,
+        int totalSets,
+        bool isBossWave,
+        string name)
+    {
+        var catalog = new TaskCatalog();
+        var plan = catalog.CreateDungeonPlanFromRoute(new[]
+        {
+            new DungeonRouteSlot(dungeonTypeId, totalSets, 12, "chest_quest_01", 90),
+        });
+
+        var task = plan.Stages.FirstOrDefault();
+        if (task is null)
+        {
+            return $"UI_SCREENSHOT_SKIPPED {name} no-stage";
+        }
+
+        var room = Load<RoomChallengeView>(RoomChallengeScenePath);
+        try
+        {
+            var player = new PlayerState();
+            room.Initialize(
+                player,
+                task,
+                1,
+                1,
+                player.MaxHp,
+                new RoomSupplyViewModel(0, 3, false));
+            parent.AddChild(room);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!room.SmokeShowEnemyVisual(dungeonTypeId, currentSet, totalSets, isBossWave))
+            {
+                parent.RemoveChild(room);
+                room.Free();
+                return $"UI_SCREENSHOT_SKIPPED {name} visual-not-shown";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, room, name);
+        }
+        catch (System.Exception exception)
+        {
+            if (room.GetParent() == parent)
+            {
+                parent.RemoveChild(room);
+            }
+
+            room.Free();
+            return $"UI_SCREENSHOT_FAILED {name} {exception.GetType().Name}";
+        }
+    }
+
+    private static async Task<string> TryCaptureActorVisualGrid(Control parent)
+    {
+        var visualIds = new[]
+        {
+            ActorVisualIds.SlimeBasic,
+            ActorVisualIds.SkeletonBasic,
+            ActorVisualIds.SkeletonArcher,
+            ActorVisualIds.SkeletonArmored,
+            ActorVisualIds.SkeletonGreatsword,
+            ActorVisualIds.OrcBasic,
+            ActorVisualIds.OrcArmored,
+            ActorVisualIds.OrcElite,
+            ActorVisualIds.OrcRiderBoss,
+            ActorVisualIds.AxemanArmored,
+            ActorVisualIds.WerewolfBoss,
+            ActorVisualIds.WerebearBoss,
+        };
+        var catalog = new ActorVisualCatalog();
+        var grid = new Control
+        {
+            Name = "ActorVisualGrid",
+            CustomMinimumSize = new Vector2(540, 960),
+        };
+        grid.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+
+        var background = new ColorRect
+        {
+            Color = new Color(0.05f, 0.04f, 0.08f, 1),
+        };
+        background.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        grid.AddChild(background);
+
+        const int columns = 3;
+        const float cellWidth = 180;
+        const float cellHeight = 210;
+        for (var index = 0; index < visualIds.Length; index++)
+        {
+            var visual = catalog.Get(visualIds[index]);
+            var cell = new PanelContainer
+            {
+                Position = new Vector2((index % columns) * cellWidth + 8, (index / columns) * cellHeight + 22),
+                Size = new Vector2(cellWidth - 16, cellHeight - 18),
+                ClipContents = true,
+            };
+            DungeonFitUi.ApplyPanel(cell, UiPanelStyle.Card);
+            grid.AddChild(cell);
+
+            var sprite = new AnimatedSprite2D
+            {
+                SpriteFrames = SpriteSheetFramesBuilder.Build(visual.ToAnimationSet()),
+                Animation = "idle",
+                Position = new Vector2((cellWidth - 16) * 0.5f, 78),
+                Scale = Vector2.One * 4.8f * visual.DisplayScale,
+                Centered = true,
+                FlipH = true,
+                TextureFilter = CanvasItem.TextureFilterEnum.Nearest,
+            };
+            sprite.Play();
+            cell.AddChild(sprite);
+
+            var label = new Label
+            {
+                Text = visual.Id,
+                Position = new Vector2(8, 132),
+                Size = new Vector2(cellWidth - 32, 54),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            };
+            label.AddThemeFontSizeOverride("font_size", 14);
+            cell.AddChild(label);
+        }
+
+        return await TryCapture(parent, grid, "RoomChallengeDungeonVisualGrid");
+    }
+
+    private static async Task<string> TryCaptureTownProfileOnboarding(Control parent, GameSession session)
+    {
+        var town = Load<TownView>(TownScenePath);
+        try
+        {
+            town.Initialize(
+                session.Player,
+                session.SelectedPlan,
+                session.LastRunSummary,
+                session.BuildIdleRewardViewModel(),
+                session.GetSaveStatus(),
+                BodyProfileViewModel.Empty);
+            parent.AddChild(town);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!town.SmokeOpenProfileOnboarding())
+            {
+                parent.RemoveChild(town);
+                town.Free();
+                return "UI_SCREENSHOT_SKIPPED TownProfileOnboarding not-opened";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, town, "TownProfileOnboarding");
+        }
+        catch (System.Exception exception)
+        {
+            if (town.GetParent() == parent)
+            {
+                parent.RemoveChild(town);
+            }
+
+            town.Free();
+            return $"UI_SCREENSHOT_FAILED TownProfileOnboarding {exception.GetType().Name}";
+        }
+    }
+
+    private static async Task<string> TryCaptureTownBodyMetricsDialog(Control parent, GameSession session)
+    {
+        var town = Load<TownView>(TownScenePath);
+        try
+        {
+            town.Initialize(
+                session.Player,
+                session.SelectedPlan,
+                session.LastRunSummary,
+                session.BuildIdleRewardViewModel(),
+                session.GetSaveStatus(),
+                session.BuildBodyProfileViewModel());
+            parent.AddChild(town);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!town.SmokeOpenBodyMetricsDialog())
+            {
+                parent.RemoveChild(town);
+                town.Free();
+                return "UI_SCREENSHOT_SKIPPED TownBodyMetricsDialog not-opened";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, town, "TownBodyMetricsDialog");
+        }
+        catch (System.Exception exception)
+        {
+            if (town.GetParent() == parent)
+            {
+                parent.RemoveChild(town);
+            }
+
+            town.Free();
+            return $"UI_SCREENSHOT_FAILED TownBodyMetricsDialog {exception.GetType().Name}";
+        }
+    }
+
+    private static async Task<string> TryCaptureDungeonPlanMusicDialog(Control parent, GameSession session)
+    {
+        var plan = Load<DungeonPlanView>(DungeonPlanScenePath);
+        try
+        {
+            plan.Initialize(
+                session.SelectedPlan,
+                session.ActiveRun,
+                session.SelectedDungeonRoute,
+                session.CanEditPlan,
+                session.ActiveShortTermQuests);
+            parent.AddChild(plan);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!plan.SmokeOpenFirstDungeonMusicDialog())
+            {
+                parent.RemoveChild(plan);
+                plan.Free();
+                return "UI_SCREENSHOT_SKIPPED DungeonPlanMusicDialog not-opened";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, plan, "DungeonPlanMusicDialog");
+        }
+        catch (System.Exception exception)
+        {
+            if (plan.GetParent() == parent)
+            {
+                parent.RemoveChild(plan);
+            }
+
+            plan.Free();
+            return $"UI_SCREENSHOT_FAILED DungeonPlanMusicDialog {exception.GetType().Name}";
         }
     }
 

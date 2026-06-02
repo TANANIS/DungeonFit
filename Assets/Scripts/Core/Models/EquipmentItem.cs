@@ -13,6 +13,8 @@ public sealed class EquipmentItem
 
     public EquipmentSlot Slot { get; set; } = EquipmentSlot.Weapon;
 
+    public string IconPath { get; set; } = string.Empty;
+
     public string SourceDungeonTypeId { get; set; } = string.Empty;
 
     public string Rarity { get; set; } = "Common";
@@ -42,6 +44,7 @@ public sealed class EquipmentItem
         string definitionId,
         string displayName,
         EquipmentSlot slot,
+        string iconPath,
         string sourceDungeonTypeId,
         string rarity,
         int recommendedLevelMin,
@@ -54,6 +57,7 @@ public sealed class EquipmentItem
         DefinitionId = definitionId;
         DisplayName = displayName;
         Slot = slot;
+        IconPath = iconPath;
         SourceDungeonTypeId = sourceDungeonTypeId;
         Rarity = rarity;
         RecommendedLevelMin = recommendedLevelMin;

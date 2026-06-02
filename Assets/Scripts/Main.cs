@@ -69,7 +69,8 @@ public partial class Main : Control
             _session.SelectedPlan,
             _session.LastRunSummary,
             _session.BuildIdleRewardViewModel(),
-            _session.GetSaveStatus());
+            _session.GetSaveStatus(),
+            _session.BuildBodyProfileViewModel());
         town.EnterDungeonRequested += ShowDungeonPlan;
         town.NoticeBoardRequested += ShowNoticeBoard;
         town.TavernRequested += () => ShowTavern();
@@ -80,6 +81,21 @@ public partial class Main : Control
         town.IdleRewardClaimed += () => ClaimIdleReward(town);
         town.ManualSaveRequested += () => ManualSave(town);
         town.DeleteSaveRequested += ShowTownAfterDeleteSave;
+        town.ProfileSaved += (heightCm, goalId, initialWeightKg) =>
+        {
+            _session.UpdatePlayerProfile(heightCm, goalId);
+            if (initialWeightKg.HasValue)
+            {
+                _session.RecordTodayWeight(initialWeightKg.Value);
+            }
+
+            ShowTown();
+        };
+        town.TodayWeightSaved += weightKg =>
+        {
+            _session.RecordTodayWeight(weightKg);
+            ShowTown();
+        };
     }
 
     private void ShowMoonlightFountain()
@@ -323,7 +339,8 @@ public partial class Main : Control
             _session.SelectedPlan,
             _session.LastRunSummary,
             _session.BuildIdleRewardViewModel(),
-            _session.GetSaveStatus());
+            _session.GetSaveStatus(),
+            _session.BuildBodyProfileViewModel());
     }
 
     private void ManualSave(TavernView tavern)

@@ -5,6 +5,7 @@ using System.Text.Json;
 using DungeonFit.Core.Content;
 using DungeonFit.Core.Models;
 using DungeonFit.Gameplay;
+using DungeonFit.UI;
 
 namespace DungeonFit.Diagnostics;
 
@@ -68,9 +69,11 @@ public static class FlowSmokeTest
         session.CompleteDailyRun();
         lines.Add($"SESSION_AFTER_COMPLETE gold={session.Player.Gold}");
         lines.AddRange(RunSaveMigrationSmoke());
+        lines.AddRange(RunBodyProfileSmoke());
         lines.AddRange(RunIdleRewardSmoke());
         lines.AddRange(RunBlacksmithSmoke());
         lines.AddRange(RunBetaContentSmoke());
+        lines.AddRange(RunActorVisualSmoke());
         lines.AddRange(RunRunInterruptionSmoke());
         lines.AddRange(RunChurchSmoke());
         lines.AddRange(RunQuestProgressSmoke());
@@ -157,7 +160,7 @@ public static class FlowSmokeTest
             CompletionResult.Completed,
             4);
         var chestReward = loot.RollDungeonChest(chestBoss);
-        yield return $"LOOT_CHEST_BOSS equipment={chestReward.Equipment?.DefinitionId ?? "none"} source={chestReward.Equipment?.SourceDungeonTypeId ?? "none"} rarity={chestReward.Equipment?.Rarity ?? "none"}";
+        yield return $"LOOT_CHEST_BOSS equipment={chestReward.Equipment?.DefinitionId ?? "none"} source={chestReward.Equipment?.SourceDungeonTypeId ?? "none"} rarity={chestReward.Equipment?.Rarity ?? "none"} icon={(string.IsNullOrWhiteSpace(chestReward.Equipment?.IconPath) ? "missing" : "set")}";
 
         var legsBoss = new DungeonChest(
             "loot_smoke_legs_boss",
@@ -179,7 +182,7 @@ public static class FlowSmokeTest
             CompletionResult.Completed,
             1);
         var normalReward = loot.RollDungeonChest(normalChest);
-        yield return $"LOOT_NORMAL gold={normalReward.Gold} equipment={normalReward.Equipment?.DefinitionId ?? "none"}";
+        yield return $"LOOT_NORMAL gold={normalReward.Gold} equipment={normalReward.Equipment?.DefinitionId ?? "none"} rarity={normalReward.Equipment?.Rarity ?? "none"}";
 
         var partialBoss = new DungeonChest(
             "loot_smoke_partial_boss",
@@ -237,7 +240,7 @@ public static class FlowSmokeTest
             new RewardBundle(RewardSource.DungeonRoom, 0, null),
             new[] { CompletionResult.Completed, CompletionResult.Completed });
         var earlySetSummary = service.RecordStageResult(earlyRun, earlySummary);
-        yield return $"LOOT_RUN_EARLY bossCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Boss")} normalCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Normal")}";
+        yield return $"LOOT_RUN_EARLY bossCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Boss")} normalCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Normal")} equipment={earlySetSummary.BankedRewards.Count(reward => reward.Reward.Equipment is not null)}";
     }
 
     private static IEnumerable<string> RunSaveMigrationSmoke()
@@ -258,12 +261,15 @@ public static class FlowSmokeTest
         yield return $"MIGRATION_HP currentHp={missingLoadoutState.CurrentHp} dailyKey={(string.IsNullOrWhiteSpace(missingLoadoutState.DailyStateKey) ? "none" : "set")}";
         yield return $"MIGRATION_IDLE unclaimed={missingLoadoutState.UnclaimedIdleGold} timestamp={missingLoadoutState.IdleLastCalculatedAtUtc.HasValue}";
         yield return $"MIGRATION_CHURCH active={(missingLoadoutState.ActiveLongTermQuest is null ? "none" : missingLoadoutState.ActiveLongTermQuest.QuestId)} claimed={missingLoadoutState.ClaimedLongTermQuestIds?.Count ?? -1} titles={missingLoadoutState.UnlockedTitles?.Count ?? -1}";
+        yield return $"MIGRATION_BODY profileCompleted={missingLoadoutState.Profile?.HasCompletedOnboarding} metrics={missingLoadoutState.BodyMetrics?.Count ?? -1}";
+        yield return $"MIGRATION_DUNGEON_PROGRESS count={missingLoadoutState.DungeonProgress?.Count ?? -1}";
 
         var duplicateOne = new EquipmentItem(
             "duplicate_item",
             "moon_iron_shortsword",
             "Duplicate Sword",
             EquipmentSlot.Weapon,
+            string.Empty,
             "chest",
             "\u666e\u901a",
             1,
@@ -276,6 +282,7 @@ public static class FlowSmokeTest
             "moon_iron_shortsword",
             "Duplicate Sword",
             EquipmentSlot.Weapon,
+            string.Empty,
             "chest",
             "\u666e\u901a",
             1,
@@ -299,6 +306,54 @@ public static class FlowSmokeTest
         var distinctIds = invalidLoadoutState.Inventory?.Select(item => item.Id).Distinct().Count() ?? 0;
         yield return $"MIGRATION_INVALID changed={invalidChanged} version={invalidLoadoutState.Version} distinctIds={distinctIds} weapon={invalidLoadoutState.EquipmentLoadout?.WeaponId ?? "none"} accessory={invalidLoadoutState.EquipmentLoadout?.AccessoryId ?? "none"}";
         yield return $"MIGRATION_ENHANCEMENT first={invalidLoadoutState.Inventory![0].EnhancementLevel} second={invalidLoadoutState.Inventory[1].EnhancementLevel}";
+    }
+
+    private static IEnumerable<string> RunBodyProfileSmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        var invalidHeight = session.UpdatePlayerProfile(90, FitnessGoal.MuscleGain);
+        var savedProfile = session.UpdatePlayerProfile(172, "bad_goal");
+        var profile = session.BuildBodyProfileViewModel(new DateTime(2026, 6, 2));
+        yield return $"BODY_PROFILE invalidHeight={invalidHeight} saved={savedProfile} completed={profile.HasCompletedOnboarding} height={profile.HeightCm} goal={profile.GoalId}";
+
+        var firstWeight = session.RecordTodayWeight(72.44, new DateTime(2026, 6, 2));
+        var secondWeight = session.RecordTodayWeight(71.96, new DateTime(2026, 6, 2));
+        var invalidWeight = session.RecordTodayWeight(251, new DateTime(2026, 6, 2));
+        var body = session.BuildBodyProfileViewModel(new DateTime(2026, 6, 2));
+        yield return $"BODY_WEIGHT first={firstWeight} second={secondWeight} invalid={invalidWeight} count={session.BodyMetrics.Count} today={body.TodayWeightKg:0.0}";
+
+        var badState = new SaveGameState
+        {
+            Profile = new PlayerProfile
+            {
+                HeightCm = 10,
+                GoalId = "unknown",
+                HasCompletedOnboarding = true,
+            },
+            BodyMetrics = new List<BodyMetricEntry>
+            {
+                new()
+                {
+                    DateKey = "2026-06-02",
+                    WeightKg = 72.444,
+                    RecordedAtUtc = new DateTime(2026, 6, 2, 8, 0, 0, DateTimeKind.Utc),
+                },
+                new()
+                {
+                    DateKey = "2026-06-02",
+                    WeightKg = 70.0,
+                    RecordedAtUtc = new DateTime(2026, 6, 2, 9, 0, 0, DateTimeKind.Utc),
+                },
+                new()
+                {
+                    DateKey = "bad",
+                    WeightKg = 10,
+                    RecordedAtUtc = DateTime.UtcNow,
+                },
+            },
+        };
+        var normalized = GameSession.NormalizeSaveState(badState);
+        yield return $"BODY_NORMALIZE changed={normalized} completed={badState.Profile?.HasCompletedOnboarding} goal={badState.Profile?.GoalId} metrics={badState.BodyMetrics?.Count ?? -1} latest={badState.BodyMetrics?.FirstOrDefault()?.WeightKg:0.0}";
     }
 
     private static IEnumerable<string> RunIdleRewardSmoke()
@@ -340,6 +395,7 @@ public static class FlowSmokeTest
             "moon_iron_shortsword",
             "Smoke Sword",
             EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Weapons/moon_blade.png",
             "chest",
             "\u666e\u901a",
             1,
@@ -389,10 +445,15 @@ public static class FlowSmokeTest
         var shortQuests = new ShortTermQuestCatalog();
         var longQuests = new LongTermQuestCatalog();
         yield return $"BETA_CONTENT equipment={equipment.GetAll().Count} lootProfiles={lootProfiles.GetAll().Count} exercises={exercises.GetAll().Count} shortDaily={shortQuests.GetDailyBoard().Count} longQuests={longQuests.GetAll().Count}";
+        var iconCount = equipment.GetAll().Count(definition => !string.IsNullOrWhiteSpace(definition.IconPath));
+        var uniqueNames = equipment.GetAll().Select(definition => definition.DisplayName).Distinct().Count();
+        yield return $"EQUIPMENT_POOL definitions={equipment.GetAll().Count} icons={iconCount} uniqueNames={uniqueNames}";
 
         foreach (var profile in lootProfiles.GetAll())
         {
-            yield return $"BETA_LOOT_PROFILE dungeon={profile.DungeonTypeId} definitions={profile.EquipmentDefinitionIds.Count} extras={profile.ExtraModifierCandidates.Count}";
+            var dungeonDefinitions = equipment.GetForDungeon(profile.DungeonTypeId);
+            var slots = string.Join(",", dungeonDefinitions.Select(definition => definition.Slot).Distinct().OrderBy(slot => slot));
+            yield return $"BETA_LOOT_PROFILE dungeon={profile.DungeonTypeId} definitions={profile.EquipmentDefinitionIds.Count} generated={dungeonDefinitions.Count} slots={slots} extras={profile.ExtraModifierCandidates.Count}";
         }
 
         foreach (var dungeonTypeId in new[] { "chest", "shoulders", "back", "legs", "core", "arms" })
@@ -407,6 +468,60 @@ public static class FlowSmokeTest
                     !string.IsNullOrWhiteSpace(exercise.SafetyNote));
             yield return $"BETA_EXERCISES dungeon={dungeonTypeId} count={dungeonExercises.Count} recommended={dungeonExercises.Count(exercise => exercise.IsRecommended)} complete={complete}";
         }
+    }
+
+    private static IEnumerable<string> RunActorVisualSmoke()
+    {
+        var visuals = new ActorVisualCatalog();
+        var allVisualIds = new[]
+        {
+            ActorVisualIds.SlimeBasic,
+            ActorVisualIds.SkeletonBasic,
+            ActorVisualIds.SkeletonArcher,
+            ActorVisualIds.SkeletonArmored,
+            ActorVisualIds.SkeletonGreatsword,
+            ActorVisualIds.OrcBasic,
+            ActorVisualIds.OrcArmored,
+            ActorVisualIds.OrcElite,
+            ActorVisualIds.OrcRiderBoss,
+            ActorVisualIds.AxemanArmored,
+            ActorVisualIds.WerewolfBoss,
+            ActorVisualIds.WerebearBoss,
+        };
+        var resolvedVisualIds = allVisualIds
+            .Select(id => visuals.Get(id).Id)
+            .ToList();
+        var fallback = visuals.Get("missing_visual");
+        yield return $"ACTOR_VISUALS count={resolvedVisualIds.Count} unique={resolvedVisualIds.Distinct().Count()} fallback={fallback.Id}";
+
+        var enemies = new EnemyCatalog();
+        var dungeonVisuals = new[] { "chest", "shoulders", "back", "legs", "core", "arms" }
+            .Select(id =>
+            {
+                var enemy = enemies.GetForDungeon(id);
+                return $"{id}:{enemy.NormalVisualId}/{enemy.EliteVisualId}/{enemy.BossVisualId}";
+            });
+        var missing = enemies.GetForDungeon("missing");
+        yield return $"ENEMY_VISUAL_MAP {string.Join(" ", dungeonVisuals)} missing={missing.NormalVisualId}/{missing.EliteVisualId}/{missing.BossVisualId}";
+
+        var slimeSet = visuals.Get(ActorVisualIds.SlimeBasic).ToAnimationSet();
+        yield return $"ACTOR_VISUAL_SET idle={slimeSet.IdlePath.EndsWith("idle.png")} attack={slimeSet.AttackPath.EndsWith("attack_01.png")} blockFallback={string.IsNullOrEmpty(slimeSet.BlockPath)}";
+
+        var chestEnemy = enemies.GetForDungeon("chest");
+        var fourSet = new[]
+        {
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(1, 4, false, false, false)),
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(2, 4, false, false, false)),
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(3, 4, false, false, false)),
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(4, 4, true, false, false)),
+        };
+        var twoSet = new[]
+        {
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(1, 2, false, false, false)),
+            BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(2, 2, true, false, false)),
+        };
+        var oneSet = BattleEncounterView.ResolveEnemyVisualId(chestEnemy, new RoomProgress(1, 1, true, false, false));
+        yield return $"ENEMY_VISUAL_RULE sets4={string.Join(",", fourSet)} sets2={string.Join(",", twoSet)} sets1={oneSet}";
     }
 
     private static IEnumerable<string> RunRunInterruptionSmoke()
@@ -768,6 +883,58 @@ public static class FlowSmokeTest
             evading.PlayerHpAfter,
             44));
         yield return $"COMBAT_SESSION_EXP level={expSession.Player.Level} exp={expSession.Player.Experience}/{expSession.Player.ExperienceToNextLevel}";
+
+        var autoExpSession = new GameSession(persistenceEnabled: false);
+        autoExpSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("back", 4, 12, "chest_quest_01", 90),
+        });
+        autoExpSession.StartOrGetActiveRun();
+        var autoStage = autoExpSession.ActiveRun!.CurrentStage;
+        autoExpSession.RecordStageResult(new RunSummary(
+            "Auto EXP Smoke",
+            autoStage.RoomName,
+            0,
+            autoStage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 0, null),
+            Array.Empty<CompletionResult>(),
+            Array.Empty<CombatSetResult>(),
+            24));
+        yield return $"TRAINING_GROWTH_AUTO gained={autoExpSession.LastRunSummary?.ExperienceGained ?? 0} exp={autoExpSession.Player.Experience}/{autoExpSession.Player.ExperienceToNextLevel}";
+
+        var dungeonGrowthSession = new GameSession(persistenceEnabled: false);
+        dungeonGrowthSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+        });
+        var initialDungeonLevel = dungeonGrowthSession.SelectedPlan.Stages[0].DungeonLevel;
+        dungeonGrowthSession.StartOrGetActiveRun();
+        var growthStage = dungeonGrowthSession.ActiveRun!.CurrentStage;
+        dungeonGrowthSession.RecordStageResult(new RunSummary(
+            "Dungeon Growth Smoke",
+            growthStage.RoomName,
+            growthStage.TotalSets,
+            growthStage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 40, null),
+            CompletedResults(growthStage.TotalSets),
+            ClearedCombatResults(growthStage.TotalSets),
+            24));
+        var chestProgress = dungeonGrowthSession.DungeonProgress.First(progress => progress.DungeonTypeId == "chest");
+        dungeonGrowthSession.CompleteDailyRun();
+        dungeonGrowthSession.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+        });
+        yield return $"DUNGEON_GROWTH dungeon=chest initial={initialDungeonLevel} level={chestProgress.Level} exp={chestProgress.Experience}/{chestProgress.ExperienceToNextLevel} rooms={chestProgress.CompletedRooms} bosses={chestProgress.BossClears} nextStageLevel={dungeonGrowthSession.SelectedPlan.Stages[0].DungeonLevel}";
 
         var service = new DungeonRunService();
         var run = service.Start(route, 24);

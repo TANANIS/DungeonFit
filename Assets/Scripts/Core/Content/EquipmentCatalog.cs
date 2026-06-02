@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DungeonFit.Core.Models;
@@ -6,234 +7,144 @@ namespace DungeonFit.Core.Content;
 
 public sealed class EquipmentCatalog
 {
-    private readonly EquipmentDefinition[] _definitions =
+    private static readonly GearTemplate[] Templates =
     {
         new(
-            "chest_vanguard_blade",
-            "\u80f8\u57ce\u5148\u92d2\u528d",
+            "blade",
+            "刃",
             EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Weapons/moon_blade.png",
+            0,
+            0,
+            new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty)),
+        new(
+            "hammer",
+            "鎚",
+            EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Weapons/war_hammer.png",
             1,
             5,
+            new EquipmentModifier(EquipmentStatType.Attack, 6, string.Empty)),
+        new(
+            "bow",
+            "弓",
+            EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Weapons/training_bow.png",
+            0,
+            10,
+            new EquipmentModifier(EquipmentStatType.Attack, 4, string.Empty)),
+        new(
+            "dagger",
+            "匕",
+            EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Weapons/silver_dagger.png",
+            -1,
+            -5,
+            new EquipmentModifier(EquipmentStatType.Attack, 4, string.Empty)),
+        new(
+            "guard",
+            "甲",
+            EquipmentSlot.Armor,
+            "res://Assets/Art/Items/Armor/guard_plate.png",
+            1,
+            -5,
+            new EquipmentModifier(EquipmentStatType.MaxHp, 20, string.Empty)),
+        new(
+            "helm",
+            "盔",
+            EquipmentSlot.Armor,
+            "res://Assets/Art/Items/Armor/iron_helm.png",
+            0,
+            -10,
+            new EquipmentModifier(EquipmentStatType.MaxHp, 16, string.Empty)),
+        new(
+            "shield",
+            "盾",
+            EquipmentSlot.Armor,
+            "res://Assets/Art/Items/Armor/round_shield.png",
+            2,
             5,
-            80,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 5, string.Empty),
-            }),
+            new EquipmentModifier(EquipmentStatType.MaxHp, 18, string.Empty)),
         new(
-            "chest_guard_plate",
-            "\u80f8\u57ce\u5b88\u5099\u7532",
+            "plate",
+            "鎧",
             EquipmentSlot.Armor,
-            1,
-            5,
-            6,
-            75,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 20, string.Empty),
-            }),
-        new(
-            "chest_oath_ring",
-            "\u7d2b\u8a93\u6212\u6307",
-            EquipmentSlot.Accessory,
-            1,
-            5,
-            8,
-            120,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 3, string.Empty),
-            }),
-        new(
-            "shoulder_moon_halberd",
-            "\u6708\u80a9\u6230\u621f",
-            EquipmentSlot.Weapon,
-            1,
-            6,
-            6,
-            95,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 6, string.Empty),
-            }),
-        new(
-            "shoulder_guard_mantle",
-            "\u5b88\u671b\u62ab\u80a9",
-            EquipmentSlot.Armor,
-            1,
-            6,
-            6,
-            90,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 18, string.Empty),
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 2, "shoulders"),
-            }),
-        new(
-            "shoulder_captain_medal",
-            "\u5b88\u5099\u968a\u52f3\u7ae0",
-            EquipmentSlot.Accessory,
-            1,
-            6,
-            7,
-            110,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 4, string.Empty),
-            }),
-        new(
-            "back_shadow_axe",
-            "\u80cc\u5f71\u6230\u65a7",
-            EquipmentSlot.Weapon,
+            "res://Assets/Art/Items/Armor/stone_plate.png",
             2,
-            7,
-            7,
-            115,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 7, string.Empty),
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 2, "back"),
-            }),
-        new(
-            "back_watcher_coat",
-            "\u9ed1\u7ffc\u5b88\u671b\u9577\u8863",
-            EquipmentSlot.Armor,
-            2,
-            7,
-            7,
-            105,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 22, string.Empty),
-            }),
-        new(
-            "back_raven_charm",
-            "\u9d09\u7fbd\u8b77\u7b26",
-            EquipmentSlot.Accessory,
-            2,
-            7,
-            8,
-            130,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 4, "back"),
-            }),
-        new(
-            "leg_miner_pick",
-            "\u7926\u5de5\u6708\u9435\u93ac",
-            EquipmentSlot.Weapon,
-            2,
-            8,
-            7,
-            115,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 6, string.Empty),
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 3, "legs"),
-            }),
-        new(
-            "leg_deepstride_greaves",
-            "\u6df1\u6b65\u8b77\u817f\u7532",
-            EquipmentSlot.Armor,
-            2,
-            8,
-            8,
-            125,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 26, string.Empty),
-            }),
-        new(
-            "leg_ore_badge",
-            "\u6df1\u5c64\u7926\u77f3\u5fbd\u7ae0",
-            EquipmentSlot.Accessory,
-            2,
-            8,
-            8,
-            125,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 4, string.Empty),
-            }),
-        new(
-            "core_moon_staff",
-            "\u6708\u767d\u7948\u6756",
-            EquipmentSlot.Weapon,
-            3,
-            9,
-            8,
-            135,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 6, string.Empty),
-                new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 3, string.Empty),
-            }),
-        new(
-            "core_stability_vest",
-            "\u6838\u5fc3\u7a69\u5b9a\u8b77\u8863",
-            EquipmentSlot.Armor,
-            3,
-            9,
-            9,
-            140,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 30, string.Empty),
-            }),
-        new(
-            "core_prayer_beads",
-            "\u6708\u767d\u7948\u73e0",
-            EquipmentSlot.Accessory,
-            3,
-            9,
-            9,
-            150,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 5, string.Empty),
-            }),
-        new(
-            "arm_courier_sabre",
-            "\u4fe1\u4f7f\u77ed\u5203",
-            EquipmentSlot.Weapon,
-            3,
             10,
-            9,
-            145,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.Attack, 8, string.Empty),
-            }),
+            new EquipmentModifier(EquipmentStatType.MaxHp, 24, string.Empty)),
         new(
-            "arm_parcel_guard",
-            "\u5305\u88f9\u5b88\u885b\u8b77\u7532",
-            EquipmentSlot.Armor,
-            3,
-            10,
-            9,
-            145,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.MaxHp, 24, string.Empty),
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 3, "arms"),
-            }),
-        new(
-            "arm_signal_bracelet",
-            "\u9060\u884c\u4fe1\u865f\u624b\u74b0",
+            "charm",
+            "符",
             EquipmentSlot.Accessory,
-            3,
-            10,
-            10,
-            160,
-            new[]
-            {
-                new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 5, "arms"),
-            }),
+            "res://Assets/Art/Items/Accessories/oath_charm.png",
+            2,
+            20,
+            new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 3, string.Empty)),
+        new(
+            "crystal",
+            "晶",
+            EquipmentSlot.Accessory,
+            "res://Assets/Art/Items/Accessories/focus_crystal.png",
+            1,
+            25,
+            new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 2, string.Empty)),
+        new(
+            "ring",
+            "戒",
+            EquipmentSlot.Accessory,
+            "res://Assets/Art/Items/Accessories/golden_ring.png",
+            2,
+            30,
+            new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 2, "{dungeon}")),
+        new(
+            "medal",
+            "章",
+            EquipmentSlot.Accessory,
+            "res://Assets/Art/Items/Accessories/guard_medal.png",
+            1,
+            15,
+            new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 4, string.Empty)),
     };
+
+    private static readonly GearAffix[] Affixes =
+    {
+        new("vanguard", "先鋒", new EquipmentModifier(EquipmentStatType.Attack, 2, string.Empty)),
+        new("fortitude", "堅韌", new EquipmentModifier(EquipmentStatType.MaxHp, 12, string.Empty)),
+        new("prospector", "尋寶", new EquipmentModifier(EquipmentStatType.DungeonGoldBonusPercent, 3, "{dungeon}")),
+        new("oath", "誓約", new EquipmentModifier(EquipmentStatType.QuestRewardBonusPercent, 2, string.Empty)),
+    };
+
+    private static readonly DungeonGearTheme[] Themes =
+    {
+        new("chest", "胸城", 1, 5, 5, 80),
+        new("shoulders", "月肩", 1, 6, 6, 90),
+        new("back", "背影", 2, 7, 7, 105),
+        new("legs", "深步", 2, 8, 7, 115),
+        new("core", "核心", 3, 9, 8, 135),
+        new("arms", "遠行", 3, 10, 9, 145),
+    };
+
+    private readonly EquipmentDefinition[] _definitions = BuildDefinitions();
 
     public IReadOnlyList<EquipmentDefinition> GetAll()
     {
         return _definitions;
+    }
+
+    public IReadOnlyList<EquipmentDefinition> GetForDungeon(string dungeonTypeId)
+    {
+        var matches = _definitions
+            .Where(definition => definition.Id.StartsWith($"{dungeonTypeId}_", StringComparison.Ordinal))
+            .ToArray();
+        return matches.Length > 0 ? matches : GetForDungeon("chest");
+    }
+
+    public IReadOnlyList<string> GetDefinitionIdsForDungeon(string dungeonTypeId)
+    {
+        return GetForDungeon(dungeonTypeId)
+            .Select(definition => definition.Id)
+            .ToArray();
     }
 
     public EquipmentDefinition GetById(string id)
@@ -256,6 +167,7 @@ public sealed class EquipmentCatalog
             definition.Id,
             definition.DisplayName,
             definition.Slot,
+            definition.IconPath,
             chest.SourceDungeonTypeId,
             rarity.DisplayName,
             definition.RecommendedLevelMin,
@@ -264,4 +176,58 @@ public sealed class EquipmentCatalog
             definition.BaseSellPrice * rarity.SellPriceMultiplier,
             modifiers);
     }
+
+    private static EquipmentDefinition[] BuildDefinitions()
+    {
+        return Themes
+            .SelectMany(theme => Templates.SelectMany(template => Affixes.Select(affix => BuildDefinition(theme, template, affix))))
+            .ToArray();
+    }
+
+    private static EquipmentDefinition BuildDefinition(DungeonGearTheme theme, GearTemplate template, GearAffix affix)
+    {
+        return new EquipmentDefinition(
+            $"{theme.DungeonTypeId}_{template.IdSuffix}_{affix.IdSuffix}",
+            $"{theme.NamePrefix}{affix.NamePrefix}{template.NameSuffix}",
+            template.Slot,
+            template.IconPath,
+            theme.LevelMin,
+            theme.LevelMax,
+            theme.BasePower + template.PowerOffset,
+            theme.BaseSellPrice + template.SellPriceOffset,
+            new[]
+            {
+                ResolveAffixModifier(theme.DungeonTypeId, template.BaseModifier),
+                ResolveAffixModifier(theme.DungeonTypeId, affix.Modifier),
+            });
+    }
+
+    private static EquipmentModifier ResolveAffixModifier(string dungeonTypeId, EquipmentModifier modifier)
+    {
+        return modifier.Scope == "{dungeon}"
+            ? modifier with { Scope = dungeonTypeId }
+            : modifier;
+    }
+
+    private sealed record DungeonGearTheme(
+        string DungeonTypeId,
+        string NamePrefix,
+        int LevelMin,
+        int LevelMax,
+        int BasePower,
+        int BaseSellPrice);
+
+    private sealed record GearTemplate(
+        string IdSuffix,
+        string NameSuffix,
+        EquipmentSlot Slot,
+        string IconPath,
+        int PowerOffset,
+        int SellPriceOffset,
+        EquipmentModifier BaseModifier);
+
+    private sealed record GearAffix(
+        string IdSuffix,
+        string NamePrefix,
+        EquipmentModifier Modifier);
 }

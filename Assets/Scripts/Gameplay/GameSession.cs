@@ -858,6 +858,12 @@ public sealed class GameSession
             return TutorialGuideViewModel.Empty;
         }
 
+        var readableGuide = BuildReadableTutorialGuide(_tutorial.StepId);
+        if (readableGuide.IsVisible)
+        {
+            return readableGuide;
+        }
+
         return _tutorial.StepId switch
         {
             TutorialStepIds.Welcome => new TutorialGuideViewModel(
@@ -905,6 +911,59 @@ public sealed class GameSession
                 "目標：進入酒館，確認裝備、出售普通裝或鎖定稀有裝。",
                 "前往酒館",
                 "結束引導"),
+            _ => TutorialGuideViewModel.Empty,
+        };
+    }
+
+    private static TutorialGuideViewModel BuildReadableTutorialGuide(string stepId)
+    {
+        return stepId switch
+        {
+            TutorialStepIds.Welcome => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.Welcome,
+                "村長 露文",
+                "歡迎來到 DungeonFit",
+                "這座城鎮會把每天的訓練變成地城路線。選擇部位、完成房間、帶回金幣與裝備，角色就會慢慢成長。",
+                "目標：先建立一條今日路線，開始第一個房間。",
+                "開始規劃",
+                "稍後再說"),
+            TutorialStepIds.PlanRoute => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.PlanRoute,
+                "村長 露文",
+                "規劃今日路線",
+                "每個地城代表一種訓練部位。加入至少四個房間後，就能開始今天的路線。路線越長，收益越高，但疲勞也會累積。",
+                "目標：選滿路線並進入第一個房間。",
+                "前往房間",
+                "稍後再說"),
+            TutorialStepIds.ClearRoom => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.ClearRoom,
+                "村長 露文",
+                "完成一個房間",
+                "每組訓練都會推進戰鬥。HP 歸零前完成房間，就能把金幣、EXP 和可能出現的寶箱暫存到今日結算。",
+                "目標：完成目前房間，查看 Set Summary。",
+                "挑戰房間",
+                "稍後再說"),
+            TutorialStepIds.ClaimRewards => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.ClaimRewards,
+                "村長 露文",
+                "領取今日收益",
+                "房間收益會先暫存在今日結算。按下 Open All 後，金幣與裝備才會正式加入角色狀態。",
+                "目標：領取今日結算，再回城鎮整理裝備。",
+                "領取獎勵",
+                "稍後再說"),
+            TutorialStepIds.VisitTavern => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.VisitTavern,
+                "村長 露文",
+                "整理裝備",
+                "酒館可以查看裝備、切換穿戴、鎖定稀有裝備，或賣掉不需要的普通裝備。先整理背包，下一趟會更穩。",
+                "目標：進入酒館查看你剛得到的裝備。",
+                "前往酒館",
+                "完成教學"),
             _ => TutorialGuideViewModel.Empty,
         };
     }
@@ -1233,6 +1292,12 @@ public sealed class GameSession
             changed = true;
         }
 
+        if (state.Gold < 0)
+        {
+            state.Gold = 0;
+            changed = true;
+        }
+
         var expectedExperienceToNext = PlayerState.GetExperienceToNextLevel(state.Level);
         if (state.ExperienceToNextLevel != expectedExperienceToNext)
         {
@@ -1339,19 +1404,38 @@ public sealed class GameSession
         changed = NormalizeLoadout(state.Inventory, state.EquipmentLoadout) || changed;
         changed = NormalizeLongTermQuestState(state) || changed;
 
-        if (!state.CurrentHp.HasValue)
+        var normalizedPlayer = new PlayerState();
+        normalizedPlayer.Load(
+            state.Gold,
+            state.Inventory,
+            state.EquipmentLoadout,
+            state.Level,
+            state.Experience,
+            state.ExperienceToNextLevel,
+            null,
+            state.DailyBlessingId);
+        var normalizedCurrentHp = state.CurrentHp.HasValue
+            ? Math.Clamp(state.CurrentHp.Value, 0, normalizedPlayer.MaxHp)
+            : normalizedPlayer.MaxHp;
+        if (state.CurrentHp != normalizedCurrentHp)
         {
-            var player = new PlayerState();
-            player.Load(
-                state.Gold,
-                state.Inventory,
-                state.EquipmentLoadout,
-                state.Level,
-                state.Experience,
-                state.ExperienceToNextLevel,
-                null,
-                state.DailyBlessingId);
-            state.CurrentHp = player.MaxHp;
+            state.CurrentHp = normalizedCurrentHp;
+            changed = true;
+        }
+
+        if (state.ActiveRunCurrentHp.HasValue)
+        {
+            var normalizedRunHp = Math.Clamp(state.ActiveRunCurrentHp.Value, 0, normalizedPlayer.MaxHp);
+            if (state.ActiveRunCurrentHp != normalizedRunHp)
+            {
+                state.ActiveRunCurrentHp = normalizedRunHp;
+                changed = true;
+            }
+        }
+
+        if (!state.HasActiveRun && state.ActiveStageResults.Count == 0 && state.ActiveRunCurrentHp.HasValue)
+        {
+            state.ActiveRunCurrentHp = null;
             changed = true;
         }
 

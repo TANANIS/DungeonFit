@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DungeonFit Art Dashboard</title>
+  <script src="./art_manifest.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090813;
+      --panel: #141125;
+      --panel2: #1d1833;
+      --line: #a8873d;
+      --text: #f4e8cf;
+      --muted: #b7a8ce;
+      --accent: #8c64db;
+      --ok: #77d68a;
+      --warn: #f0bc54;
+      --bad: #f06f6f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(9, 8, 19, 0.96);
+      border-bottom: 1px solid rgba(168, 135, 61, 0.45);
+      padding: 16px 20px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    button, select, input[type="search"] {
+      border: 1px solid rgba(168, 135, 61, 0.7);
+      background: #21183a;
+      color: var(--text);
+      min-height: 38px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font: inherit;
+    }
+    button.primary { background: #5c3fb0; }
+    button:disabled { opacity: 0.45; }
+    input[type="search"] { min-width: 280px; }
+    main { padding: 18px 20px 32px; }
+    footer {
+      color: var(--muted);
+      padding: 0 20px 24px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .toolbar, .stats, .filters, .row-actions, .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .stats { margin: 10px 0 14px; }
+    .stat {
+      border: 1px solid rgba(168, 135, 61, 0.45);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--muted);
+    }
+    .stat strong { color: var(--text); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid rgba(168, 135, 61, 0.52);
+      background: var(--panel);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .card-head {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid rgba(168, 135, 61, 0.22);
+    }
+    .preview {
+      width: 88px;
+      height: 88px;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.07) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,.07) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,.07) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.07) 75%);
+      background-size: 18px 18px;
+      background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .preview img {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: pixelated;
+    }
+    .title {
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    .path {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .tag {
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .tag.ok { color: var(--ok); }
+    .tag.warn { color: var(--warn); }
+    .tag.bad { color: var(--bad); }
+    .tag.p0 { color: #fff2a8; border-color: rgba(255, 210, 86, .65); }
+    .tag.p1 { color: #b8dcff; }
+    .tag.p2 { color: #b7a8ce; }
+    .body {
+      padding: 12px;
+      display: grid;
+      gap: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .body strong { color: var(--text); }
+    .drop, .prompt, .final-checks {
+      border: 1px solid rgba(168, 135, 61, 0.42);
+      border-radius: 6px;
+      padding: 10px;
+      background: var(--panel2);
+    }
+    .drop { border-style: dashed; }
+    .drop.dragging { outline: 2px solid var(--accent); }
+    .file-input { width: 100%; }
+    .prompt-text {
+      max-height: 110px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: var(--text);
+      background: rgba(0,0,0,.18);
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+    }
+    .check {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 7px;
+      align-items: start;
+      color: var(--muted);
+      min-width: 160px;
+    }
+    .check span { color: var(--text); }
+    .check small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DungeonFit Art Dashboard</h1>
+    <div class="toolbar">
+      <button class="primary" id="pickRoot">Choose DungeonFit Folder</button>
+      <button id="exportCsv">Export CSV</button>
+      <button id="copyNeeded">Copy Needs Final Art</button>
+      <button id="copyP0Prompts">Copy P0 Prompts</button>
+      <span id="rootStatus" class="stat">Write access not granted</span>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="filters">
+      <input id="search" type="search" placeholder="Search title, path, role, look, prompt" />
+      <select id="category"></select>
+      <select id="priority">
+        <option value="all">All priorities</option>
+        <option value="P0">P0 main screens</option>
+        <option value="P1">P1 core support</option>
+        <option value="P2">P2 extended</option>
+      </select>
+      <select id="status">
+        <option value="all">All asset states</option>
+        <option value="needs">Needs final art</option>
+        <option value="exists">Has file</option>
+        <option value="missing">Missing file</option>
+        <option value="checked">Final check complete</option>
+      </select>
+    </div>
+  </header>
+  <main>
+    <div class="grid" id="grid"></div>
+  </main>
+  <footer>
+    Direct overwrite requires Chrome or Edge with File System Access API. First choose the project root:
+    D:\GameDev\DungeonFit. Uploaded PNG files are written to each card's Assets/Art path.
+    Final checkboxes are stored in this browser's localStorage.
+  </footer>
+  <script>
+    const manifest = window.DUNGEONFIT_ART_MANIFEST || { summary: { total: 0, categories: [] }, assets: [] };
+    const checkStoreKey = "dungeonfit-art-dashboard-checks-v1";
+    let checkState = readCheckState();
+    let rootHandle = null;
+    let filteredAssets = manifest.assets.slice();
+
+    const grid = document.getElementById("grid");
+    const stats = document.getElementById("stats");
+    const search = document.getElementById("search");
+    const category = document.getElementById("category");
+    const priority = document.getElementById("priority");
+    const status = document.getElementById("status");
+    const rootStatus = document.getElementById("rootStatus");
+
+    function init() {
+      const categories = ["all", ...new Set(manifest.assets.map(asset => asset.category).sort())];
+      category.innerHTML = categories.map(item => `<option value="${escapeHtml(item)}">${item === "all" ? "All categories" : escapeHtml(item)}</option>`).join("");
+      renderStats();
+      applyFilters();
+    }
+
+    function readCheckState() {
+      try {
+        return JSON.parse(localStorage.getItem(checkStoreKey) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function saveCheckState() {
+      localStorage.setItem(checkStoreKey, JSON.stringify(checkState));
+    }
+
+    function isCheckComplete(asset) {
+      const checks = asset.finalChecks || [];
+      return checks.length > 0 && checks.every(check => checkState[asset.id]?.[check.id]);
+    }
+
+    function renderStats() {
+      const existing = manifest.assets.filter(asset => asset.exists).length;
+      const missing = manifest.assets.length - existing;
+      const needs = manifest.assets.filter(asset => asset.productionStatus === "Needs final art").length;
+      const p0 = manifest.assets.filter(asset => asset.priority === "P0").length;
+      const checked = manifest.assets.filter(isCheckComplete).length;
+      const categoryText = manifest.summary.categories
+        .map(item => `${escapeHtml(item.category)} <strong>${item.count}</strong>`)
+        .join('</span><span class="stat">');
+      stats.innerHTML = `
+        <span class="stat">Total <strong>${manifest.assets.length}</strong></span>
+        <span class="stat">P0 <strong>${p0}</strong></span>
+        <span class="stat">Needs final art <strong>${needs}</strong></span>
+        <span class="stat">Has file <strong>${existing}</strong></span>
+        <span class="stat">Missing <strong>${missing}</strong></span>
+        <span class="stat">Final check complete <strong>${checked}</strong></span>
+        <span class="stat">${categoryText}</span>
+      `;
+    }
+
+    function applyFilters() {
+      const query = search.value.trim().toLowerCase();
+      filteredAssets = manifest.assets.filter(asset => {
+        const haystack = [
+          asset.title,
+          asset.category,
+          asset.priority,
+          asset.relativePath,
+          asset.role,
+          asset.look,
+          asset.notes,
+          asset.generatedPrompt
+        ].join(" ").toLowerCase();
+        if (query && !haystack.includes(query)) return false;
+        if (category.value !== "all" && asset.category !== category.value) return false;
+        if (priority.value !== "all" && asset.priority !== priority.value) return false;
+        if (status.value === "needs" && asset.productionStatus !== "Needs final art") return false;
+        if (status.value === "exists" && !asset.exists) return false;
+        if (status.value === "missing" && asset.exists) return false;
+        if (status.value === "checked" && !isCheckComplete(asset)) return false;
+        return true;
+      });
+      renderGrid();
+    }
+
+    function renderGrid() {
+      grid.innerHTML = filteredAssets.map(cardHtml).join("");
+      for (const card of grid.querySelectorAll(".card")) {
+        const asset = manifest.assets.find(item => item.id === card.dataset.id);
+        const input = card.querySelector("input[type=file]");
+        const drop = card.querySelector(".drop");
+        input.addEventListener("change", () => {
+          if (input.files[0]) writeAsset(asset, input.files[0], card);
+        });
+        for (const eventName of ["dragenter", "dragover"]) {
+          drop.addEventListener(eventName, event => {
+            event.preventDefault();
+            drop.classList.add("dragging");
+          });
+        }
+        for (const eventName of ["dragleave", "drop"]) {
+          drop.addEventListener(eventName, () => drop.classList.remove("dragging"));
+        }
+        drop.addEventListener("drop", event => {
+          event.preventDefault();
+          const file = event.dataTransfer.files[0];
+          if (file) writeAsset(asset, file, card);
+        });
+        for (const checkbox of card.querySelectorAll("[data-check]")) {
+          checkbox.addEventListener("change", () => {
+            checkState[asset.id] = checkState[asset.id] || {};
+            checkState[asset.id][checkbox.dataset.check] = checkbox.checked;
+            saveCheckState();
+            renderStats();
+          });
+        }
+      }
+    }
+
+    function cardHtml(asset) {
+      const statusClass = asset.exists ? "ok" : "bad";
+      const fileStatus = asset.exists ? "Has file" : "Missing file";
+      const transparent = asset.transparent ? "Transparent" : "Opaque";
+      const nine = asset.nineSlice ? "Nine-slice" : "Flat image";
+      const checks = (asset.finalChecks || []).map(check => {
+        const checked = checkState[asset.id]?.[check.id] ? "checked" : "";
+        return `
+          <label class="check">
+            <input type="checkbox" data-check="${escapeAttr(check.id)}" ${checked}>
+            <span>${escapeHtml(check.label)}<small>${escapeHtml(check.required)}</small></span>
+          </label>
+        `;
+      }).join("");
+      return `
+        <article class="card" data-id="${escapeHtml(asset.id)}">
+          <div class="card-head">
+            <div class="preview"><img src="${escapeAttr(asset.samplePath)}" alt=""></div>
+            <div>
+              <div class="title">${escapeHtml(asset.title)}</div>
+              <div class="path">${escapeHtml(asset.relativePath)}</div>
+              <div class="meta">
+                <span class="tag ${asset.priority.toLowerCase()}">${escapeHtml(asset.priority)}</span>
+                <span class="tag">${escapeHtml(asset.category)}</span>
+                <span class="tag">${asset.expectedWidth} x ${asset.expectedHeight}</span>
+                <span class="tag">${transparent}</span>
+                <span class="tag">${nine}</span>
+                <span class="tag ${statusClass}">${fileStatus}</span>
+                <span class="tag warn">${escapeHtml(asset.productionStatus || "Needs review")}</span>
+              </div>
+            </div>
+          </div>
+          <div class="body">
+            <div><strong>Role</strong> ${escapeHtml(asset.role)}</div>
+            <div><strong>Look</strong> ${escapeHtml(asset.look)}</div>
+            ${asset.notes ? `<div><strong>Notes</strong> ${escapeHtml(asset.notes)}</div>` : ""}
+            <div class="prompt">
+              <strong>AI prompt</strong>
+              <div class="prompt-text">${escapeHtml(asset.generatedPrompt || buildPrompt(asset))}</div>
+              <div class="row-actions">
+                <button type="button" onclick="copyPrompt('${escapeAttr(asset.id)}')">Copy AI Prompt</button>
+              </div>
+            </div>
+            <div class="final-checks">
+              <strong>Final check</strong>
+              <div class="checks">${checks}</div>
+            </div>
+            <div class="drop">
+              <input class="file-input" type="file" accept="image/png" />
+              <div class="path">Drop a PNG here or choose a file to overwrite ${escapeHtml(asset.relativePath)}</div>
+            </div>
+            <div class="row-actions">
+              <a href="${escapeAttr(asset.samplePath)}" download><button type="button">Download Test PNG</button></a>
+              <button type="button" onclick="copyText('${escapeAttr(asset.relativePath)}')">Copy Path</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function buildPrompt(asset) {
+      return [
+        "Create a production-ready 2D game asset for DungeonFit.",
+        `Category: ${asset.category}.`,
+        `Role: ${asset.role}.`,
+        `Visual direction: ${asset.look}.`,
+        `Exact canvas: ${asset.expectedWidth}x${asset.expectedHeight} px.`,
+        `Transparent background required: ${asset.transparent}.`,
+        `Nine-slice/stretch-safe frame required: ${asset.nineSlice}.`,
+        "Style: dark moonlit fantasy RPG, purple and gold accents, crisp pixel-inspired rendering, mobile readability.",
+        "Do not include baked text, watermarks, logos, signatures, UI labels, or extra margins unless the role requires a full background."
+      ].join(" ");
+    }
+
+    async function writeAsset(asset, file, card) {
+      if (file.type !== "image/png" && !file.name.toLowerCase().endsWith(".png")) {
+        alert("Please upload a PNG file.");
+        return;
+      }
+      if (!rootHandle) {
+        alert("Choose the DungeonFit project folder first.");
+        return;
+      }
+      try {
+        const handle = await getFileHandleForRelativePath(rootHandle, asset.relativePath, true);
+        const writable = await handle.createWritable();
+        await writable.write(file);
+        await writable.close();
+        card.querySelector(".drop .path").textContent = `Overwritten: ${asset.relativePath}`;
+        card.querySelector(".preview img").src = URL.createObjectURL(file);
+      } catch (error) {
+        alert(`Write failed: ${error.message}`);
+      }
+    }
+
+    async function getFileHandleForRelativePath(root, relativePath, create) {
+      const parts = relativePath.split("/");
+      const fileName = parts.pop();
+      let dir = root;
+      for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part, { create });
+      }
+      return dir.getFileHandle(fileName, { create });
+    }
+
+    document.getElementById("pickRoot").addEventListener("click", async () => {
+      if (!window.showDirectoryPicker) {
+        alert("This browser cannot overwrite local files. Open this dashboard in Chrome or Edge.");
+        return;
+      }
+      rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+      rootStatus.textContent = `Granted: ${rootHandle.name}`;
+    });
+
+    document.getElementById("exportCsv").addEventListener("click", () => {
+      const headers = [
+        "priority",
+        "category",
+        "title",
+        "relativePath",
+        "expectedWidth",
+        "expectedHeight",
+        "transparent",
+        "nineSlice",
+        "exists",
+        "productionStatus",
+        "role",
+        "look",
+        "generatedPrompt",
+        "notes"
+      ];
+      const lines = [headers.join(",")];
+      for (const asset of manifest.assets) {
+        lines.push(headers.map(key => csv(asset[key])).join(","));
+      }
+      downloadText("dungeonfit-art-spec.csv", lines.join("\n"));
+    });
+
+    document.getElementById("copyNeeded").addEventListener("click", () => {
+      const text = manifest.assets
+        .filter(asset => asset.productionStatus === "Needs final art")
+        .map(asset => `${asset.priority} ${asset.relativePath} ${asset.expectedWidth}x${asset.expectedHeight} ${asset.category}`)
+        .join("\n") || "No assets need final art.";
+      copyText(text);
+    });
+
+    document.getElementById("copyP0Prompts").addEventListener("click", () => {
+      const text = manifest.assets
+        .filter(asset => asset.priority === "P0")
+        .map(asset => `[${asset.relativePath}]\n${asset.generatedPrompt || buildPrompt(asset)}`)
+        .join("\n\n");
+      copyText(text);
+    });
+
+    search.addEventListener("input", applyFilters);
+    category.addEventListener("change", applyFilters);
+    priority.addEventListener("change", applyFilters);
+    status.addEventListener("change", applyFilters);
+
+    function copyPrompt(assetId) {
+      const asset = manifest.assets.find(item => item.id === assetId);
+      if (asset) copyText(asset.generatedPrompt || buildPrompt(asset));
+    }
+
+    function csv(value) {
+      return `"${String(value ?? "").replaceAll('"', '""')}"`;
+    }
+
+    function downloadText(name, text) {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function copyText(text) {
+      await navigator.clipboard.writeText(text);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value).replaceAll("`", "&#96;");
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -74,7 +74,7 @@ public sealed class PlayerState
         Level = level <= 0 ? DefaultLevel : level;
         Experience = experience < 0 ? 0 : experience;
         ExperienceToNextLevel = experienceToNextLevel <= 0 ? GetExperienceToNextLevel(Level) : experienceToNextLevel;
-        Gold = gold;
+        Gold = Math.Max(0, gold);
         DailyBlessingId = DailyBlessing.IsValid(dailyBlessingId) ? dailyBlessingId! : DailyBlessing.None;
         Inventory.Clear();
 

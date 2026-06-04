@@ -3,5 +3,7 @@
 /android/
 /APK/*.apk
 /.codex-remote-attachments/
+/渲染圖/*.import
+/Tools/ArtDashboard/test-png/**/*.import
 bin/
 obj/

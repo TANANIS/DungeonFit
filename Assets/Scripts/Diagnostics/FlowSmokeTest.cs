@@ -318,8 +318,12 @@ public static class FlowSmokeTest
         var missingLoadoutState = new SaveGameState
         {
             Version = 0,
+            Gold = -25,
             Experience = -10,
             ExperienceToNextLevel = 0,
+            CurrentHp = 999,
+            HasActiveRun = true,
+            ActiveRunCurrentHp = -5,
             Inventory = null,
             EquipmentLoadout = null,
             SelectedDungeonRoute = null,
@@ -328,7 +332,7 @@ public static class FlowSmokeTest
         };
         var missingChanged = GameSession.NormalizeSaveState(missingLoadoutState);
         yield return $"MIGRATION_MISSING changed={missingChanged} version={missingLoadoutState.Version} inventory={missingLoadoutState.Inventory?.Count} exp={missingLoadoutState.Experience}/{missingLoadoutState.ExperienceToNextLevel}";
-        yield return $"MIGRATION_HP currentHp={missingLoadoutState.CurrentHp} dailyKey={(string.IsNullOrWhiteSpace(missingLoadoutState.DailyStateKey) ? "none" : "set")}";
+        yield return $"MIGRATION_HP gold={missingLoadoutState.Gold} currentHp={missingLoadoutState.CurrentHp} runHp={missingLoadoutState.ActiveRunCurrentHp} dailyKey={(string.IsNullOrWhiteSpace(missingLoadoutState.DailyStateKey) ? "none" : "set")}";
         yield return $"MIGRATION_IDLE unclaimed={missingLoadoutState.UnclaimedIdleGold} timestamp={missingLoadoutState.IdleLastCalculatedAtUtc.HasValue}";
         yield return $"MIGRATION_CHURCH active={(missingLoadoutState.ActiveLongTermQuest is null ? "none" : missingLoadoutState.ActiveLongTermQuest.QuestId)} claimed={missingLoadoutState.ClaimedLongTermQuestIds?.Count ?? -1} titles={missingLoadoutState.UnlockedTitles?.Count ?? -1}";
         yield return $"MIGRATION_BODY profileCompleted={missingLoadoutState.Profile?.HasCompletedOnboarding} metrics={missingLoadoutState.BodyMetrics?.Count ?? -1}";

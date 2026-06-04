@@ -46,6 +46,8 @@ public static class FlowSmokeTest
             CompletedResults(plan.Stages[0].TotalSets),
             ClearedCombatResults(plan.Stages[0].TotalSets),
             24));
+        var sessionDailySummary = session.BuildDailySummary();
+        lines.Add($"SESSION_DAILY_BEFORE_CLAIM chests={sessionDailySummary?.ChestCount ?? -1} rewards={sessionDailySummary?.BankedRewardCount ?? -1}");
         lines.Add($"SESSION_BEFORE_COMPLETE gold={session.Player.Gold}");
         session.ClaimDailyRewards();
         lines.Add($"SESSION_AFTER_CLAIM gold={session.Player.Gold}");
@@ -66,9 +68,49 @@ public static class FlowSmokeTest
             lines.Add($"TAVERN_UNLOCK result={session.SetEquipmentLocked(claimedEquipment.Id, false)} sellUnlocked={session.SellEquipment(claimedEquipment.Id)} inventory={session.Player.Inventory.Count}");
         }
 
+        var bulkSession = new GameSession(persistenceEnabled: false);
+        bulkSession.Player.Apply(new RewardBundle(
+            RewardSource.DungeonRoom,
+            0,
+            new EquipmentItem(
+                "bulk_common",
+                "bulk_common",
+                "Bulk Common Sword",
+                EquipmentSlot.Weapon,
+                string.Empty,
+                "chest",
+                "\u666e\u901a",
+                1,
+                5,
+                2,
+                11,
+                Array.Empty<EquipmentModifier>())));
+        bulkSession.Player.Apply(new RewardBundle(
+            RewardSource.DungeonRoom,
+            0,
+            new EquipmentItem(
+                "bulk_rare",
+                "bulk_rare",
+                "Bulk Rare Guard",
+                EquipmentSlot.Armor,
+                string.Empty,
+                "chest",
+                "\u7a00\u6709",
+                1,
+                5,
+                4,
+                23,
+                Array.Empty<EquipmentModifier>())));
+        var bulkBefore = bulkSession.BuildTavernEquipmentViewModel();
+        var lockedRare = bulkSession.LockRareEquipment();
+        var soldCommon = bulkSession.SellCommonEquipment();
+        var bulkAfter = bulkSession.BuildTavernEquipmentViewModel();
+        lines.Add($"TAVERN_BULK commonBefore={bulkBefore.CommonSellableCount} rareBefore={bulkBefore.RareUnlockedCount} locked={lockedRare} sold={soldCommon} inventory={bulkAfter.InventoryCount} gold={bulkSession.Player.Gold}");
+
         session.CompleteDailyRun();
         lines.Add($"SESSION_AFTER_COMPLETE gold={session.Player.Gold}");
         lines.AddRange(RunSaveMigrationSmoke());
+        lines.AddRange(RunTutorialSmoke());
         lines.AddRange(RunBodyProfileSmoke());
         lines.AddRange(RunIdleRewardSmoke());
         lines.AddRange(RunBlacksmithSmoke());
@@ -97,7 +139,7 @@ public static class FlowSmokeTest
             new RewardBundle(RewardSource.DungeonRoom, 80, null),
             CompletedResults(earlyStage.TotalSets)));
         var earlyDailySummary = earlyExitSession.BuildDailySummary();
-        lines.Add($"EARLY_END_BEFORE_CLAIM gold={earlyExitSession.Player.Gold} bankedGold={earlyDailySummary?.TotalGold}");
+        lines.Add($"EARLY_END_BEFORE_CLAIM gold={earlyExitSession.Player.Gold} bankedGold={earlyDailySummary?.TotalGold} chests={earlyDailySummary?.ChestCount}");
         earlyExitSession.ClaimDailyRewards();
         lines.Add($"EARLY_END_AFTER_CLAIM gold={earlyExitSession.Player.Gold}");
         lines.AddRange(RunLootProfileSmoke());
@@ -230,6 +272,34 @@ public static class FlowSmokeTest
         var bossReward = partialSetSummary.BankedRewards.FirstOrDefault(reward => reward.ChestTier == "Boss");
         yield return $"LOOT_RUN_PARTIAL bossResult={bossReward?.Result.ToString() ?? "none"} tier={bossReward?.ChestTier ?? "none"} equipment={bossReward?.Reward.Equipment?.DefinitionId ?? "none"}";
 
+        var defeatedRun = service.Start(route, 24);
+        var defeatedStage = defeatedRun.CurrentStage;
+        var defeatedSummary = new RunSummary(
+            "Defeated Finish",
+            defeatedStage.RoomName,
+            defeatedStage.TotalSets,
+            defeatedStage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 40, null),
+            CompletedResults(defeatedStage.TotalSets),
+            ClearedCombatResults(defeatedStage.TotalSets),
+            0);
+        var defeatedSetSummary = service.RecordStageResult(defeatedRun, defeatedSummary);
+        yield return $"LOOT_ROOM_GUARANTEE hp0Chests={defeatedSetSummary.BankedChestCount} bossResult={defeatedSetSummary.BankedRewards.LastOrDefault(reward => reward.IsChest)?.Result.ToString() ?? "none"}";
+
+        var aliveRun = service.Start(route, 24);
+        var aliveStage = aliveRun.CurrentStage;
+        var aliveSummary = new RunSummary(
+            "Alive Finish",
+            aliveStage.RoomName,
+            aliveStage.TotalSets,
+            aliveStage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 40, null),
+            CompletedResults(aliveStage.TotalSets),
+            ClearedCombatResults(aliveStage.TotalSets),
+            12);
+        var aliveSetSummary = service.RecordStageResult(aliveRun, aliveSummary);
+        yield return $"LOOT_ROOM_ALIVE_BONUS chests={aliveSetSummary.BankedChestCount} bossResult={aliveSetSummary.BankedRewards.LastOrDefault(reward => reward.IsChest)?.Result.ToString() ?? "none"} equipment={aliveSetSummary.BankedRewards.Count(reward => reward.Reward.Equipment is not null)}";
+
         var earlyRun = service.Start(route, 24);
         var earlyStage = earlyRun.CurrentStage;
         var earlySummary = new RunSummary(
@@ -240,7 +310,7 @@ public static class FlowSmokeTest
             new RewardBundle(RewardSource.DungeonRoom, 0, null),
             new[] { CompletionResult.Completed, CompletionResult.Completed });
         var earlySetSummary = service.RecordStageResult(earlyRun, earlySummary);
-        yield return $"LOOT_RUN_EARLY bossCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Boss")} normalCount={earlySetSummary.BankedRewards.Count(reward => reward.ChestTier == "Normal")} equipment={earlySetSummary.BankedRewards.Count(reward => reward.Reward.Equipment is not null)}";
+        yield return $"LOOT_RUN_EARLY bossCount={earlySetSummary.BankedRewards.Count(reward => reward.IsChest && reward.ChestTier == "Boss")} normalCount={earlySetSummary.BankedRewards.Count(reward => reward.IsChest && reward.ChestTier == "Normal")} equipment={earlySetSummary.BankedRewards.Count(reward => reward.Reward.Equipment is not null)}";
     }
 
     private static IEnumerable<string> RunSaveMigrationSmoke()
@@ -306,6 +376,43 @@ public static class FlowSmokeTest
         var distinctIds = invalidLoadoutState.Inventory?.Select(item => item.Id).Distinct().Count() ?? 0;
         yield return $"MIGRATION_INVALID changed={invalidChanged} version={invalidLoadoutState.Version} distinctIds={distinctIds} weapon={invalidLoadoutState.EquipmentLoadout?.WeaponId ?? "none"} accessory={invalidLoadoutState.EquipmentLoadout?.AccessoryId ?? "none"}";
         yield return $"MIGRATION_ENHANCEMENT first={invalidLoadoutState.Inventory![0].EnhancementLevel} second={invalidLoadoutState.Inventory[1].EnhancementLevel}";
+    }
+
+    private static IEnumerable<string> RunTutorialSmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        var start = session.BuildTutorialGuideViewModel();
+        session.AdvanceTutorialFromTown();
+        var afterAccept = session.BuildTutorialGuideViewModel();
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("shoulders", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+        });
+        var afterRoute = session.BuildTutorialGuideViewModel();
+        session.StartOrGetActiveRun();
+        var stage = session.ActiveRun!.CurrentStage;
+        session.RecordStageResult(new RunSummary(
+            "Tutorial Smoke",
+            stage.RoomName,
+            stage.TotalSets,
+            stage.TotalSets,
+            new RewardBundle(RewardSource.DungeonRoom, 40, null),
+            CompletedResults(stage.TotalSets),
+            ClearedCombatResults(stage.TotalSets),
+            24));
+        var afterRoom = session.BuildTutorialGuideViewModel();
+        session.ClaimDailyRewards();
+        var afterClaim = session.BuildTutorialGuideViewModel();
+        session.MarkTutorialTavernVisited();
+        var completed = session.BuildTutorialGuideViewModel();
+        yield return $"TUTORIAL_FLOW start={start.StepId} accept={afterAccept.StepId} route={afterRoute.StepId} room={afterRoom.StepId} claim={afterClaim.StepId} visibleAfterDone={completed.IsVisible}";
+
+        var skippedSession = new GameSession(persistenceEnabled: false);
+        skippedSession.SkipTutorial();
+        yield return $"TUTORIAL_SKIP visible={skippedSession.BuildTutorialGuideViewModel().IsVisible}";
     }
 
     private static IEnumerable<string> RunBodyProfileSmoke()
@@ -858,11 +965,22 @@ public static class FlowSmokeTest
         yield return $"COMBAT_REPS_12_CORE killed={ResolveNormalSetForReps(roomService, catalog, enemyCatalog, 12, "core").EnemyDefeated}";
 
         var levelingPlayer = new PlayerState();
-        levelingPlayer.Load(0, null, level: 1, experience: 292, experienceToNextLevel: 300);
+        levelingPlayer.Load(
+            0,
+            null,
+            level: 1,
+            experience: PlayerState.GetExperienceToNextLevel(1) - 8,
+            experienceToNextLevel: PlayerState.GetExperienceToNextLevel(1));
         var levelsGained = levelingPlayer.AddExperience(44);
         yield return $"COMBAT_LEVEL gained={levelsGained} level={levelingPlayer.Level} exp={levelingPlayer.Experience}/{levelingPlayer.ExperienceToNextLevel} hp={levelingPlayer.MaxHp} attack={levelingPlayer.Attack}";
 
         var expSession = new GameSession(persistenceEnabled: false);
+        expSession.Player.Load(
+            0,
+            null,
+            level: 1,
+            experience: PlayerState.GetExperienceToNextLevel(1) - 8,
+            experienceToNextLevel: PlayerState.GetExperienceToNextLevel(1));
         expSession.UpdateDungeonRoute(new[]
         {
             new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90),
@@ -882,7 +1000,7 @@ public static class FlowSmokeTest
             new[] { evading },
             evading.PlayerHpAfter,
             44));
-        yield return $"COMBAT_SESSION_EXP level={expSession.Player.Level} exp={expSession.Player.Experience}/{expSession.Player.ExperienceToNextLevel}";
+        yield return $"COMBAT_SESSION_EXP level={expSession.Player.Level} exp={expSession.Player.Experience}/{expSession.Player.ExperienceToNextLevel} levelRewards={expSession.LastRunSummary?.LevelUpRewardCount ?? 0} inventory={expSession.Player.Inventory.Count}";
 
         var autoExpSession = new GameSession(persistenceEnabled: false);
         autoExpSession.UpdateDungeonRoute(new[]

@@ -13,7 +13,9 @@ public sealed record RunSummary(
 	IReadOnlyList<CombatSetResult>? CombatResults = null,
 	int? RemainingPlayerHp = null,
 	int ExperienceGained = 0,
-	int LevelsGained = 0)
+	int LevelsGained = 0,
+	int LevelUpRewardCount = 0,
+	int FatigueRewardPercent = 100)
 {
 	public string RewardText => Reward.Equipment is null
 		? HasChest ? $"金幣 +{Reward.Gold}, EXP +{ExperienceGained}, 待開寶箱 {ChestCount}" : $"金幣 +{Reward.Gold}, EXP +{ExperienceGained}"
@@ -36,7 +38,7 @@ public sealed record RunSummary(
 
 	public bool HasPartialSet => EffectiveSetResults.Any(result => result == CompletionResult.Partial);
 
-	public int ChestCount => CombatResults?.Count(result => result.RewardKind == BankedRewardKind.Chest) ?? LegacyChestCount;
+	public int ChestCount => HasCombatResults ? CompletedRoomChestCount : LegacyChestCount;
 
 	public bool HasChest => ChestCount > 0 || Reward.Equipment is not null;
 
@@ -52,7 +54,20 @@ public sealed record RunSummary(
 		return CombatResults[setNumber - 1];
 	}
 
-	private int LegacyChestCount => Reward.Equipment is null ? 0 : 1;
+	private int LegacyChestCount => IsCompletedRoom
+		? System.Math.Min(2, 1 + ((RemainingPlayerHp ?? 0) > 0 && CompletedSets > 1 ? 1 : 0))
+		: Reward.Equipment is null ? 0 : 1;
+
+	private int CompletedRoomChestCount => IsCompletedRoom
+		? FatigueRewardPercent < 100
+			? 1
+			: System.Math.Min(2, 1 + ((RemainingPlayerHp ?? 0) > 0 && CompletedSets > 1 ? 1 : 0))
+		: 0;
+
+	private bool IsCompletedRoom => TotalSets > 0 &&
+		CompletedSets >= TotalSets &&
+		Enumerable.Range(1, TotalSets)
+			.All(set => GetSetResult(set) != CompletionResult.Skipped);
 
 	private IEnumerable<CompletionResult> EffectiveSetResults =>
 		SetResults ?? Enumerable.Repeat(CompletionResult.Completed, CompletedSets);

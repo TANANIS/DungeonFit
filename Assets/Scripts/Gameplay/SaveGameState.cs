@@ -5,7 +5,7 @@ namespace DungeonFit.Gameplay;
 
 public sealed class SaveGameState
 {
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 14;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -13,7 +13,7 @@ public sealed class SaveGameState
 
     public int Experience { get; set; } = 120;
 
-    public int ExperienceToNextLevel { get; set; } = 300;
+    public int ExperienceToNextLevel { get; set; } = 180;
 
     public int Gold { get; set; }
 
@@ -24,6 +24,8 @@ public sealed class SaveGameState
     public List<BodyMetricEntry>? BodyMetrics { get; set; } = new();
 
     public List<DungeonProgressEntry>? DungeonProgress { get; set; } = new();
+
+    public TutorialProgress? Tutorial { get; set; } = new();
 
     public string DailyStateKey { get; set; } = string.Empty;
 

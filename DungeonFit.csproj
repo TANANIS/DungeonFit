@@ -4,6 +4,6 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>DungeonFit</RootNamespace>
     <Nullable>enable</Nullable>
-    <DefaultItemExcludes>$(DefaultItemExcludes);android\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);android\**;Tools\**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

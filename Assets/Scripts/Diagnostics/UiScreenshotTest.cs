@@ -50,7 +50,8 @@ public static class UiScreenshotTest
             session.LastRunSummary,
             session.BuildIdleRewardViewModel(),
             session.GetSaveStatus(),
-            session.BuildBodyProfileViewModel());
+            session.BuildBodyProfileViewModel(),
+            session.BuildTutorialGuideViewModel());
         lines.Add(await TryCapture(parent, town, "Town"));
         lines.Add(await TryCaptureTownProfileOnboarding(parent, session));
         lines.Add(await TryCaptureTownBodyMetricsDialog(parent, session));

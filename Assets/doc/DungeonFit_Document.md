@@ -156,11 +156,11 @@ DungeonFit combat is a reward-efficiency system, not a fail state. The player's 
 
 MVP combat stats are intentionally small:
 
-- Player base HP starts at 24.
-- Player base Attack starts at 3.
+- Player base HP starts at 30.
+- Player base Attack starts at 4.
 - Equipment Attack and HP add onto those base values.
 - Dungeon enemies use fixed normal and boss HP/Attack values per dungeon type.
-- Player level adds slow base growth: MaxHP +2 per level, Attack +1 every two levels.
+- Player level adds early-friendly base growth: MaxHP +3 per level, Attack +1 every two levels.
 - Dungeon level exists on room templates and is fixed to Lv.1 for the first balance pass.
 - Enemy level follows dungeon level. Future dungeon level scaling can increase HP by roughly 8% per level and Attack by +1 every three levels.
 
@@ -176,12 +176,26 @@ If the enemy is defeated before the set ends, the enemy remains at 0 HP and no l
 
 Healing, lifesteal, buffs, defense, hit rate, critical hits, elements, enemy skills, and equipment enhancement are reserved for later passes. Healing hooks may exist in code, but v1 does not require healing equipment to be available.
 
+Current stamina and supply rules:
+
+- Starting a dungeon run refills the player to at least 2 small potions, up to the carry limit.
+- Small potions restore 45% Max HP in the active room.
+- Small potion cost is 35 Gold, with a daily purchase limit of 4 and carry limit of 4.
+- Basic healing costs 60 Gold; full healing costs 140 Gold.
+- Completing a room without withdrawing restores 25% Max HP before the next room if the route continues.
+- Route stages 1-4 are treated as the recommended daily route.
+- Route stages 5+ are long-route fatigue rooms: they still allow training and rewards, but EXP and Gold are reduced to 25%, the alive bonus chest is disabled, and Set Summary labels the fatigue rate.
+
 EXP is awarded at room completion, not daily summary:
 
 - Each completed set grants 8 EXP.
-- Each chest set grants +4 EXP.
-- A Boss chest grants an additional +12 EXP.
+- Partial sets still grant 5 EXP so a finished workout never feels empty.
+- Defeating the enemy in a set grants +4 EXP.
+- A defeated Boss grants an additional +12 EXP; a survived Boss attempt grants +6 EXP.
 - Gold-only sets still grant the base set EXP.
+- The current player level curve starts at 180 EXP to Lv.2 and adds +55 EXP per later level.
+- Set Summary shows a `Level Up` line when the completed room causes one or more player levels.
+- Each player level gained immediately rolls one level-up Boss chest from the completed room's dungeon type and applies that reward to the player inventory.
 - Level-up does not refill active run HP.
 
 ## Reward And Loot
@@ -197,9 +211,14 @@ Reward flow is now separated into preview, banked rewards, and claimed rewards.
 MVP reward rules:
 
 - Each completed set creates a positive reward packet.
-- A chest is created only when the enemy is defeated.
-- If the enemy survives, the set stores a gold-only reward.
-- Chest eligibility and reward packet existence must remain separate concepts.
+- Completing a room without using the in-room withdraw action guarantees one pending dungeon chest, even if player HP reaches 0.
+- A completed room can bank at most two chests.
+- If the player finishes the room alive, the room also banks one bonus chest and the Boss chest uses the high-grade rarity table.
+- If the player finishes with HP at 0, the guaranteed Boss chest still appears, but it uses the lower partial-clear rarity table.
+- Withdrawing before the room is complete does not create a chest.
+- Non-chest completed sets still store gold-only reward packets.
+- Chest eligibility and reward packet existence remain separate concepts.
+- Chest equipment slot, item definition, rarity, and extra modifiers are rolled from the unique chest instance seed, not fixed to set number, so repeated daily routes do not produce the same item pattern forever.
 - Damage and HP update during reps; gold and chest eligibility are still sealed at set end.
 - Banked rewards are not applied immediately.
 - Daily Summary `Open All` applies banked rewards to `PlayerState`.
@@ -223,6 +242,7 @@ Current saved data includes:
 - Player gold.
 - Player level, EXP, and next-level threshold.
 - Player inventory and equipment loadout.
+- Village-chief tutorial progress.
 - Selected dungeon route, only when it belongs to an active run.
 - Active run existence, including the edge case where the player started a route but has not cleared the first room yet.
 - Active run current HP.
@@ -291,17 +311,47 @@ Town is the main hub. MVP functional focus:
 - Enter Dungeon.
 - Idle exploration panel.
 - Last banked reward summary.
+- Village-chief tutorial guidance for the first route and reward loop.
 
 Most buildings can remain decorative until their systems are implemented.
 
 Planned buildings:
 
-- Tavern: equipment review, loadout slots, warehouse inventory, selling, locking.
+- Tavern: equipment review, loadout slots, warehouse inventory, selling, locking, bulk sell common gear, and bulk lock rare-or-better gear.
 - Herb shop: paid healing, potion purchases, and room-challenge supply items.
 - Blacksmith: equipment purchases, enhancement, and extending equipment usable level range.
 - Notice board: optional NPC quests.
 - Church: long-term oath quests, basic NPC dialogue, story, prayer.
 - Moonlight Fountain: daily free recovery and today's blessing buff.
+
+## New Player Tutorial
+
+The first playable tutorial is an in-Town village-chief guide rather than a separate tutorial dungeon. It should feel like a short quest from the town elder, not a manual.
+
+Tutorial speaker:
+
+- `村長 羅文`
+
+Tutorial goal:
+
+- Give the player a concrete first objective: complete a first dungeon route, open the daily reward, then visit Tavern to inspect and organize equipment.
+
+Tutorial steps:
+
+- `welcome`: the village chief introduces the Moonlit Town problem and asks the player to accept the first commission.
+- `plan_route`: sends the player to Dungeon Plan and explains the recommended four-room route length.
+- `clear_room`: tells the player to finish at least one room and clarifies that HP reaching 0 is not a full fail state.
+- `claim_rewards`: points the player to Daily Summary and `Open All`.
+- `visit_tavern`: sends the player to Tavern to review new equipment, sell common gear, or lock rare gear.
+- `completed`: hidden state after the Tavern visit.
+
+Tutorial UX rules:
+
+- The guide is shown as a village-chief card on Town.
+- The player can skip the guide.
+- Tutorial progress is saved.
+- Existing migrated saves with meaningful progress are marked tutorial-complete so returning players are not forced through the new guide.
+- The guide does not block the body-profile onboarding dialog; body-profile setup takes focus first.
 
 ## Remaining Core MVP Systems
 
@@ -502,7 +552,8 @@ Implemented MVP scope:
 - Result panel presenter split.
 - Room audio bridge split.
 - Battle actor / encounter display split.
-- Tavern equipment MVP with character summary, loadout slots, inventory filters/sort, equip, unequip, sell, lock, and save-management panel.
+- Tavern equipment MVP with character summary, loadout slots, inventory filters/sort, equip, unequip, sell, lock, bulk common selling, rare locking, and save-management panel.
+- Village-chief new-player tutorial with saved progress, skip, first-route objective, reward claim direction, and Tavern equipment cleanup direction.
 - Notice Board with six short-term quest cards, detail panel, optional multi-quest acceptance, room-completion progress updates, ready-to-report state, direct gold reward claiming, claimed state persistence, local-date refresh, and Dungeon Plan active quest bonus display.
 - Dungeon Plan helper presenters for grid, route list, and summary state.
 - Banked rewards with Open All claim timing.
@@ -540,7 +591,7 @@ Post-MVP / public-test readiness work:
 - Notice Board final visual polish, visible refresh countdown, and broader reward variety.
 - Android package identity, launcher icons, release signing, and device verification.
 - Precise music loop points, beat offsets, and latency calibration.
-- JSON content loading, analytics, fatigue rules, music unlocks, store/billing decisions, and broader retention tuning.
+- JSON content loading, analytics, music unlocks, store/billing decisions, and broader retention tuning.
 
 ## Current Risks
 

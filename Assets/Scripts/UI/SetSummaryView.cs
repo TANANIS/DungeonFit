@@ -55,6 +55,9 @@ public partial class SetSummaryView : Control
             string.Format(Text.SetsFormat, _summary.Run.CompletedSets, _summary.Run.TotalSets) + "\n" +
             string.Format(Text.GoldPreviewFormat, _summary.Run.Reward.Gold) + "\n" +
             string.Format(Text.ExperienceFormat, _summary.Run.ExperienceGained) + "\n" +
+            BuildFatigueLine(_summary.Run.FatigueRewardPercent) +
+            BuildLevelUpLine(_summary.Run.LevelsGained) +
+            BuildLevelUpRewardLine(_summary.Run.LevelUpRewardCount) +
             string.Format(Text.BankedChestFormat, _summary.BankedChestCount);
 
         var nextLine = _summary.NextStage is null
@@ -105,6 +108,27 @@ public partial class SetSummaryView : Control
         };
     }
 
+    private static string BuildLevelUpLine(int levelsGained)
+    {
+        return levelsGained <= 0
+            ? string.Empty
+            : string.Format(Text.LevelUpFormat, levelsGained) + "\n";
+    }
+
+    private static string BuildFatigueLine(int rewardPercent)
+    {
+        return rewardPercent >= 100
+            ? string.Empty
+            : string.Format(Text.FatigueFormat, rewardPercent) + "\n";
+    }
+
+    private static string BuildLevelUpRewardLine(int rewardCount)
+    {
+        return rewardCount <= 0
+            ? string.Empty
+            : string.Format(Text.LevelUpRewardFormat, rewardCount) + "\n";
+    }
+
     private static class Text
     {
         public const string TitleFormat = "\u623f\u9593 {0} / {1} \u7d50\u7b97";
@@ -113,6 +137,9 @@ public partial class SetSummaryView : Control
         public const string SetsFormat = "\u7d44\u6578 {0} / {1}";
         public const string GoldPreviewFormat = "\u91d1\u5e63\u9810\u89bd +{0}";
         public const string ExperienceFormat = "EXP +{0}";
+        public const string FatigueFormat = "\u9577\u8def\u7dda\u75b2\u52de\uff1aEXP / Gold {0}%\uff0c\u7121\u52a0\u6210\u5bf6\u7bb1";
+        public const string LevelUpFormat = "\u5347\u7d1a\uff01Lv +{0}";
+        public const string LevelUpRewardFormat = "\u5347\u7d1a\u5bf6\u7bb1\u62bd\u734e +{0}";
         public const string BankedChestFormat = "\u5b58\u5165\u5bf6\u7bb1 +{0}";
         public const string RouteCompleteHint = "\u4eca\u65e5\u8def\u7dda\u5df2\u5b8c\u6210\uff0c\u53ef\u524d\u5f80\u7e3d\u7d50\u7b97\u3002";
         public const string NextRoomFormat = "\u4e0b\u4e00\u623f\u9593\uff1a{0}  {1} x {2}  \u4f11\u606f {3}s";

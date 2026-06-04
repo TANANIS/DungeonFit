@@ -180,12 +180,12 @@ public partial class HerbShopView : Control
         public const string Description = "在進入下一段訓練前，整理生命值與小型藥水。";
         public const string HealTitle = "生命恢復";
         public const string HpFormat = "目前 HP  {0} / {1}";
-        public const string BasicHeal = "基礎恢復\n80 Gold";
-        public const string FullHeal = "完全恢復\n180 Gold";
+        public const string BasicHeal = "基礎恢復\n60 Gold";
+        public const string FullHeal = "完全恢復\n140 Gold";
         public const string SupplyTitle = "冒險補給";
-        public const string SupplyDescription = "小型藥水可在房間中恢復 30% HP。";
-        public const string BuyPotion = "購買小型藥水\n50 Gold";
-        public const string SupplyHint = "每日最多購買 3 瓶，進入地城後可在房間中使用。";
+        public const string SupplyDescription = "小型藥水可在房間中恢復 45% HP。";
+        public const string BuyPotion = "購買小型藥水\n35 Gold";
+        public const string SupplyHint = "每日最多購買 4 瓶，進入地城後可在房間中使用。";
         public const string PotionStatusFormat = "持有 {0}  今日購買 {1} / {2}";
     }
 }

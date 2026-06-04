@@ -25,6 +25,12 @@ public sealed class TavernEquipmentViewModel
         InventoryCount = player.Inventory.Count;
         SellableCount = InventoryItems.Count(item => item.CanSell);
         SellableValue = InventoryItems.Where(item => item.CanSell).Sum(item => item.SellPrice);
+        CommonSellableCount = AllInventoryItems.Count(item => item.Rarity == "\u666e\u901a" && item.CanSell);
+        CommonSellableValue = AllInventoryItems
+            .Where(item => item.Rarity == "\u666e\u901a" && item.CanSell)
+            .Sum(item => item.SellPrice);
+        RareUnlockedCount = AllInventoryItems
+            .Count(item => IsRareOrBetter(item.Rarity) && !item.IsLocked && !item.IsEquipped);
         Filter = filter;
         Sort = sort;
     }
@@ -44,6 +50,12 @@ public sealed class TavernEquipmentViewModel
     public int SellableCount { get; }
 
     public int SellableValue { get; }
+
+    public int CommonSellableCount { get; }
+
+    public int CommonSellableValue { get; }
+
+    public int RareUnlockedCount { get; }
 
     public EquipmentInventoryFilter Filter { get; }
 
@@ -203,6 +215,11 @@ public sealed class TavernEquipmentViewModel
             "\u666e\u901a" => 2,
             _ => 3,
         };
+    }
+
+    private static bool IsRareOrBetter(string rarity)
+    {
+        return rarity is "\u7a00\u6709" or "\u53f2\u8a69";
     }
 }
 

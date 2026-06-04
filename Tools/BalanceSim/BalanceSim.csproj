@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**\bin\**;**\obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Assets\Scripts\Core\**\*.cs" LinkBase="Core" />
+    <Compile Include="..\..\Assets\Scripts\Gameplay\BlacksmithRules.cs" Link="Gameplay\BlacksmithRules.cs" />
+    <Compile Include="..\..\Assets\Scripts\Gameplay\DungeonRunService.cs" Link="Gameplay\DungeonRunService.cs" />
+    <Compile Include="..\..\Assets\Scripts\Gameplay\RoomRunService.cs" Link="Gameplay\RoomRunService.cs" />
+  </ItemGroup>
+</Project>

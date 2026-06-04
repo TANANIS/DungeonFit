@@ -15,6 +15,8 @@ public partial class TavernView : Control
     public event Action<EquipmentSlot>? UnequipRequested;
     public event Action<string>? SellRequested;
     public event Action<string, bool>? LockChanged;
+    public event Action? SellCommonRequested;
+    public event Action? LockRareRequested;
     public event Action<EquipmentInventoryFilter, EquipmentInventorySort>? ViewChanged;
 
     private TavernEquipmentViewModel _model = null!;
@@ -35,6 +37,8 @@ public partial class TavernView : Control
     private Button _equipButton = null!;
     private Button _sellButton = null!;
     private Button _lockButton = null!;
+    private Button _sellCommonButton = null!;
+    private Button _lockRareButton = null!;
     private OptionButton _filterOption = null!;
     private OptionButton _sortOption = null!;
     private SaveStatus? _saveStatus;
@@ -90,6 +94,8 @@ public partial class TavernView : Control
         _lockButton = GetNode<Button>("%LockButton");
         _filterOption = GetNode<OptionButton>("%FilterOption");
         _sortOption = GetNode<OptionButton>("%SortOption");
+        _sellCommonButton = GetNode<Button>("%SellCommonButton");
+        _lockRareButton = GetNode<Button>("%LockRareButton");
         ApplyArtStyles();
     }
 
@@ -100,6 +106,8 @@ public partial class TavernView : Control
         _equipButton.Pressed += OnEquipPressed;
         _sellButton.Pressed += OnSellPressed;
         _lockButton.Pressed += OnLockPressed;
+        _sellCommonButton.Pressed += () => SellCommonRequested?.Invoke();
+        _lockRareButton.Pressed += () => LockRareRequested?.Invoke();
 
         AddFilterOption(Text.All, EquipmentInventoryFilter.All);
         AddFilterOption(Text.Weapon, EquipmentInventoryFilter.Weapon);
@@ -139,6 +147,7 @@ public partial class TavernView : Control
         SelectOption(_sortOption, (int)_sort);
         RefreshEquipped();
         RefreshInventory();
+        RefreshBulkActions();
         RefreshDetail();
     }
 
@@ -246,6 +255,17 @@ public partial class TavernView : Control
         _sellButton.Disabled = !item.CanSell;
         _lockButton.Disabled = item.IsEquipped;
         _lockButton.Text = item.IsLocked ? Text.Unlock : Text.Lock;
+    }
+
+    private void RefreshBulkActions()
+    {
+        _sellCommonButton.Text = string.Format(
+            Text.SellCommonFormat,
+            _model.CommonSellableCount,
+            _model.CommonSellableValue);
+        _sellCommonButton.Disabled = _model.CommonSellableCount <= 0;
+        _lockRareButton.Text = string.Format(Text.LockRareFormat, _model.RareUnlockedCount);
+        _lockRareButton.Disabled = _model.RareUnlockedCount <= 0;
     }
 
     private void RefreshDetailIcon(string iconPath)
@@ -473,6 +493,8 @@ public partial class TavernView : Control
         DungeonFitUi.ApplyButton(_equipButton, UiButtonStyle.Primary);
         DungeonFitUi.ApplyButton(_sellButton, UiButtonStyle.Danger);
         DungeonFitUi.ApplyButton(_lockButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(_sellCommonButton, UiButtonStyle.Danger);
+        DungeonFitUi.ApplyButton(_lockRareButton, UiButtonStyle.Secondary);
         DungeonFitUi.ApplyProgressBar(_expBar, new Color(0.48f, 0.82f, 0.58f));
     }
 
@@ -514,6 +536,8 @@ public partial class TavernView : Control
         public const string Equip = "\u88dd\u5099";
         public const string Unequip = "\u5378\u4e0b";
         public const string Sell = "\u51fa\u552e";
+        public const string SellCommonFormat = "\u552e\u666e\u901a {0} (+{1}G)";
+        public const string LockRareFormat = "\u9396\u7a00\u6709 {0}";
         public const string Lock = "\u9396\u5b9a";
         public const string Unlock = "\u89e3\u9396";
         public const string SettingsTitle = "\u8a2d\u5b9a";

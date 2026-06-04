@@ -21,12 +21,15 @@ public partial class TownView : Control
     public event Action? DeleteSaveRequested;
     public event Action<int, string, double?>? ProfileSaved;
     public event Action<double>? TodayWeightSaved;
+    public event Action<string>? TutorialPrimaryRequested;
+    public event Action? TutorialSkipped;
 
     private PlayerState _player = new();
     private DungeonPlan _todayPlan = null!;
     private RunSummary? _lastRunSummary;
     private IdleRewardViewModel _idleReward = new(0, 72, 10, false, string.Empty);
     private BodyProfileViewModel _bodyProfile = BodyProfileViewModel.Empty;
+    private TutorialGuideViewModel _tutorialGuide = TutorialGuideViewModel.Empty;
     private SaveStatus? _saveStatus;
     private Label _levelLabel = null!;
     private Label _goldLabel = null!;
@@ -38,6 +41,13 @@ public partial class TownView : Control
     private Label _saveStatusLabel = null!;
     private PanelContainer _settingsPanel = null!;
     private PanelContainer _bodyPanel = null!;
+    private PanelContainer _tutorialPanel = null!;
+    private Label _tutorialSpeaker = null!;
+    private Label _tutorialTitle = null!;
+    private Label _tutorialBody = null!;
+    private Label _tutorialGoal = null!;
+    private Button _tutorialPrimaryButton = null!;
+    private Button _tutorialSecondaryButton = null!;
     private Label _bodyDialogError = null!;
     private Label _bodyDialogAdvice = null!;
     private LineEdit _heightInput = null!;
@@ -93,6 +103,7 @@ public partial class TownView : Control
         ApplyArtStyles();
         BuildSettingsPanel();
         BuildBodyPanel();
+        BuildTutorialPanel();
         Refresh();
     }
 
@@ -102,7 +113,8 @@ public partial class TownView : Control
         RunSummary? lastRunSummary,
         IdleRewardViewModel idleReward,
         SaveStatus saveStatus,
-        BodyProfileViewModel? bodyProfile = null)
+        BodyProfileViewModel? bodyProfile = null,
+        TutorialGuideViewModel? tutorialGuide = null)
     {
         _player = player;
         _todayPlan = todayPlan;
@@ -110,6 +122,7 @@ public partial class TownView : Control
         _idleReward = idleReward;
         _saveStatus = saveStatus;
         _bodyProfile = bodyProfile ?? BodyProfileViewModel.Empty;
+        _tutorialGuide = tutorialGuide ?? TutorialGuideViewModel.Empty;
         _hasInitialized = true;
 
         if (IsNodeReady())
@@ -153,6 +166,7 @@ public partial class TownView : Control
                 _lastRunSummary.ExperienceGained);
         RefreshSaveStatus();
         MaybeShowOnboarding();
+        MaybeShowTutorial();
     }
 
     public bool SmokeOpenProfileOnboarding()
@@ -220,6 +234,27 @@ public partial class TownView : Control
 
         _onboardingPromptShown = true;
         ShowProfileDialog(onboarding: true);
+    }
+
+    private void MaybeShowTutorial()
+    {
+        if (_tutorialPanel is null ||
+            !_hasInitialized ||
+            !_tutorialGuide.IsVisible ||
+            _settingsPanel.Visible ||
+            _bodyPanel.Visible)
+        {
+            if (_tutorialPanel is not null)
+            {
+                _tutorialPanel.Visible = false;
+            }
+
+            return;
+        }
+
+        RefreshTutorialPanel();
+        _tutorialPanel.Visible = true;
+        _tutorialPanel.MoveToFront();
     }
 
     private void RefreshSaveStatus()
@@ -347,6 +382,74 @@ public partial class TownView : Control
         DungeonFitUi.ApplyPanel(_bodyPanel, UiPanelStyle.Overlay);
         AddChild(_bodyPanel);
         _bodyPanel.MoveToFront();
+    }
+
+    private void BuildTutorialPanel()
+    {
+        _tutorialPanel = new PanelContainer
+        {
+            Name = "TutorialPanel",
+            Visible = false,
+            MouseFilter = MouseFilterEnum.Stop,
+        };
+        _tutorialPanel.SetAnchor(Side.Left, 0);
+        _tutorialPanel.SetAnchor(Side.Top, 1);
+        _tutorialPanel.SetAnchor(Side.Right, 1);
+        _tutorialPanel.SetAnchor(Side.Bottom, 1);
+        _tutorialPanel.OffsetLeft = 28;
+        _tutorialPanel.OffsetTop = -360;
+        _tutorialPanel.OffsetRight = -28;
+        _tutorialPanel.OffsetBottom = -24;
+        DungeonFitUi.ApplyPanel(_tutorialPanel, UiPanelStyle.Main);
+        AddChild(_tutorialPanel);
+        _tutorialPanel.MoveToFront();
+
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 24);
+        margin.AddThemeConstantOverride("margin_top", 20);
+        margin.AddThemeConstantOverride("margin_right", 24);
+        margin.AddThemeConstantOverride("margin_bottom", 20);
+        _tutorialPanel.AddChild(margin);
+
+        var layout = new VBoxContainer();
+        layout.AddThemeConstantOverride("separation", 10);
+        margin.AddChild(layout);
+
+        _tutorialSpeaker = CreateTutorialLabel(string.Empty, 23, HorizontalAlignment.Left);
+        _tutorialSpeaker.AddThemeColorOverride("font_color", new Color(0.75f, 0.9f, 1f));
+        layout.AddChild(_tutorialSpeaker);
+
+        _tutorialTitle = CreateTutorialLabel(string.Empty, 34, HorizontalAlignment.Left);
+        layout.AddChild(_tutorialTitle);
+
+        _tutorialBody = CreateTutorialLabel(string.Empty, 24, HorizontalAlignment.Left);
+        layout.AddChild(_tutorialBody);
+
+        _tutorialGoal = CreateTutorialLabel(string.Empty, 23, HorizontalAlignment.Left);
+        _tutorialGoal.AddThemeColorOverride("font_color", new Color(0.98f, 0.88f, 0.58f));
+        layout.AddChild(_tutorialGoal);
+
+        var actions = new HBoxContainer();
+        actions.AddThemeConstantOverride("separation", 12);
+        layout.AddChild(actions);
+
+        _tutorialSecondaryButton = CreateTutorialButton(string.Empty, UiButtonStyle.Secondary);
+        _tutorialSecondaryButton.Pressed += () => TutorialSkipped?.Invoke();
+        actions.AddChild(_tutorialSecondaryButton);
+
+        _tutorialPrimaryButton = CreateTutorialButton(string.Empty, UiButtonStyle.Primary);
+        _tutorialPrimaryButton.Pressed += () => TutorialPrimaryRequested?.Invoke(_tutorialGuide.StepId);
+        actions.AddChild(_tutorialPrimaryButton);
+    }
+
+    private void RefreshTutorialPanel()
+    {
+        _tutorialSpeaker.Text = _tutorialGuide.SpeakerName;
+        _tutorialTitle.Text = _tutorialGuide.Title;
+        _tutorialBody.Text = _tutorialGuide.Body;
+        _tutorialGoal.Text = _tutorialGuide.GoalText;
+        _tutorialPrimaryButton.Text = _tutorialGuide.PrimaryActionText;
+        _tutorialSecondaryButton.Text = _tutorialGuide.SecondaryActionText;
     }
 
     private void ShowProfileDialog(bool onboarding)
@@ -643,6 +746,7 @@ public partial class TownView : Control
     private void HideBodyPanel()
     {
         _bodyPanel.Visible = false;
+        MaybeShowTutorial();
     }
 
     private static void ClearChildren(Node node)
@@ -663,6 +767,31 @@ public partial class TownView : Control
         button.AddThemeFontSizeOverride("font_size", 27);
         DungeonFitUi.ApplyButton(button, UiButtonStyle.Secondary);
         button.Pressed += () => IdleRewardClaimed?.Invoke();
+        return button;
+    }
+
+    private static Label CreateTutorialLabel(string text, int fontSize, HorizontalAlignment alignment)
+    {
+        var label = new Label
+        {
+            Text = text,
+            HorizontalAlignment = alignment,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeFontSizeOverride("font_size", fontSize);
+        return label;
+    }
+
+    private static Button CreateTutorialButton(string text, UiButtonStyle style)
+    {
+        var button = new Button
+        {
+            Text = text,
+            CustomMinimumSize = new Vector2(0, 72),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        };
+        button.AddThemeFontSizeOverride("font_size", 25);
+        DungeonFitUi.ApplyButton(button, style);
         return button;
     }
 

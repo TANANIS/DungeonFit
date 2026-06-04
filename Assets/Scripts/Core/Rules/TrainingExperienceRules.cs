@@ -24,7 +24,7 @@ public static class TrainingExperienceRules
                     _ => 2,
                 };
 
-                if (result.RewardKind == BankedRewardKind.Chest)
+                if (result.EnemyDefeated)
                 {
                     experience += 4;
                 }

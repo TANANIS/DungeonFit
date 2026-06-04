@@ -3,3 +3,5 @@
 /android/
 /APK/*.apk
 /.codex-remote-attachments/
+bin/
+obj/

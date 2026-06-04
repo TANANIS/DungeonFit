@@ -16,12 +16,12 @@ public sealed class DungeonLootProfileCatalog
     private static readonly DungeonChestLootRule BossChest = new(
         Gold: 20,
         DropsEquipment: true,
-        RarityTable: new RarityDropTable(52, 36, 12));
+        RarityTable: new RarityDropTable(30, 50, 20));
 
     private static readonly DungeonChestLootRule PartialBossChest = new(
         Gold: 15,
         DropsEquipment: true,
-        RarityTable: new RarityDropTable(75, 23, 2),
+        RarityTable: new RarityDropTable(80, 18, 2),
         ExtraModifierPenalty: 1);
 
     private readonly DungeonLootProfile[] _profiles =

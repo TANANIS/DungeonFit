@@ -11,13 +11,18 @@ namespace DungeonFit.Gameplay;
 public sealed class GameSession
 {
     private const double MoonlightRecoveryPercent = 0.5;
+    private const double RoomRecoveryPercent = 0.25;
     private const double BasicHealPercent = 0.4;
-    private const double SmallPotionHealPercent = 0.3;
-    private const int BasicHealCost = 80;
-    private const int FullHealCost = 180;
-    private const int SmallPotionCost = 50;
-    private const int SmallPotionDailyPurchaseLimit = 3;
-    private const int SmallPotionCarryLimit = 3;
+    private const double SmallPotionHealPercent = 0.45;
+    private const int BasicHealCost = 60;
+    private const int FullHealCost = 140;
+    private const int SmallPotionCost = 35;
+    private const int SmallPotionDailyPurchaseLimit = 4;
+    private const int SmallPotionCarryLimit = 4;
+    private const int StarterSmallPotionCount = 2;
+    private const int RecommendedRouteStages = 4;
+    private const int FatiguedRewardPercent = 25;
+    private const double FatiguedRewardMultiplier = 0.25;
     private const int IdleRewardIntervalMinutes = 10;
     private const int IdleRewardGoldPerInterval = 1;
     private const int IdleRewardMaxUnclaimedGold = 72;
@@ -25,6 +30,7 @@ public sealed class GameSession
     private readonly TaskCatalog _taskCatalog = new();
     private readonly DungeonRunService _dungeonRunService = new();
     private readonly DungeonRouteRules _routeRules = new();
+    private readonly LootRoller _lootRoller = new();
     private readonly ShortTermQuestCatalog _shortTermQuestCatalog = new();
     private readonly LongTermQuestCatalog _longTermQuestCatalog = new();
     private readonly SaveService _saveService = new();
@@ -39,6 +45,7 @@ public sealed class GameSession
     private DateTime _idleLastCalculatedAtUtc;
     private int _unclaimedIdleGold;
     private PlayerProfile _profile = CreateIncompleteProfile();
+    private TutorialProgress _tutorial = new();
     private readonly List<BodyMetricEntry> _bodyMetrics = new();
     private readonly List<DungeonProgressEntry> _dungeonProgress = new();
 
@@ -131,6 +138,7 @@ public sealed class GameSession
         ClaimedLongTermQuestIds = new List<string>();
         UnlockedTitles = new List<string>();
         _profile = CreateIncompleteProfile();
+        _tutorial = new TutorialProgress();
         _bodyMetrics.Clear();
         _dungeonProgress.Clear();
         _noticeBoardRefreshKey = GetTodayRefreshKey();
@@ -318,6 +326,11 @@ public sealed class GameSession
 
         SelectedDungeonRoute = route;
         SelectedPlan = CreateLeveledPlan(SelectedDungeonRoute);
+        if (!AdvanceTutorial(TutorialStepIds.PlanRoute, TutorialStepIds.ClearRoom))
+        {
+            AdvanceTutorial(TutorialStepIds.Welcome, TutorialStepIds.ClearRoom);
+        }
+
         Save();
     }
 
@@ -330,6 +343,7 @@ public sealed class GameSession
 
         if (ActiveRun is null)
         {
+            RefillStarterSupplies();
             ActiveRun = _dungeonRunService.Start(SelectedPlan, Player.CurrentHp);
             DailyRewardsClaimed = false;
             Save();
@@ -347,16 +361,22 @@ public sealed class GameSession
     {
         RefreshNoticeBoardIfExpired();
         var appliedSummary = EnsureTrainingExperience(summary);
-        LastRunSummary = appliedSummary;
 
         if (ActiveRun is not null)
         {
+            appliedSummary = ApplyRouteFatigue(ActiveRun, appliedSummary);
+            LastRunSummary = appliedSummary;
             var completedStage = ActiveRun.CurrentStage;
             LastSetSummary = _dungeonRunService.RecordStageResult(ActiveRun, appliedSummary);
             var levelsGained = Player.AddExperience(appliedSummary.ExperienceGained);
             if (levelsGained > 0)
             {
-                var updatedRun = appliedSummary with { LevelsGained = levelsGained };
+                var levelUpRewards = GrantLevelUpRewards(completedStage, levelsGained);
+                var updatedRun = appliedSummary with
+                {
+                    LevelsGained = levelsGained,
+                    LevelUpRewardCount = levelUpRewards,
+                };
                 LastRunSummary = updatedRun;
                 LastSetSummary = LastSetSummary with { Run = updatedRun };
                 appliedSummary = updatedRun;
@@ -367,10 +387,21 @@ public sealed class GameSession
                 Player.SetCurrentHp(appliedSummary.RemainingPlayerHp.Value);
             }
 
+            ApplyRoomRecovery(appliedSummary);
+
             UpdateShortTermQuestProgress(completedStage, appliedSummary);
             UpdateLongTermQuestProgress(completedStage, appliedSummary);
             UpdateDungeonProgress(completedStage, appliedSummary);
+            if (IsRoomCompleted(appliedSummary))
+            {
+                AdvanceTutorial(TutorialStepIds.ClearRoom, TutorialStepIds.ClaimRewards);
+            }
+
             Save();
+        }
+        else
+        {
+            LastRunSummary = appliedSummary;
         }
     }
 
@@ -404,6 +435,80 @@ public sealed class GameSession
                 summary.TotalSets,
                 summary.CombatResults),
         };
+    }
+
+    private static RunSummary ApplyRouteFatigue(DungeonRun run, RunSummary summary)
+    {
+        var completedStageNumber = run.CurrentStageIndex + 1;
+        if (completedStageNumber <= RecommendedRouteStages)
+        {
+            return summary;
+        }
+
+        var scaledCombatResults = summary.CombatResults?
+            .Select(result => result with { Gold = ScaleFatiguedReward(result.Gold) })
+            .ToArray();
+        var scaledGold = scaledCombatResults is { Length: > 0 }
+            ? scaledCombatResults.Sum(result => result.Gold)
+            : ScaleFatiguedReward(summary.Reward.Gold);
+
+        return summary with
+        {
+            Reward = summary.Reward with { Gold = scaledGold },
+            CombatResults = scaledCombatResults,
+            ExperienceGained = ScaleFatiguedReward(summary.ExperienceGained),
+            FatigueRewardPercent = FatiguedRewardPercent,
+        };
+    }
+
+    private static int ScaleFatiguedReward(int value)
+    {
+        return value <= 0
+            ? 0
+            : Math.Max(1, (int)Math.Ceiling(value * FatiguedRewardMultiplier));
+    }
+
+    private int GrantLevelUpRewards(TaskTemplate completedStage, int levelsGained)
+    {
+        var rewardCount = 0;
+        for (var level = 1; level <= levelsGained; level++)
+        {
+            var chest = new DungeonChest(
+                $"{completedStage.Id}_level_up_{Player.Level}_{level}",
+                "Boss",
+                completedStage.Id,
+                completedStage.DungeonTypeId,
+                $"level_up_{Guid.NewGuid():N}",
+                CompletionResult.Completed,
+                Player.Level + level);
+            Player.Apply(_lootRoller.RollDungeonChest(chest));
+            rewardCount++;
+        }
+
+        return rewardCount;
+    }
+
+    private void ApplyRoomRecovery(RunSummary summary)
+    {
+        if (ActiveRun is null ||
+            ActiveRun.IsComplete ||
+            !IsRoomCompleted(summary))
+        {
+            return;
+        }
+
+        var healed = Player.HealPercent(RoomRecoveryPercent);
+        if (healed > 0)
+        {
+            ActiveRun.RestorePlayerHp(Player.CurrentHp);
+        }
+    }
+
+    private void RefillStarterSupplies()
+    {
+        _smallPotionCount = Math.Max(
+            _smallPotionCount,
+            Math.Min(SmallPotionCarryLimit, StarterSmallPotionCount));
     }
 
     private DungeonPlan CreateLeveledPlan(IEnumerable<DungeonRouteSlot> route)
@@ -746,6 +851,104 @@ public sealed class GameSession
         return new TavernEquipmentViewModel(Player, filter, sort);
     }
 
+    public TutorialGuideViewModel BuildTutorialGuideViewModel()
+    {
+        if (_tutorial.IsCompleted || _tutorial.IsSkipped)
+        {
+            return TutorialGuideViewModel.Empty;
+        }
+
+        return _tutorial.StepId switch
+        {
+            TutorialStepIds.Welcome => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.Welcome,
+                "村長 羅文",
+                "月鎮的新委託",
+                "你醒得正好。月鎮外的地城又開始發光了，我需要一位能把訓練變成冒險的人。先不用逞強，今天的目標很單純：完成第一條訓練路線，帶回寶箱。",
+                "目標：完成一次地城路線，打開每日獎勵，回酒館整理裝備。",
+                "接受委託",
+                "跳過引導"),
+            TutorialStepIds.PlanRoute => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.PlanRoute,
+                "村長 羅文",
+                "先規劃今天的路線",
+                "先從熟悉的胸、肩、核心或手臂地城開始。四個房間是今日推薦長度；想多練也可以，但第五房以後會進入疲勞收益。",
+                "目標：進入地城規劃，排出一條可以開始的路線。",
+                "前往地城規劃",
+                "跳過引導"),
+            TutorialStepIds.ClearRoom => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.ClearRoom,
+                "村長 羅文",
+                "完成第一個房間",
+                "每一組動作都會推進戰鬥。HP 到 0 不會讓今天白費；只要沒有中途放棄，完成房間就有保底寶箱。",
+                "目標：完成至少一個房間，看看 Set Summary 的 EXP、金幣與寶箱。",
+                "繼續訓練",
+                "跳過引導"),
+            TutorialStepIds.ClaimRewards => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.ClaimRewards,
+                "村長 羅文",
+                "把獎勵帶回來",
+                "寶箱和金幣會先存在每日總結裡。記得按下 Open All，裝備和金幣才會真正進到角色身上。",
+                "目標：前往每日總結，打開今天的獎勵。",
+                "查看總結算",
+                "跳過引導"),
+            TutorialStepIds.VisitTavern => new TutorialGuideViewModel(
+                true,
+                TutorialStepIds.VisitTavern,
+                "村長 羅文",
+                "去酒館整理裝備",
+                "冒險者不只靠肌肉，也靠整理背包。去酒館看看新裝備，普通裝可以賣掉，稀有裝可以先鎖起來。",
+                "目標：進入酒館，確認裝備、出售普通裝或鎖定稀有裝。",
+                "前往酒館",
+                "結束引導"),
+            _ => TutorialGuideViewModel.Empty,
+        };
+    }
+
+    public void AdvanceTutorialFromTown()
+    {
+        AdvanceTutorial(TutorialStepIds.Welcome, TutorialStepIds.PlanRoute);
+        Save();
+    }
+
+    public void SkipTutorial()
+    {
+        _tutorial = TutorialProgress.Completed();
+        _tutorial.IsSkipped = true;
+        Save();
+    }
+
+    public void MarkTutorialTavernVisited()
+    {
+        if (AdvanceTutorial(TutorialStepIds.VisitTavern, TutorialStepIds.Completed))
+        {
+            _tutorial.IsCompleted = true;
+            Save();
+        }
+    }
+
+    private bool AdvanceTutorial(string expectedStepId, string nextStepId)
+    {
+        if (_tutorial.IsSkipped ||
+            _tutorial.IsCompleted ||
+            _tutorial.StepId != expectedStepId)
+        {
+            return false;
+        }
+
+        _tutorial.StepId = nextStepId;
+        if (nextStepId == TutorialStepIds.Completed)
+        {
+            _tutorial.IsCompleted = true;
+        }
+
+        return true;
+    }
+
     public BlacksmithViewModel BuildBlacksmithViewModel(string? selectedItemId = null)
     {
         return new BlacksmithViewModel(Player, selectedItemId);
@@ -764,6 +967,7 @@ public sealed class GameSession
         }
 
         DailyRewardsClaimed = true;
+        AdvanceTutorial(TutorialStepIds.ClaimRewards, TutorialStepIds.VisitTavern);
         Save();
     }
 
@@ -801,6 +1005,30 @@ public sealed class GameSession
         }
 
         return changed;
+    }
+
+    public int LockRareEquipment()
+    {
+        var changedCount = 0;
+        foreach (var item in Player.Inventory)
+        {
+            if (!IsRareOrBetter(item.Rarity) || item.IsLocked || Player.IsEquipped(item.Id))
+            {
+                continue;
+            }
+
+            if (Player.SetEquipmentLocked(item.Id, true))
+            {
+                changedCount++;
+            }
+        }
+
+        if (changedCount > 0)
+        {
+            Save();
+        }
+
+        return changedCount;
     }
 
     public bool EnhanceEquipment(string itemId)
@@ -881,6 +1109,15 @@ public sealed class GameSession
         return soldCount;
     }
 
+    public int SellCommonEquipment()
+    {
+        var itemIds = Player.Inventory
+            .Where(item => item.Rarity == "\u666e\u901a" && !item.IsLocked && !Player.IsEquipped(item.Id))
+            .Select(item => item.Id)
+            .ToArray();
+        return SellUnlockedEquipment(itemIds);
+    }
+
     public void CompleteDailyRun()
     {
         ActiveRun = null;
@@ -917,6 +1154,7 @@ public sealed class GameSession
         _idleLastCalculatedAtUtc = NormalizeUtc(state.IdleLastCalculatedAtUtc ?? GetUtcNow());
         _unclaimedIdleGold = Math.Clamp(state.UnclaimedIdleGold, 0, IdleRewardMaxUnclaimedGold);
         _profile = state.Profile!;
+        _tutorial = state.Tutorial!;
         _bodyMetrics.Clear();
         _bodyMetrics.AddRange(state.BodyMetrics!);
         _dungeonProgress.Clear();
@@ -975,6 +1213,7 @@ public sealed class GameSession
     public static bool NormalizeSaveState(SaveGameState state)
     {
         var changed = false;
+        var originalVersion = state.Version;
 
         if (state.Version != SaveGameState.CurrentVersion)
         {
@@ -994,8 +1233,17 @@ public sealed class GameSession
             changed = true;
         }
 
-        if (state.ExperienceToNextLevel <= 0)
+        var expectedExperienceToNext = PlayerState.GetExperienceToNextLevel(state.Level);
+        if (state.ExperienceToNextLevel != expectedExperienceToNext)
         {
+            state.ExperienceToNextLevel = expectedExperienceToNext;
+            changed = true;
+        }
+
+        while (state.Experience >= state.ExperienceToNextLevel)
+        {
+            state.Experience -= state.ExperienceToNextLevel;
+            state.Level++;
             state.ExperienceToNextLevel = PlayerState.GetExperienceToNextLevel(state.Level);
             changed = true;
         }
@@ -1084,6 +1332,7 @@ public sealed class GameSession
             changed = true;
         }
 
+        changed = NormalizeTutorialState(state, originalVersion) || changed;
         changed = NormalizeBodyProfileState(state) || changed;
         changed = NormalizeDungeonProgressState(state) || changed;
         changed = NormalizeInventory(state.Inventory) || changed;
@@ -1202,6 +1451,47 @@ public sealed class GameSession
         };
     }
 
+    private static bool NormalizeTutorialState(SaveGameState state, int originalVersion)
+    {
+        if (state.Tutorial is null)
+        {
+            state.Tutorial = ShouldCompleteTutorialForMigratedSave(state, originalVersion)
+                ? TutorialProgress.Completed()
+                : new TutorialProgress();
+            return true;
+        }
+
+        var changed = false;
+        if (!TutorialStepIds.IsValid(state.Tutorial.StepId))
+        {
+            state.Tutorial.StepId = TutorialStepIds.Welcome;
+            changed = true;
+        }
+
+        if (state.Tutorial.IsCompleted || state.Tutorial.IsSkipped)
+        {
+            if (state.Tutorial.StepId != TutorialStepIds.Completed)
+            {
+                state.Tutorial.StepId = TutorialStepIds.Completed;
+                changed = true;
+            }
+
+            state.Tutorial.IsCompleted = true;
+            return changed;
+        }
+
+        return changed;
+    }
+
+    private static bool ShouldCompleteTutorialForMigratedSave(SaveGameState state, int originalVersion)
+    {
+        return originalVersion < SaveGameState.CurrentVersion &&
+            (state.Level > 1 ||
+                state.Inventory?.Count > 0 ||
+                state.ActiveStageResults?.Count > 0 ||
+                state.LastRunSummary is not null);
+    }
+
     private static bool NormalizeBodyProfileState(SaveGameState state)
     {
         var changed = false;
@@ -1293,6 +1583,11 @@ public sealed class GameSession
             metric.DateKey.Length == 10 &&
             metric.WeightKg >= BodyMetricEntry.MinWeightKg &&
             metric.WeightKg <= BodyMetricEntry.MaxWeightKg;
+    }
+
+    private static bool IsRareOrBetter(string rarity)
+    {
+        return rarity is "\u7a00\u6709" or "\u53f2\u8a69";
     }
 
     private static bool NormalizeDungeonProgressState(SaveGameState state)
@@ -1397,6 +1692,7 @@ public sealed class GameSession
             DungeonProgress = _dungeonProgress
                 .Select(CloneDungeonProgress)
                 .ToList(),
+            Tutorial = CloneTutorial(_tutorial),
             DailyStateKey = _dailyStateKey,
             MoonlightRecoveryUsed = _moonlightRecoveryUsed,
             DailyBlessingId = Player.DailyBlessingId,
@@ -1651,6 +1947,16 @@ public sealed class GameSession
         };
     }
 
+    private static TutorialProgress CloneTutorial(TutorialProgress tutorial)
+    {
+        return new TutorialProgress
+        {
+            StepId = tutorial.StepId,
+            IsSkipped = tutorial.IsSkipped,
+            IsCompleted = tutorial.IsCompleted,
+        };
+    }
+
     private static DungeonProgressEntry CloneDungeonProgress(DungeonProgressEntry entry)
     {
         return new DungeonProgressEntry
@@ -1767,6 +2073,14 @@ public sealed class GameSession
             summary.CompletedSets >= summary.TotalSets &&
             Enumerable.Range(1, summary.TotalSets)
                 .All(setNumber => summary.GetSetResult(setNumber) == CompletionResult.Completed);
+    }
+
+    private static bool IsRoomCompleted(RunSummary summary)
+    {
+        return summary.TotalSets > 0 &&
+            summary.CompletedSets >= summary.TotalSets &&
+            Enumerable.Range(1, summary.TotalSets)
+                .All(setNumber => summary.GetSetResult(setNumber) != CompletionResult.Skipped);
     }
 
     private ActiveShortTermQuest ClaimShortTermQuestReward(

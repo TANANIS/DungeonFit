@@ -29,8 +29,9 @@ public partial class Main : Control
     public async override void _Ready()
     {
         GD.Print("DungeonFit entry loaded.");
+        var userArgs = OS.GetCmdlineUserArgs();
 
-        if (OS.GetCmdlineUserArgs().Contains("--ui-screenshot-test"))
+        if (userArgs.Contains("--ui-screenshot-test"))
         {
             foreach (var line in await UiScreenshotTest.Run(this))
             {
@@ -41,7 +42,7 @@ public partial class Main : Control
             return;
         }
 
-        if (OS.GetCmdlineUserArgs().Contains("--flow-smoke-test"))
+        if (userArgs.Contains("--flow-smoke-test"))
         {
             foreach (var line in FlowSmokeTest.RunDefaultPlanProgression())
             {
@@ -56,6 +57,7 @@ public partial class Main : Control
             GetTree().Quit();
             return;
         }
+
         _session = new GameSession();
         ShowTown();
     }
@@ -70,7 +72,8 @@ public partial class Main : Control
             _session.LastRunSummary,
             _session.BuildIdleRewardViewModel(),
             _session.GetSaveStatus(),
-            _session.BuildBodyProfileViewModel());
+            _session.BuildBodyProfileViewModel(),
+            _session.BuildTutorialGuideViewModel());
         town.EnterDungeonRequested += ShowDungeonPlan;
         town.NoticeBoardRequested += ShowNoticeBoard;
         town.TavernRequested += () => ShowTavern();
@@ -96,6 +99,32 @@ public partial class Main : Control
             _session.RecordTodayWeight(weightKg);
             ShowTown();
         };
+        town.TutorialPrimaryRequested += HandleTutorialPrimaryAction;
+        town.TutorialSkipped += () =>
+        {
+            _session.SkipTutorial();
+            ShowTown();
+        };
+    }
+
+    private void HandleTutorialPrimaryAction(string stepId)
+    {
+        switch (stepId)
+        {
+            case TutorialStepIds.Welcome:
+                _session.AdvanceTutorialFromTown();
+                ShowTown();
+                break;
+            case TutorialStepIds.VisitTavern:
+                ShowTavern();
+                break;
+            case TutorialStepIds.ClaimRewards when _session.ActiveRun?.IsComplete == true:
+                ShowDailySummary();
+                break;
+            default:
+                ShowDungeonPlan();
+                break;
+        }
     }
 
     private void ShowMoonlightFountain()
@@ -152,6 +181,7 @@ public partial class Main : Control
         EquipmentInventoryFilter filter = EquipmentInventoryFilter.All,
         EquipmentInventorySort sort = EquipmentInventorySort.Rarity)
     {
+        _session.MarkTutorialTavernVisited();
         var tavern = LoadView<TavernView>(TavernScenePath);
         tavern.Initialize(_session.BuildTavernEquipmentViewModel(filter, sort), _session.GetSaveStatus());
         tavern.BackToTownRequested += ShowTown;
@@ -173,9 +203,19 @@ public partial class Main : Control
             _session.SellEquipment(itemId);
             ShowTavern(filter, sort);
         };
+        tavern.SellCommonRequested += () =>
+        {
+            _session.SellCommonEquipment();
+            ShowTavern(filter, sort);
+        };
         tavern.LockChanged += (itemId, isLocked) =>
         {
             _session.SetEquipmentLocked(itemId, isLocked);
+            ShowTavern(filter, sort);
+        };
+        tavern.LockRareRequested += () =>
+        {
+            _session.LockRareEquipment();
             ShowTavern(filter, sort);
         };
     }

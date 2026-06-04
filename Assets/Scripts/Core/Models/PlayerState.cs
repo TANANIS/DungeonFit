@@ -8,9 +8,9 @@ public sealed class PlayerState
 {
     private const int DefaultLevel = 1;
     private const int DefaultExperience = 120;
-    private const int DefaultExperienceToNextLevel = 300;
-    private const int DefaultBaseAttack = 3;
-    private const int DefaultBaseMaxHp = 24;
+    private const int DefaultExperienceToNextLevel = 180;
+    private const int DefaultBaseAttack = 4;
+    private const int DefaultBaseMaxHp = 30;
 
     public int Level { get; private set; } = DefaultLevel;
 
@@ -32,7 +32,7 @@ public sealed class PlayerState
 
     public int BaseAttack => DefaultBaseAttack + ((Level - 1) / 2);
 
-    public int BaseMaxHp => DefaultBaseMaxHp + ((Level - 1) * 2);
+    public int BaseMaxHp => DefaultBaseMaxHp + ((Level - 1) * 3);
 
     public int Attack
     {
@@ -362,6 +362,6 @@ public sealed class PlayerState
     public static int GetExperienceToNextLevel(int level)
     {
         var safeLevel = level <= 0 ? DefaultLevel : level;
-        return DefaultExperienceToNextLevel + ((safeLevel - 1) * 80);
+        return DefaultExperienceToNextLevel + ((safeLevel - 1) * 55);
     }
 }

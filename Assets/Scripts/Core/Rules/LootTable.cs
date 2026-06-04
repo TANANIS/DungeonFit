@@ -65,11 +65,12 @@ public sealed class LootTable
             return equipmentCatalog.GetAll()[0].Id;
         }
 
-        var slotOffset = chest.SetNumber % 3;
-        var slot = slotOffset switch
+        var seed = BuildChestSeed(chest);
+        var slotRoll = StableRoll($"{seed}:{profile.DungeonTypeId}:slot", 3);
+        var slot = slotRoll switch
         {
-            1 => EquipmentSlot.Weapon,
-            2 => EquipmentSlot.Armor,
+            0 => EquipmentSlot.Weapon,
+            1 => EquipmentSlot.Armor,
             _ => EquipmentSlot.Accessory,
         };
         var slotCandidates = candidates.Where(definition => definition.Slot == slot).ToArray();
@@ -78,14 +79,14 @@ public sealed class LootTable
             slotCandidates = candidates.ToArray();
         }
 
-        var index = StableRoll($"{chest.Id}:{profile.DungeonTypeId}:definition:{slot}", slotCandidates.Length);
+        var index = StableRoll($"{seed}:{profile.DungeonTypeId}:definition:{slot}", slotCandidates.Length);
         return slotCandidates[index].Id;
     }
 
     private static EquipmentRarity RollRarity(RarityDropTable table, DungeonChest chest)
     {
         var totalWeight = Math.Max(1, table.TotalWeight);
-        var roll = StableRoll($"{chest.Id}:{chest.SourceDungeonTypeId}:rarity:{chest.Result}", totalWeight);
+        var roll = StableRoll($"{BuildChestSeed(chest)}:{chest.SourceDungeonTypeId}:rarity:{chest.Result}", totalWeight);
 
         if (roll < table.CommonWeight)
         {
@@ -112,11 +113,18 @@ public sealed class LootTable
             return Enumerable.Empty<EquipmentModifier>();
         }
 
-        var roll = StableRoll($"{chest.Id}:{profile.DungeonTypeId}:modifier:{chest.Result}", profile.ExtraModifierCandidates.Count);
+        var roll = StableRoll($"{BuildChestSeed(chest)}:{profile.DungeonTypeId}:modifier:{chest.Result}", profile.ExtraModifierCandidates.Count);
         return profile.ExtraModifierCandidates
             .Skip(roll)
             .Concat(profile.ExtraModifierCandidates.Take(roll))
             .Take(count);
+    }
+
+    private static string BuildChestSeed(DungeonChest chest)
+    {
+        return string.IsNullOrWhiteSpace(chest.InstanceIdPrefix)
+            ? chest.Id
+            : $"{chest.InstanceIdPrefix}:{chest.Id}";
     }
 
     private static int StableRoll(string seed, int maxExclusive)

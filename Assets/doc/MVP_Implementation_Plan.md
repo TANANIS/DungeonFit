@@ -48,7 +48,7 @@ The full MVP direction should treat `Enter Dungeon` as a planning step, not an i
 4. Each route slot resolves into one workout room from that target area's content pool.
 5. Each stage is one real workout action, such as a `4 x 8-16` movement.
 6. Inside a stage, each set is one Wave-driven room segment.
-7. Completing a set banks one chest or reward packet, but does not force a full loot-opening animation immediately.
+7. Completing a set banks a reward packet, and completing the full room without withdrawing guarantees at least one pending chest for that room.
 8. After each set, the game shows a small summary and asks whether the player wants to continue exploring, so real body state can override the plan.
 9. After the planned 4 to 6 stages end, the game shows a daily summary and opens all banked dungeon chests together.
 
@@ -286,10 +286,10 @@ Recorded on May 23, 2026. Updated on May 25, 2026. MVP completion snapshot added
 - Town settings now includes player-facing save management: manual save, delete current save, and a current save status summary. Deleting the save resets the active session.
 - Route music now uses stable `MusicId` values instead of display names, while UI text is resolved from `MusicCatalog`.
 - Full route reordering, custom workout creation, advanced category filters, quest bonus selection, and JSON content loading remain deferred to post-MVP expansion.
-- The product target is now documented as Town -> dungeon planning -> 4 to 6 ordered workout stages -> per-set chest banking -> daily summary -> concentrated chest opening -> Town.
+- The product target is now documented as Town -> dungeon planning -> 4 to 6 ordered workout stages -> per-set reward banking plus per-room chest floor -> daily summary -> concentrated chest opening -> Town.
 - The Beat Flow panel now has a first Wave indicator prototype: a BPM-driven target wave, a current rhythm marker, and automatic Break after the rep-count wave cycles finish.
 - The current UI now uses the player Knight plus expanded enemy sprite sets for core combat readability. Final Spine animation, action-specific Wave shapes, and exact audio sync remain post-MVP work.
-- The current playable loop is Town -> Dungeon Plan -> current stage Room Challenge -> result -> Set Summary -> Dungeon Plan with updated route progress -> Daily Summary -> Open All -> Town. MVP per-set reward banking exists; full chest-opening animation remains post-MVP polish.
+- The current playable loop is Town -> Dungeon Plan -> current stage Room Challenge -> result -> Set Summary -> Dungeon Plan with updated route progress -> Daily Summary -> Open All -> Town. MVP per-set reward banking and per-room chest floor exist; full chest-opening animation remains post-MVP polish.
 - Ending training from Set Summary now routes into Daily Summary first. Town gold only changes after `Open All`, so players cannot accidentally bypass reward claim by returning to Town early.
 - Idle gold, healing shop, potion supply, Blacksmith, Church, Notice Board, Tavern equipment management, body profile, dungeon growth, combat rewards, expanded actor visuals, and screenshot QA now exist as MVP systems.
 - Current validated content breadth includes 6 dungeon categories, 48 exercises, 16 music tracks, 12 enemy visual sets plus the player Knight, 288 equipment definitions, 6 dungeon loot profiles, 6 short-term daily quests, and 12 Church oath quests.

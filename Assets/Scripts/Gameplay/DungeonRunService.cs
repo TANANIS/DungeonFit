@@ -25,12 +25,20 @@ public sealed class DungeonRunService
 
     private IEnumerable<BankedReward> BuildBankedRewards(DungeonRun run, TaskTemplate stage, RunSummary summary)
     {
+        var guaranteedChestSet = GetGuaranteedChestSet(summary);
+        var aliveBonusChestSet = GetAliveBonusChestSet(summary, guaranteedChestSet);
+
         for (var set = 1; set <= summary.CompletedSets; set++)
         {
             var combatResult = summary.GetCombatSetResult(set);
-            var result = combatResult?.Result ?? summary.GetSetResult(set);
-            var chestTier = combatResult?.ChestTier ?? (set == summary.TotalSets ? "Boss" : "Normal");
-            var rewardKind = combatResult?.RewardKind ?? GetLegacyRewardKind(summary, set);
+            var isGuaranteedChest = set == guaranteedChestSet;
+            var isAliveBonusChest = set == aliveBonusChestSet;
+            var isChest = isGuaranteedChest || isAliveBonusChest;
+            var result = GetRewardResult(summary, combatResult, set, isGuaranteedChest);
+            var chestTier = isGuaranteedChest ? "Boss" : combatResult?.ChestTier ?? "Normal";
+            var rewardKind = isChest
+                ? BankedRewardKind.Chest
+                : BankedRewardKind.GoldOnly;
             var chest = new DungeonChest(
                 $"{stage.Id}_set_{set}",
                 chestTier,
@@ -58,21 +66,53 @@ public sealed class DungeonRunService
         }
     }
 
-    private static BankedRewardKind GetLegacyRewardKind(RunSummary summary, int set)
+    private static int GetGuaranteedChestSet(RunSummary summary)
     {
-        if (summary.HasCombatResults)
+        return IsCompletedRoom(summary)
+            ? System.Math.Min(summary.CompletedSets, summary.TotalSets)
+            : 0;
+    }
+
+    private static int GetAliveBonusChestSet(RunSummary summary, int guaranteedChestSet)
+    {
+        if (guaranteedChestSet <= 0 ||
+            summary.FatigueRewardPercent < 100 ||
+            summary.CompletedSets <= 1 ||
+            (summary.RemainingPlayerHp ?? 0) <= 0)
         {
-            return BankedRewardKind.GoldOnly;
+            return 0;
         }
 
-        if (summary.GetSetResult(set) != CompletionResult.Skipped)
+        return System.Math.Max(1, guaranteedChestSet - 1);
+    }
+
+    private static bool IsCompletedRoom(RunSummary summary)
+    {
+        return summary.TotalSets > 0 &&
+            summary.CompletedSets >= summary.TotalSets &&
+            Enumerable.Range(1, summary.TotalSets)
+                .All(set => summary.GetSetResult(set) != CompletionResult.Skipped);
+    }
+
+    private static CompletionResult GetRewardResult(
+        RunSummary summary,
+        CombatSetResult? combatResult,
+        int set,
+        bool isGuaranteedChest)
+    {
+        if (!isGuaranteedChest)
         {
-            return BankedRewardKind.Chest;
+            return combatResult?.Result ?? summary.GetSetResult(set);
         }
 
-        return summary.Reward.Equipment is not null && set == summary.TotalSets
-            ? BankedRewardKind.Chest
-            : BankedRewardKind.GoldOnly;
+        if (summary.FatigueRewardPercent < 100)
+        {
+            return CompletionResult.Partial;
+        }
+
+        return (summary.RemainingPlayerHp ?? 0) > 0
+            ? CompletionResult.Completed
+            : CompletionResult.Partial;
     }
 
     private static RewardBundle BuildLegacyReward(RunSummary summary, int set, BankedRewardKind rewardKind)

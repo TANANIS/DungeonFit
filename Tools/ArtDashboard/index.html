@@ -15,6 +15,7 @@
       --text: #f4e8cf;
       --muted: #b7a8ce;
       --accent: #8c64db;
+      --hot: #d9b45c;
       --ok: #77d68a;
       --warn: #f0bc54;
       --bad: #f06f6f;
@@ -49,6 +50,7 @@
       font: inherit;
     }
     button.primary { background: #5c3fb0; }
+    button.update { background: #3b6f4a; }
     button:disabled { opacity: 0.45; }
     input[type="search"] { min-width: 280px; }
     main { padding: 18px 20px 32px; }
@@ -73,6 +75,10 @@
       color: var(--muted);
     }
     .stat strong { color: var(--text); }
+    .stat.live {
+      border-color: rgba(217, 180, 92, 0.8);
+      color: var(--hot);
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -161,6 +167,11 @@
     .drop { border-style: dashed; }
     .drop.dragging { outline: 2px solid var(--accent); }
     .file-input { width: 100%; }
+    .file-choice {
+      color: var(--hot);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     .prompt-text {
       max-height: 110px;
       overflow: auto;
@@ -197,7 +208,9 @@
       <button id="exportCsv">Export CSV</button>
       <button id="copyNeeded">Copy Needs Final Art</button>
       <button id="copyP0Prompts">Copy P0 Prompts</button>
+      <button id="refreshDashboard">Refresh Dashboard</button>
       <span id="rootStatus" class="stat">Write access not granted</span>
+      <span id="actionStatus" class="stat live">Ready</span>
     </div>
     <div class="stats" id="stats"></div>
     <div class="filters">
@@ -229,7 +242,10 @@
   <script>
     const manifest = window.DUNGEONFIT_ART_MANIFEST || { summary: { total: 0, categories: [] }, assets: [] };
     const checkStoreKey = "dungeonfit-art-dashboard-checks-v1";
+    const uploadStoreKey = "dungeonfit-art-dashboard-uploads-v1";
     let checkState = readCheckState();
+    let uploadState = readUploadState();
+    let pendingFiles = {};
     let rootHandle = null;
     let filteredAssets = manifest.assets.slice();
 
@@ -240,8 +256,10 @@
     const priority = document.getElementById("priority");
     const status = document.getElementById("status");
     const rootStatus = document.getElementById("rootStatus");
+    const actionStatus = document.getElementById("actionStatus");
 
     function init() {
+      applyLocalAssetState();
       const categories = ["all", ...new Set(manifest.assets.map(asset => asset.category).sort())];
       category.innerHTML = categories.map(item => `<option value="${escapeHtml(item)}">${item === "all" ? "All categories" : escapeHtml(item)}</option>`).join("");
       renderStats();
@@ -260,6 +278,29 @@
       localStorage.setItem(checkStoreKey, JSON.stringify(checkState));
     }
 
+    function readUploadState() {
+      try {
+        return JSON.parse(localStorage.getItem(uploadStoreKey) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function saveUploadState() {
+      localStorage.setItem(uploadStoreKey, JSON.stringify(uploadState));
+    }
+
+    function applyLocalAssetState() {
+      for (const asset of manifest.assets) {
+        const local = uploadState[asset.id];
+        if (!local) continue;
+        asset.exists = true;
+        asset.productionStatus = local.productionStatus || "Uploaded final art";
+        asset.updatedAt = local.updatedAt;
+        asset.updatedFileName = local.fileName;
+      }
+    }
+
     function isCheckComplete(asset) {
       const checks = asset.finalChecks || [];
       return checks.length > 0 && checks.every(check => checkState[asset.id]?.[check.id]);
@@ -270,6 +311,7 @@
       const missing = manifest.assets.length - existing;
       const needs = manifest.assets.filter(asset => asset.productionStatus === "Needs final art").length;
       const p0 = manifest.assets.filter(asset => asset.priority === "P0").length;
+      const uploaded = Object.keys(uploadState).length;
       const checked = manifest.assets.filter(isCheckComplete).length;
       const categoryText = manifest.summary.categories
         .map(item => `${escapeHtml(item.category)} <strong>${item.count}</strong>`)
@@ -278,6 +320,7 @@
         <span class="stat">Total <strong>${manifest.assets.length}</strong></span>
         <span class="stat">P0 <strong>${p0}</strong></span>
         <span class="stat">Needs final art <strong>${needs}</strong></span>
+        <span class="stat">Updated now <strong>${uploaded}</strong></span>
         <span class="stat">Has file <strong>${existing}</strong></span>
         <span class="stat">Missing <strong>${missing}</strong></span>
         <span class="stat">Final check complete <strong>${checked}</strong></span>
@@ -315,10 +358,22 @@
       for (const card of grid.querySelectorAll(".card")) {
         const asset = manifest.assets.find(item => item.id === card.dataset.id);
         const input = card.querySelector("input[type=file]");
+        const updateButton = card.querySelector("[data-action='update-asset']");
+        const fileChoice = card.querySelector(".file-choice");
         const drop = card.querySelector(".drop");
         input.addEventListener("change", () => {
-          if (input.files[0]) writeAsset(asset, input.files[0], card);
+          if (!input.files[0]) return;
+          pendingFiles[asset.id] = input.files[0];
+          updateButton.disabled = false;
+          fileChoice.textContent = `Selected: ${input.files[0].name}`;
+          setActionStatus(`Selected ${asset.title}. Press Update Asset to overwrite.`);
         });
+        updateButton.addEventListener("click", () => {
+          const file = pendingFiles[asset.id] || input.files[0];
+          if (file) writeAsset(asset, file, card);
+        });
+        card.querySelector("[data-action='copy-prompt']").addEventListener("click", () => copyPrompt(asset.id));
+        card.querySelector("[data-action='copy-path']").addEventListener("click", () => copyText(asset.relativePath, "Path copied"));
         for (const eventName of ["dragenter", "dragover"]) {
           drop.addEventListener(eventName, event => {
             event.preventDefault();
@@ -331,14 +386,20 @@
         drop.addEventListener("drop", event => {
           event.preventDefault();
           const file = event.dataTransfer.files[0];
-          if (file) writeAsset(asset, file, card);
+          if (file) {
+            pendingFiles[asset.id] = file;
+            fileChoice.textContent = `Dropped: ${file.name}`;
+            writeAsset(asset, file, card);
+          }
         });
         for (const checkbox of card.querySelectorAll("[data-check]")) {
           checkbox.addEventListener("change", () => {
             checkState[asset.id] = checkState[asset.id] || {};
             checkState[asset.id][checkbox.dataset.check] = checkbox.checked;
             saveCheckState();
+            setActionStatus(`Final check updated: ${asset.title}`);
             renderStats();
+            if (status.value === "checked") applyFilters();
           });
         }
       }
@@ -349,6 +410,8 @@
       const fileStatus = asset.exists ? "Has file" : "Missing file";
       const transparent = asset.transparent ? "Transparent" : "Opaque";
       const nine = asset.nineSlice ? "Nine-slice" : "Flat image";
+      const previewSrc = asset.localPreviewUrl || asset.samplePath;
+      const updatedTag = asset.updatedAt ? `<span class="tag ok">Updated ${escapeHtml(asset.updatedAt)}</span>` : "";
       const checks = (asset.finalChecks || []).map(check => {
         const checked = checkState[asset.id]?.[check.id] ? "checked" : "";
         return `
@@ -361,7 +424,7 @@
       return `
         <article class="card" data-id="${escapeHtml(asset.id)}">
           <div class="card-head">
-            <div class="preview"><img src="${escapeAttr(asset.samplePath)}" alt=""></div>
+            <div class="preview"><img src="${escapeAttr(previewSrc)}" alt=""></div>
             <div>
               <div class="title">${escapeHtml(asset.title)}</div>
               <div class="path">${escapeHtml(asset.relativePath)}</div>
@@ -373,6 +436,7 @@
                 <span class="tag">${nine}</span>
                 <span class="tag ${statusClass}">${fileStatus}</span>
                 <span class="tag warn">${escapeHtml(asset.productionStatus || "Needs review")}</span>
+                ${updatedTag}
               </div>
             </div>
           </div>
@@ -384,7 +448,7 @@
               <strong>AI prompt</strong>
               <div class="prompt-text">${escapeHtml(asset.generatedPrompt || buildPrompt(asset))}</div>
               <div class="row-actions">
-                <button type="button" onclick="copyPrompt('${escapeAttr(asset.id)}')">Copy AI Prompt</button>
+                <button type="button" data-action="copy-prompt">Copy AI Prompt</button>
               </div>
             </div>
             <div class="final-checks">
@@ -393,11 +457,15 @@
             </div>
             <div class="drop">
               <input class="file-input" type="file" accept="image/png" />
+              <div class="file-choice">No PNG selected</div>
               <div class="path">Drop a PNG here or choose a file to overwrite ${escapeHtml(asset.relativePath)}</div>
+              <div class="row-actions">
+                <button class="update" type="button" data-action="update-asset" disabled>Update Asset</button>
+              </div>
             </div>
             <div class="row-actions">
               <a href="${escapeAttr(asset.samplePath)}" download><button type="button">Download Test PNG</button></a>
-              <button type="button" onclick="copyText('${escapeAttr(asset.relativePath)}')">Copy Path</button>
+              <button type="button" data-action="copy-path">Copy Path</button>
             </div>
           </div>
         </article>
@@ -432,10 +500,25 @@
         const writable = await handle.createWritable();
         await writable.write(file);
         await writable.close();
-        card.querySelector(".drop .path").textContent = `Overwritten: ${asset.relativePath}`;
-        card.querySelector(".preview img").src = URL.createObjectURL(file);
+        if (asset.localPreviewUrl) URL.revokeObjectURL(asset.localPreviewUrl);
+        asset.localPreviewUrl = URL.createObjectURL(file);
+        asset.exists = true;
+        asset.productionStatus = "Uploaded final art";
+        asset.updatedAt = new Date().toLocaleTimeString();
+        asset.updatedFileName = file.name;
+        uploadState[asset.id] = {
+          fileName: file.name,
+          updatedAt: asset.updatedAt,
+          productionStatus: asset.productionStatus
+        };
+        saveUploadState();
+        delete pendingFiles[asset.id];
+        setActionStatus(`Updated ${asset.title}`);
+        renderStats();
+        applyFilters();
       } catch (error) {
         alert(`Write failed: ${error.message}`);
+        setActionStatus(`Write failed: ${asset.title}`);
       }
     }
 
@@ -454,8 +537,17 @@
         alert("This browser cannot overwrite local files. Open this dashboard in Chrome or Edge.");
         return;
       }
-      rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
-      rootStatus.textContent = `Granted: ${rootHandle.name}`;
+      try {
+        rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+        rootStatus.textContent = `Granted: ${rootHandle.name}`;
+        setActionStatus("Write access granted");
+      } catch (error) {
+        setActionStatus("Folder selection cancelled");
+      }
+    });
+
+    document.getElementById("refreshDashboard").addEventListener("click", () => {
+      location.reload();
     });
 
     document.getElementById("exportCsv").addEventListener("click", () => {
@@ -487,7 +579,7 @@
         .filter(asset => asset.productionStatus === "Needs final art")
         .map(asset => `${asset.priority} ${asset.relativePath} ${asset.expectedWidth}x${asset.expectedHeight} ${asset.category}`)
         .join("\n") || "No assets need final art.";
-      copyText(text);
+      copyText(text, "Needed asset list copied");
     });
 
     document.getElementById("copyP0Prompts").addEventListener("click", () => {
@@ -495,7 +587,7 @@
         .filter(asset => asset.priority === "P0")
         .map(asset => `[${asset.relativePath}]\n${asset.generatedPrompt || buildPrompt(asset)}`)
         .join("\n\n");
-      copyText(text);
+      copyText(text, "P0 prompts copied");
     });
 
     search.addEventListener("input", applyFilters);
@@ -505,7 +597,7 @@
 
     function copyPrompt(assetId) {
       const asset = manifest.assets.find(item => item.id === assetId);
-      if (asset) copyText(asset.generatedPrompt || buildPrompt(asset));
+      if (asset) copyText(asset.generatedPrompt || buildPrompt(asset), "AI prompt copied");
     }
 
     function csv(value) {
@@ -521,8 +613,42 @@
       URL.revokeObjectURL(a.href);
     }
 
-    async function copyText(text) {
-      await navigator.clipboard.writeText(text);
+    async function copyText(text, successMessage = "Copied") {
+      try {
+        if (window.location.protocol === "file:") {
+          fallbackCopyText(text);
+        } else if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          fallbackCopyText(text);
+        }
+        setActionStatus(successMessage);
+      } catch {
+        try {
+          fallbackCopyText(text);
+          setActionStatus(successMessage);
+        } catch (error) {
+          setActionStatus("Copy failed. Select the text manually.");
+          alert(`Copy failed: ${error.message}`);
+        }
+      }
+    }
+
+    function fallbackCopyText(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (!copied) throw new Error("Browser refused clipboard write");
+    }
+
+    function setActionStatus(message) {
+      actionStatus.textContent = message;
     }
 
     function escapeHtml(value) {

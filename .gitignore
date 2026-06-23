@@ -5,5 +5,8 @@
 /.codex-remote-attachments/
 /渲染圖/*.import
 /Tools/ArtDashboard/test-png/**/*.import
+/Tools/ArtDashboard/art_state.local.json
+/Tools/ArtDashboard/art_dashboard_server.pid
+__pycache__/
 bin/
 obj/

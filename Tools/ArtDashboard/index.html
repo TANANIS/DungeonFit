@@ -172,6 +172,11 @@
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .rename-preview {
+      color: var(--text);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     .prompt-text {
       max-height: 110px;
       overflow: auto;
@@ -198,6 +203,30 @@
       color: var(--muted);
       font-size: 11px;
     }
+    .auto-checks {
+      border: 1px solid rgba(168, 135, 61, 0.42);
+      border-radius: 6px;
+      padding: 10px;
+      background: rgba(0,0,0,.16);
+      display: grid;
+      gap: 6px;
+    }
+    .auto-check {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 8px;
+      align-items: start;
+      font-size: 12px;
+    }
+    .auto-check b {
+      border-radius: 999px;
+      padding: 2px 7px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,.14);
+    }
+    .auto-check.pass b { color: var(--ok); }
+    .auto-check.warn b, .auto-check.manual b { color: var(--warn); }
+    .auto-check.fail b { color: var(--bad); }
   </style>
 </head>
 <body>
@@ -205,11 +234,13 @@
     <h1>DungeonFit Art Dashboard</h1>
     <div class="toolbar">
       <button class="primary" id="pickRoot">Choose DungeonFit Folder</button>
+      <button id="syncServerState">Sync Server State</button>
       <button id="exportCsv">Export CSV</button>
       <button id="copyNeeded">Copy Needs Final Art</button>
       <button id="copyP0Prompts">Copy P0 Prompts</button>
       <button id="refreshDashboard">Refresh Dashboard</button>
-      <span id="rootStatus" class="stat">Write access not granted</span>
+      <button id="stopServer">Stop Server</button>
+      <span id="rootStatus" class="stat">Server not connected</span>
       <span id="actionStatus" class="stat live">Ready</span>
     </div>
     <div class="stats" id="stats"></div>
@@ -228,6 +259,7 @@
         <option value="exists">Has file</option>
         <option value="missing">Missing file</option>
         <option value="checked">Final check complete</option>
+        <option value="autoFailed">Auto check failed</option>
       </select>
     </div>
   </header>
@@ -235,14 +267,18 @@
     <div class="grid" id="grid"></div>
   </main>
   <footer>
-    Direct overwrite requires Chrome or Edge with File System Access API. First choose the project root:
-    D:\GameDev\DungeonFit. Uploaded PNG files are written to each card's Assets/Art path.
-    Final checkboxes are stored in this browser's localStorage.
+    Recommended: run StartArtDashboard.ps1 and open this page from http://127.0.0.1:8765.
+    Uploaded PNG files are renamed to each card's target filename and written to its Assets/Art path.
+    Server mode stores upload and final-check state in art_state.local.json; file mode falls back to browser localStorage.
   </footer>
   <script>
     const manifest = window.DUNGEONFIT_ART_MANIFEST || { summary: { total: 0, categories: [] }, assets: [] };
     const checkStoreKey = "dungeonfit-art-dashboard-checks-v1";
     const uploadStoreKey = "dungeonfit-art-dashboard-uploads-v1";
+    let serverMode = false;
+    let serverState = null;
+    let validationState = {};
+    let serverSnapshot = "";
     let checkState = readCheckState();
     let uploadState = readUploadState();
     let pendingFiles = {};
@@ -258,12 +294,14 @@
     const rootStatus = document.getElementById("rootStatus");
     const actionStatus = document.getElementById("actionStatus");
 
-    function init() {
+    async function init() {
+      await syncServerState(false);
       applyLocalAssetState();
       const categories = ["all", ...new Set(manifest.assets.map(asset => asset.category).sort())];
       category.innerHTML = categories.map(item => `<option value="${escapeHtml(item)}">${item === "all" ? "All categories" : escapeHtml(item)}</option>`).join("");
       renderStats();
       applyFilters();
+      window.setInterval(pollServerState, 5000);
     }
 
     function readCheckState() {
@@ -275,6 +313,7 @@
     }
 
     function saveCheckState() {
+      if (serverMode) return;
       localStorage.setItem(checkStoreKey, JSON.stringify(checkState));
     }
 
@@ -287,10 +326,16 @@
     }
 
     function saveUploadState() {
+      if (serverMode) return;
       localStorage.setItem(uploadStoreKey, JSON.stringify(uploadState));
     }
 
     function applyLocalAssetState() {
+      if (serverState) {
+        checkState = serverState.checks || {};
+        uploadState = serverState.uploads || {};
+        validationState = serverState.validations || {};
+      }
       for (const asset of manifest.assets) {
         const local = uploadState[asset.id];
         if (!local) continue;
@@ -298,12 +343,19 @@
         asset.productionStatus = local.productionStatus || "Uploaded final art";
         asset.updatedAt = local.updatedAt;
         asset.updatedFileName = local.fileName;
+        asset.sourceFileName = local.sourceFileName || local.fileName;
       }
     }
 
     function isCheckComplete(asset) {
       const checks = asset.finalChecks || [];
       return checks.length > 0 && checks.every(check => checkState[asset.id]?.[check.id]);
+    }
+
+    function hasFailedAutoCheck(asset) {
+      const validation = validationState[asset.id];
+      if (!validation || !validation.checks) return false;
+      return Object.values(validation.checks).some(check => check.status === "fail");
     }
 
     function renderStats() {
@@ -313,6 +365,7 @@
       const p0 = manifest.assets.filter(asset => asset.priority === "P0").length;
       const uploaded = Object.keys(uploadState).length;
       const checked = manifest.assets.filter(isCheckComplete).length;
+      const autoFailed = manifest.assets.filter(hasFailedAutoCheck).length;
       const categoryText = manifest.summary.categories
         .map(item => `${escapeHtml(item.category)} <strong>${item.count}</strong>`)
         .join('</span><span class="stat">');
@@ -324,6 +377,7 @@
         <span class="stat">Has file <strong>${existing}</strong></span>
         <span class="stat">Missing <strong>${missing}</strong></span>
         <span class="stat">Final check complete <strong>${checked}</strong></span>
+        <span class="stat">Auto failed <strong>${autoFailed}</strong></span>
         <span class="stat">${categoryText}</span>
       `;
     }
@@ -348,6 +402,7 @@
         if (status.value === "exists" && !asset.exists) return false;
         if (status.value === "missing" && asset.exists) return false;
         if (status.value === "checked" && !isCheckComplete(asset)) return false;
+        if (status.value === "autoFailed" && !hasFailedAutoCheck(asset)) return false;
         return true;
       });
       renderGrid();
@@ -365,8 +420,8 @@
           if (!input.files[0]) return;
           pendingFiles[asset.id] = input.files[0];
           updateButton.disabled = false;
-          fileChoice.textContent = `Selected: ${input.files[0].name}`;
-          setActionStatus(`Selected ${asset.title}. Press Update Asset to overwrite.`);
+          fileChoice.textContent = buildRenameText(asset, input.files[0]);
+          setActionStatus(`Selected ${asset.title}. Press Update Asset to rename and overwrite.`);
         });
         updateButton.addEventListener("click", () => {
           const file = pendingFiles[asset.id] || input.files[0];
@@ -388,7 +443,7 @@
           const file = event.dataTransfer.files[0];
           if (file) {
             pendingFiles[asset.id] = file;
-            fileChoice.textContent = `Dropped: ${file.name}`;
+            fileChoice.textContent = buildRenameText(asset, file);
             writeAsset(asset, file, card);
           }
         });
@@ -397,6 +452,7 @@
             checkState[asset.id] = checkState[asset.id] || {};
             checkState[asset.id][checkbox.dataset.check] = checkbox.checked;
             saveCheckState();
+            saveCheckToServer(asset.id, checkbox.dataset.check, checkbox.checked);
             setActionStatus(`Final check updated: ${asset.title}`);
             renderStats();
             if (status.value === "checked") applyFilters();
@@ -410,8 +466,12 @@
       const fileStatus = asset.exists ? "Has file" : "Missing file";
       const transparent = asset.transparent ? "Transparent" : "Opaque";
       const nine = asset.nineSlice ? "Nine-slice" : "Flat image";
-      const previewSrc = asset.localPreviewUrl || asset.samplePath;
+      const previewSrc = getPreviewSrc(asset);
       const updatedTag = asset.updatedAt ? `<span class="tag ok">Updated ${escapeHtml(asset.updatedAt)}</span>` : "";
+      const validation = validationState[asset.id];
+      const lastRename = asset.sourceFileName
+        ? `<div class="rename-preview"><strong>Last upload</strong> ${escapeHtml(asset.sourceFileName)} -> ${escapeHtml(asset.relativePath)}</div>`
+        : "";
       const checks = (asset.finalChecks || []).map(check => {
         const checked = checkState[asset.id]?.[check.id] ? "checked" : "";
         return `
@@ -455,12 +515,18 @@
               <strong>Final check</strong>
               <div class="checks">${checks}</div>
             </div>
+            <div class="auto-checks">
+              <strong>Auto checks</strong>
+              ${autoChecksHtml(asset, validation)}
+            </div>
             <div class="drop">
               <input class="file-input" type="file" accept="image/png" />
-              <div class="file-choice">No PNG selected</div>
-              <div class="path">Drop a PNG here or choose a file to overwrite ${escapeHtml(asset.relativePath)}</div>
+              <div class="file-choice">No PNG selected. Any uploaded filename will be saved as ${escapeHtml(getTargetFileName(asset))}.</div>
+              <div class="rename-preview">Target: ${escapeHtml(asset.relativePath)}</div>
+              ${lastRename}
+              <div class="path">Drop a PNG here or choose a file to rename and overwrite ${escapeHtml(asset.relativePath)}</div>
               <div class="row-actions">
-                <button class="update" type="button" data-action="update-asset" disabled>Update Asset</button>
+                <button class="update" type="button" data-action="update-asset" disabled>Update / Rename Asset</button>
               </div>
             </div>
             <div class="row-actions">
@@ -473,17 +539,127 @@
     }
 
     function buildPrompt(asset) {
+      const backgroundRule = asset.transparent
+        ? "Transparent PNG with alpha channel. Subject only; no colored backdrop, no square tile, no halo clipped by the canvas."
+        : "Opaque full-bleed PNG. Fill the entire canvas; no transparent holes, no UI text, no baked interface widgets.";
+      const sliceRule = asset.nineSlice
+        ? "Nine-slice friendly. Put most ornament in the corners, keep edges straight/repeatable, and keep the center quiet enough for Godot text and controls."
+        : "Not a nine-slice frame. Do not add decorative borders unless the role explicitly asks for a frame.";
+      const roleText = normalizePromptText(asset.role);
+      const lookText = normalizePromptText(asset.look);
       return [
-        "Create a production-ready 2D game asset for DungeonFit.",
+        "Create exactly one production-ready DungeonFit 2D game asset PNG.",
+        `Asset: ${asset.title}.`,
         `Category: ${asset.category}.`,
-        `Role: ${asset.role}.`,
-        `Visual direction: ${asset.look}.`,
-        `Exact canvas: ${asset.expectedWidth}x${asset.expectedHeight} px.`,
-        `Transparent background required: ${asset.transparent}.`,
-        `Nine-slice/stretch-safe frame required: ${asset.nineSlice}.`,
-        "Style: dark moonlit fantasy RPG, purple and gold accents, crisp pixel-inspired rendering, mobile readability.",
-        "Do not include baked text, watermarks, logos, signatures, UI labels, or extra margins unless the role requires a full background."
-      ].join(" ");
+        `In-game role: ${roleText}.`,
+        `Visual target: ${lookText}.`,
+        `Canvas: exactly ${asset.expectedWidth}x${asset.expectedHeight}px. Do not resize, crop, pad, upscale, or add extra margins.`,
+        `Background rule: ${backgroundRule}`,
+        `Layout rule: ${categoryPromptGuidance(asset)}`,
+        `Stretch rule: ${sliceRule}`,
+        "Style target: dark moonlit fantasy RPG UI asset, simplified painterly rendering, crisp mobile silhouette, deep indigo/purple shadows, restrained warm gold rim light, clean alpha edge, polished game-asset finish. Prefer clarity over detail.",
+        `Negative prompt: ${categoryNegativePrompt(asset.category)}, no readable text, no letters, no numbers, no watermarks, no signatures, no logos, no UI labels, no extra objects outside the role, no muddy blur, no low-resolution artifacts, no cropped edges.`
+      ].join("\n");
+    }
+
+    function normalizePromptText(value) {
+      return String(value || "").replace(/\s+/g, " ").trim().replace(/[.\s]+$/g, "");
+    }
+
+    function categoryPromptGuidance(asset) {
+      switch (asset.category) {
+        case "UI Background":
+          return "Full-bleed vertical mobile background, not an illustration card. Leave broad calm readable zones for live UI overlays near the center, top, and bottom. Use depth, atmosphere, and readable silhouettes. Do not add labels, readable signs, character portraits, inventory items, floating buttons, frames, or cropped stock-photo composition.";
+        case "UI Panel":
+          return "Transparent UI frame or panel surface only. Preserve a clean empty center for live Godot text and controls. Make corners distinct, edges straight/repeatable, and ornament low-density. Do not create a full screen, emblem crest, card illustration, background scene, or text-bearing plaque.";
+        case "UI Button":
+          return "Transparent button body only, no label. Keep the center flat/clean for live Godot text. Use simple bevels, highlights, and edge treatment that remain stable when stretched horizontally. Do not add icons, text, symbols, full UI panels, or decorative frame extensions.";
+        case "Town Facility":
+          return "Centered clickable town facility icon on transparent background. Show one building or object silhouette clearly at small mobile size, occupying about 70 percent of the canvas. No surrounding square tile, no full town scene, no readable sign text, no character, no scenic background.";
+        case "Dungeon Icon":
+          return `Compact UI route symbol, not a fantasy illustration. ${dungeonIconSubjectGuidance(asset)} Use 2-4 broad shapes, 8px transparent safe padding, and a silhouette readable at 48px. Subject should occupy about 68-78 percent of the 128px canvas. No letters, labels, scenery, frame, portal, doorway, or detailed anatomy.`;
+        case "HUD Icon":
+          return "Small HUD icon on transparent background. Use one bold simple silhouette, high contrast, clean alpha edges, and no more than a few internal highlights. Avoid tiny details, background tiles, labels, decorative frames, or full item scenes.";
+        case "Equipment Icon":
+          return "Single equipment item only on transparent background. Center it with a clean three-quarter game-icon angle, one readable silhouette, and restrained material accents. No inventory slot frame, no background tile, no character holding it, no scene, no text.";
+        case "Actor Animation":
+          if (asset.expectedWidth > asset.expectedHeight * 2) {
+            const frameCount = Math.max(2, Math.round(asset.expectedWidth / Math.max(1, asset.expectedHeight)));
+            const cellWidth = Math.round(asset.expectedWidth / frameCount);
+            return `Horizontal sprite strip with exactly ${frameCount} evenly spaced animation frames, each about ${cellWidth}x${asset.expectedHeight}px. Keep the same character scale, anchor point, ground line, lighting, and facing direction across every frame. No frame dividers, labels, background scenery, giant portrait, cropped limbs, or shadows touching the canvas edge.`;
+          }
+          return "Single centered combat sprite frame on transparent background. Keep a consistent anchor point, clean silhouette, readable pose, and enough padding for animation without cropping. No portrait crop, no background, no frame, no UI badge.";
+        default:
+          return "Centered game asset with a clear silhouette, clean alpha, and mobile-readable detail.";
+      }
+    }
+
+    function dungeonIconSubjectGuidance(asset) {
+      const key = asset.relativePath.split("/").pop().replace(".png", "").replace("dungeon_", "").toLowerCase();
+      switch (key) {
+        case "chest":
+          return "Subject: chest-training route symbol, a simplified pectoral shield or sternum-and-rib silhouette. Use two or three large shapes only. Forbidden: full torso, armor breastplate, character body, monster chest, dungeon gate, decorative badge frame.";
+        case "shoulders":
+          return "Subject: shoulder-training route symbol, two simplified deltoid caps or shoulder-plate arcs around a small center mark. Forbidden: full torso, head, arms, armor suit, spiked crest, dungeon gate, decorative badge frame.";
+        case "back":
+          return "Subject: back-training route symbol, a simplified spine line with two shoulder-blade shapes, or a compact upper-back emblem made from broad clean strokes. Forbidden: full muscular back illustration, torso, armor backplate, monster body, dungeon doorway, large heraldic crest, decorative badge frame.";
+        case "legs":
+          return "Subject: leg-training route symbol, simplified bent leg, boot-step, or paired thigh/calf shapes. Forbidden: full body, running character, pants detail, armor suit, dungeon gate, decorative badge frame.";
+        case "core":
+          return "Subject: core-training route symbol, simplified abdominal/core ring, waist brace, or central power knot. Forbidden: full torso, six-pack anatomy illustration, character body, armor chest, dungeon gate, decorative badge frame.";
+        case "arms":
+          return "Subject: arm-training route symbol, simplified forearm, flexed arm silhouette, or dumbbell-like training mark. Forbidden: full body, portrait, complex weapon, armor suit, dungeon gate, decorative badge frame.";
+        default:
+          return `Subject: compact body-part training route symbol for ${asset.title}. Forbidden: full body, character illustration, dungeon scene, large heraldic crest, decorative badge frame.`;
+      }
+    }
+
+    function categoryNegativePrompt(category) {
+      switch (category) {
+        case "Dungeon Icon":
+          return "no full body, no muscular torso illustration, no armor plate, no monster anatomy, no dungeon doorway, no portal, no heraldic crest, no badge frame, no scene background, no tiny noisy detail";
+        case "UI Background":
+          return "no UI buttons, no panels, no readable signs, no labels, no character portrait, no object collage, no border frame";
+        case "UI Panel":
+          return "no full scene, no filled center illustration, no readable text, no icons in the center, no asymmetrical broken edges";
+        case "UI Button":
+          return "no label text, no icon, no complex border, no complete menu, no panel background";
+        case "Actor Animation":
+          return "no frame dividers, no background, no portrait crop, no inconsistent scale, no inconsistent pose anchor, no cropped weapon or limb";
+        default:
+          return "no full scene, no text, no letters, no numbers, no watermark, no logo, no random symbols, no background tile";
+      }
+    }
+
+    function getPreviewSrc(asset) {
+      if (asset.localPreviewUrl) return asset.localPreviewUrl;
+      if (serverMode) {
+        const stamp = encodeURIComponent(asset.updatedAt || validationState[asset.id]?.mtime || "0");
+        return `/api/thumbnail?assetId=${encodeURIComponent(asset.id)}&v=${stamp}`;
+      }
+      return asset.samplePath;
+    }
+
+    function autoChecksHtml(asset, validation) {
+      if (!serverMode) {
+        return '<div class="auto-check manual"><b>manual</b><span>Start the local server to enable PNG size, transparency, edge, and import checks.</span></div>';
+      }
+      if (!validation || !validation.checks) {
+        return '<div class="auto-check warn"><b>warn</b><span>No validation result yet. Press Sync Server State.</span></div>';
+      }
+      const order = [
+        ["png_file", "PNG"],
+        ["size_correct", "Size"],
+        ["transparent_background", "Alpha"],
+        ["clean_edges", "Edges"],
+        ["no_baked_text", "Text"],
+        ["godot_import_tested", "Import"]
+      ];
+      return order.map(([id, label]) => {
+        const check = validation.checks[id] || { status: "manual", message: "Not checked." };
+        const status = escapeHtml(check.status || "manual");
+        return `<div class="auto-check ${status}"><b>${status}</b><span><strong>${label}</strong> ${escapeHtml(check.message || "")}</span></div>`;
+      }).join("");
     }
 
     async function writeAsset(asset, file, card) {
@@ -492,34 +668,82 @@
         return;
       }
       if (!rootHandle) {
-        alert("Choose the DungeonFit project folder first.");
-        return;
+        if (!serverMode) {
+          alert("Start the dashboard server, or choose the DungeonFit project folder first.");
+          return;
+        }
       }
       try {
-        const handle = await getFileHandleForRelativePath(rootHandle, asset.relativePath, true);
-        const writable = await handle.createWritable();
-        await writable.write(file);
-        await writable.close();
+        const uploadResult = serverMode
+          ? await uploadViaServer(asset, file)
+          : await uploadViaFileSystem(asset, file);
         if (asset.localPreviewUrl) URL.revokeObjectURL(asset.localPreviewUrl);
         asset.localPreviewUrl = URL.createObjectURL(file);
         asset.exists = true;
         asset.productionStatus = "Uploaded final art";
-        asset.updatedAt = new Date().toLocaleTimeString();
+        asset.updatedAt = uploadResult.updatedAt || new Date().toLocaleTimeString();
         asset.updatedFileName = file.name;
-        uploadState[asset.id] = {
-          fileName: file.name,
-          updatedAt: asset.updatedAt,
-          productionStatus: asset.productionStatus
-        };
+        asset.sourceFileName = file.name;
+        uploadState[asset.id] = uploadResult.upload;
+        if (uploadResult.validation) {
+          validationState[asset.id] = uploadResult.validation;
+          applyPassedAutoChecks(asset.id, uploadResult.validation);
+        }
         saveUploadState();
         delete pendingFiles[asset.id];
-        setActionStatus(`Updated ${asset.title}`);
+        setActionStatus(`Updated ${asset.title}: ${file.name} -> ${asset.relativePath}`);
         renderStats();
         applyFilters();
       } catch (error) {
         alert(`Write failed: ${error.message}`);
         setActionStatus(`Write failed: ${asset.title}`);
       }
+    }
+
+    async function uploadViaFileSystem(asset, file) {
+      const handle = await getFileHandleForRelativePath(rootHandle, asset.relativePath, true);
+      const writable = await handle.createWritable();
+      await writable.write(file);
+      await writable.close();
+      const upload = {
+        fileName: getTargetFileName(asset),
+        sourceFileName: file.name,
+        targetPath: asset.relativePath,
+        bytes: file.size,
+        updatedAt: new Date().toLocaleTimeString(),
+        productionStatus: "Uploaded final art"
+      };
+      return { upload, updatedAt: upload.updatedAt };
+    }
+
+    async function uploadViaServer(asset, file) {
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: asset.id, fileName: file.name, dataUrl })
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || response.statusText);
+      }
+      const result = await response.json();
+      serverState = result.state;
+      applyLocalAssetState();
+      return {
+        upload: uploadState[asset.id],
+        updatedAt: uploadState[asset.id]?.updatedAt,
+        validation: result.validation || validationState[asset.id]
+      };
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error("Read failed"));
+        reader.readAsDataURL(file);
+      });
     }
 
     async function getFileHandleForRelativePath(root, relativePath, create) {
@@ -530,6 +754,86 @@
         dir = await dir.getDirectoryHandle(part, { create });
       }
       return dir.getFileHandle(fileName, { create });
+    }
+
+    function getTargetFileName(asset) {
+      return asset.relativePath.split("/").pop();
+    }
+
+    function buildRenameText(asset, file) {
+      return `Selected: ${file.name} -> ${asset.relativePath}`;
+    }
+
+    async function syncServerState(showStatus = true) {
+      try {
+        const response = await fetch("/api/state", { cache: "no-store" });
+        if (!response.ok) throw new Error(response.statusText);
+        const nextState = await response.json();
+        const nextSnapshot = JSON.stringify({
+          uploads: nextState.uploads,
+          checks: nextState.checks,
+          validations: nextState.validations
+        });
+        const changed = nextSnapshot !== serverSnapshot;
+        serverSnapshot = nextSnapshot;
+        serverState = nextState;
+        serverMode = true;
+        rootStatus.textContent = "Server connected";
+        applyLocalAssetState();
+        if (showStatus) setActionStatus("Server state synced");
+        return changed;
+      } catch {
+        serverMode = false;
+        serverState = null;
+        rootStatus.textContent = "Server not connected";
+        if (showStatus) setActionStatus("Server not connected; using browser fallback");
+        return false;
+      }
+    }
+
+    async function pollServerState() {
+      if (!serverMode) return;
+      const changed = await syncServerState(false);
+      if (changed) {
+        renderStats();
+        applyFilters();
+        setActionStatus("Server state updated");
+      }
+    }
+
+    async function saveCheckToServer(assetId, checkId, checked) {
+      if (!serverMode) return;
+      try {
+        const response = await fetch("/api/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assetId, checkId, checked })
+        });
+        if (!response.ok) throw new Error(response.statusText);
+        const result = await response.json();
+        serverState = result.state;
+        applyLocalAssetState();
+      } catch {
+        setActionStatus("Check saved locally, but server sync failed");
+      }
+    }
+
+    function applyPassedAutoChecks(assetId, validation) {
+      if (!validation || !validation.checks) return;
+      const objectiveChecks = [
+        "size_correct",
+        "transparent_background",
+        "clean_edges",
+        "godot_import_tested"
+      ];
+      checkState[assetId] = checkState[assetId] || {};
+      for (const checkId of objectiveChecks) {
+        if (validation.checks[checkId]?.status === "pass") {
+          checkState[assetId][checkId] = true;
+          saveCheckToServer(assetId, checkId, true);
+        }
+      }
+      saveCheckState();
     }
 
     document.getElementById("pickRoot").addEventListener("click", async () => {
@@ -546,8 +850,29 @@
       }
     });
 
+    document.getElementById("syncServerState").addEventListener("click", async () => {
+      await syncServerState(true);
+      renderStats();
+      applyFilters();
+    });
+
     document.getElementById("refreshDashboard").addEventListener("click", () => {
       location.reload();
+    });
+
+    document.getElementById("stopServer").addEventListener("click", async () => {
+      if (!serverMode) {
+        setActionStatus("Server is not connected");
+        return;
+      }
+      try {
+        await fetch("/api/shutdown", { method: "POST" });
+        serverMode = false;
+        rootStatus.textContent = "Server stopped";
+        setActionStatus("Server stopped. Close this tab or run StartArtDashboard again.");
+      } catch {
+        setActionStatus("Stop failed. Use StopArtDashboard.bat.");
+      }
     });
 
     document.getElementById("exportCsv").addEventListener("click", () => {

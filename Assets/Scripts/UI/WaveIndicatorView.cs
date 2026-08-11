@@ -36,6 +36,10 @@ public partial class WaveIndicatorView : Control
         ? 0
         : Math.Clamp((int)Math.Floor(_elapsedSeconds / SecondsPerRep), 0, _reps);
 
+    public double RemainingSeconds => _isRunning
+        ? Math.Max(0, SetDurationSeconds - _elapsedSeconds)
+        : 0;
+
     private double SecondsPerRep => 60.0 / Math.Max(_bpm, 1) * Math.Max(_beatsPerRep, 1);
 
     private double SetDurationSeconds => SecondsPerRep * Math.Max(_reps, 1);

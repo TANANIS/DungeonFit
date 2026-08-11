@@ -59,6 +59,15 @@ theme_override_font_sizes/font_size = 64
 text = "Challenge"
 autowrap_mode = 3
 
+[node name="TimerLabel" type="Label" parent="SafeMargin/Layout/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 112)
+layout_mode = 2
+theme_override_font_sizes/font_size = 38
+text = "準備 00:03"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="PauseButton" type="Button" parent="SafeMargin/Layout/Header"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(112, 112)
@@ -211,7 +220,7 @@ script = ExtResource("2_wave")
 [node name="RestPanel" type="PanelContainer" parent="SafeMargin/Layout"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(0, 150)
+custom_minimum_size = Vector2(0, 220)
 layout_mode = 2
 
 [node name="RestMargin" type="MarginContainer" parent="SafeMargin/Layout/RestPanel"]
@@ -251,6 +260,42 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 26
 text = "+30s"
+
+[node name="AdjustButtonRow" type="HBoxContainer" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ReduceSetButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/AdjustButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "組數 -"
+
+[node name="IncreaseSetButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/AdjustButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "組數 +"
+
+[node name="ReduceRepButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/AdjustButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "次數 -"
+
+[node name="IncreaseRepButton" type="Button" parent="SafeMargin/Layout/RestPanel/RestMargin/RestLayout/AdjustButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "次數 +"
 
 [node name="SupplyPanel" type="PanelContainer" parent="SafeMargin/Layout"]
 unique_name_in_owner = true
@@ -384,9 +429,9 @@ visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.08
-anchor_top = 0.25
+anchor_top = 0.14
 anchor_right = 0.92
-anchor_bottom = 0.68
+anchor_bottom = 0.92
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0

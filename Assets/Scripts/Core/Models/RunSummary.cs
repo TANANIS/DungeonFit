@@ -15,7 +15,10 @@ public sealed record RunSummary(
 	int ExperienceGained = 0,
 	int LevelsGained = 0,
 	int LevelUpRewardCount = 0,
-	int FatigueRewardPercent = 100)
+	int FatigueRewardPercent = 100,
+	string ExerciseId = "",
+	string DungeonTypeId = "",
+	int TargetReps = 0)
 {
 	public string RewardText => Reward.Equipment is null
 		? HasChest ? $"金幣 +{Reward.Gold}, EXP +{ExperienceGained}, 待開寶箱 {ChestCount}" : $"金幣 +{Reward.Gold}, EXP +{ExperienceGained}"

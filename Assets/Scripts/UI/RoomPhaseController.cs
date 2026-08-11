@@ -6,11 +6,18 @@ public sealed class RoomPhaseController
 
     public bool IsActiveWave => Current == RoomPhase.ActiveWave;
 
+    public bool IsPreparing => Current == RoomPhase.Preparing;
+
     public bool IsRestCounting => Current == RoomPhase.RestCounting;
 
     public bool IsAwaitingReport => Current == RoomPhase.AwaitingReport;
 
     public bool IsResult => Current == RoomPhase.Result;
+
+    public void StartPreparing()
+    {
+        Current = RoomPhase.Preparing;
+    }
 
     public void StartWave()
     {

@@ -48,6 +48,7 @@ public sealed class GameSession
     private TutorialProgress _tutorial = new();
     private readonly List<BodyMetricEntry> _bodyMetrics = new();
     private readonly List<DungeonProgressEntry> _dungeonProgress = new();
+    private readonly List<ExerciseHistoryEntry> _exerciseHistory = new();
 
     public GameSession(bool persistenceEnabled = true)
     {
@@ -98,6 +99,8 @@ public sealed class GameSession
 
     public IReadOnlyList<DungeonProgressEntry> DungeonProgress => _dungeonProgress;
 
+    public IReadOnlyList<ExerciseHistoryEntry> ExerciseHistory => _exerciseHistory;
+
     public SaveStatus GetSaveStatus()
     {
         return new SaveStatus(
@@ -141,6 +144,7 @@ public sealed class GameSession
         _tutorial = new TutorialProgress();
         _bodyMetrics.Clear();
         _dungeonProgress.Clear();
+        _exerciseHistory.Clear();
         _noticeBoardRefreshKey = GetTodayRefreshKey();
         _dailyStateKey = GetTodayRefreshKey();
         _moonlightRecoveryUsed = false;
@@ -357,7 +361,46 @@ public sealed class GameSession
         LastSetSummary = null;
     }
 
-    public void RecordStageResult(RunSummary summary)
+    public ExerciseHistoryEntry? GetLastExerciseHistory(string exerciseId)
+    {
+        if (string.IsNullOrWhiteSpace(exerciseId))
+        {
+            return null;
+        }
+
+        return _exerciseHistory
+            .Where(entry => entry.ExerciseId == exerciseId)
+            .OrderByDescending(entry => entry.CompletedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public ExercisePersonalRecord? GetExercisePersonalRecord(string exerciseId)
+    {
+        if (string.IsNullOrWhiteSpace(exerciseId))
+        {
+            return null;
+        }
+
+        var entries = _exerciseHistory
+            .Where(entry => entry.ExerciseId == exerciseId)
+            .ToArray();
+        if (entries.Length == 0)
+        {
+            return null;
+        }
+
+        var weights = entries
+            .Where(entry => entry.WeightKg.HasValue)
+            .Select(entry => entry.WeightKg!.Value)
+            .ToArray();
+        return new ExercisePersonalRecord(
+            exerciseId,
+            weights.Length == 0 ? null : weights.Max(),
+            entries.Max(entry => entry.ActualReps),
+            entries.Max(entry => entry.ActualSets));
+    }
+
+    public void RecordStageResult(RunSummary summary, ExerciseHistoryEntry? exerciseRecord = null)
     {
         RefreshNoticeBoardIfExpired();
         var appliedSummary = EnsureTrainingExperience(summary);
@@ -367,6 +410,7 @@ public sealed class GameSession
             appliedSummary = ApplyRouteFatigue(ActiveRun, appliedSummary);
             LastRunSummary = appliedSummary;
             var completedStage = ActiveRun.CurrentStage;
+            RecordExerciseHistory(completedStage, appliedSummary, exerciseRecord);
             LastSetSummary = _dungeonRunService.RecordStageResult(ActiveRun, appliedSummary);
             var levelsGained = Player.AddExperience(appliedSummary.ExperienceGained);
             if (levelsGained > 0)
@@ -402,7 +446,49 @@ public sealed class GameSession
         else
         {
             LastRunSummary = appliedSummary;
+            RecordExerciseHistory(null, appliedSummary, exerciseRecord);
         }
+    }
+
+    private void RecordExerciseHistory(TaskTemplate? completedStage, RunSummary summary, ExerciseHistoryEntry? exerciseRecord)
+    {
+        if (exerciseRecord is null)
+        {
+            return;
+        }
+
+        var exerciseId = !string.IsNullOrWhiteSpace(exerciseRecord.ExerciseId)
+            ? exerciseRecord.ExerciseId
+            : !string.IsNullOrWhiteSpace(summary.ExerciseId)
+                ? summary.ExerciseId
+                : completedStage?.ExerciseId ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(exerciseId))
+        {
+            return;
+        }
+
+        var plannedSets = Math.Max(0, summary.TotalSets);
+        var plannedReps = summary.TargetReps > 0
+            ? summary.TargetReps
+            : completedStage?.TargetReps ?? 0;
+        var entry = new ExerciseHistoryEntry
+        {
+            ExerciseId = exerciseId,
+            DungeonTypeId = !string.IsNullOrWhiteSpace(exerciseRecord.DungeonTypeId)
+                ? exerciseRecord.DungeonTypeId
+                : !string.IsNullOrWhiteSpace(summary.DungeonTypeId)
+                    ? summary.DungeonTypeId
+                    : completedStage?.DungeonTypeId ?? string.Empty,
+            CompletedAtUtc = NormalizeUtc(exerciseRecord.CompletedAtUtc == default ? GetUtcNow() : exerciseRecord.CompletedAtUtc),
+            PlannedSets = plannedSets,
+            PlannedReps = Math.Max(0, plannedReps),
+            ActualSets = Math.Clamp(exerciseRecord.ActualSets <= 0 ? summary.CompletedSets : exerciseRecord.ActualSets, 0, 99),
+            ActualReps = Math.Clamp(exerciseRecord.ActualReps <= 0 ? plannedReps : exerciseRecord.ActualReps, 0, 999),
+            WeightKg = exerciseRecord.WeightKg.HasValue
+                ? Math.Round(Math.Max(0, exerciseRecord.WeightKg.Value), 1, MidpointRounding.AwayFromZero)
+                : null,
+        };
+        _exerciseHistory.Add(entry);
     }
 
     private void UpdateDungeonProgress(TaskTemplate completedStage, RunSummary summary)
@@ -1218,6 +1304,8 @@ public sealed class GameSession
         _bodyMetrics.AddRange(state.BodyMetrics!);
         _dungeonProgress.Clear();
         _dungeonProgress.AddRange(state.DungeonProgress!);
+        _exerciseHistory.Clear();
+        _exerciseHistory.AddRange(state.ExerciseHistory!);
         var idleChanged = RefreshIdleRewards(persist: false);
         var hasActiveRun = state.HasActiveRun || state.ActiveStageResults!.Count > 0;
         SelectedDungeonRoute = hasActiveRun
@@ -1379,6 +1467,12 @@ public sealed class GameSession
             changed = true;
         }
 
+        if (state.ExerciseHistory is null)
+        {
+            state.ExerciseHistory = new List<ExerciseHistoryEntry>();
+            changed = true;
+        }
+
         if (state.ActiveShortTermQuests is null)
         {
             state.ActiveShortTermQuests = new List<ActiveShortTermQuest>();
@@ -1400,6 +1494,7 @@ public sealed class GameSession
         changed = NormalizeTutorialState(state, originalVersion) || changed;
         changed = NormalizeBodyProfileState(state) || changed;
         changed = NormalizeDungeonProgressState(state) || changed;
+        changed = NormalizeExerciseHistoryState(state) || changed;
         changed = NormalizeInventory(state.Inventory) || changed;
         changed = NormalizeLoadout(state.Inventory, state.EquipmentLoadout) || changed;
         changed = NormalizeLongTermQuestState(state) || changed;
@@ -1721,6 +1816,54 @@ public sealed class GameSession
         return false;
     }
 
+    private static bool NormalizeExerciseHistoryState(SaveGameState state)
+    {
+        if (state.ExerciseHistory is null)
+        {
+            state.ExerciseHistory = new List<ExerciseHistoryEntry>();
+            return true;
+        }
+
+        var normalized = state.ExerciseHistory
+            .Where(entry => entry is not null && !string.IsNullOrWhiteSpace(entry.ExerciseId))
+            .Select(entry => new ExerciseHistoryEntry
+            {
+                ExerciseId = entry.ExerciseId,
+                DungeonTypeId = entry.DungeonTypeId ?? string.Empty,
+                CompletedAtUtc = NormalizeUtc(entry.CompletedAtUtc == default ? GetUtcNow() : entry.CompletedAtUtc),
+                PlannedSets = Math.Clamp(entry.PlannedSets, 0, 99),
+                PlannedReps = Math.Clamp(entry.PlannedReps, 0, 999),
+                ActualSets = Math.Clamp(entry.ActualSets, 0, 99),
+                ActualReps = Math.Clamp(entry.ActualReps, 0, 999),
+                WeightKg = entry.WeightKg.HasValue
+                    ? Math.Round(Math.Clamp(entry.WeightKg.Value, 0, 999), 1, MidpointRounding.AwayFromZero)
+                    : null,
+            })
+            .OrderBy(entry => entry.CompletedAtUtc)
+            .ToList();
+
+        var changed = normalized.Count != state.ExerciseHistory.Count;
+        if (!changed)
+        {
+            changed = normalized.Zip(state.ExerciseHistory).Any(pair =>
+                pair.First.ExerciseId != pair.Second.ExerciseId ||
+                pair.First.DungeonTypeId != pair.Second.DungeonTypeId ||
+                pair.First.CompletedAtUtc != pair.Second.CompletedAtUtc ||
+                pair.First.PlannedSets != pair.Second.PlannedSets ||
+                pair.First.PlannedReps != pair.Second.PlannedReps ||
+                pair.First.ActualSets != pair.Second.ActualSets ||
+                pair.First.ActualReps != pair.Second.ActualReps ||
+                pair.First.WeightKg != pair.Second.WeightKg);
+        }
+
+        if (changed)
+        {
+            state.ExerciseHistory = normalized;
+        }
+
+        return changed;
+    }
+
     private static bool NormalizeLoadout(List<EquipmentItem> inventory, EquipmentLoadout loadout)
     {
         var changed = false;
@@ -1775,6 +1918,9 @@ public sealed class GameSession
                 .ToList(),
             DungeonProgress = _dungeonProgress
                 .Select(CloneDungeonProgress)
+                .ToList(),
+            ExerciseHistory = _exerciseHistory
+                .Select(CloneExerciseHistory)
                 .ToList(),
             Tutorial = CloneTutorial(_tutorial),
             DailyStateKey = _dailyStateKey,
@@ -2051,6 +2197,21 @@ public sealed class GameSession
             ExperienceToNextLevel = entry.ExperienceToNextLevel,
             CompletedRooms = entry.CompletedRooms,
             BossClears = entry.BossClears,
+        };
+    }
+
+    private static ExerciseHistoryEntry CloneExerciseHistory(ExerciseHistoryEntry entry)
+    {
+        return new ExerciseHistoryEntry
+        {
+            ExerciseId = entry.ExerciseId,
+            DungeonTypeId = entry.DungeonTypeId,
+            CompletedAtUtc = entry.CompletedAtUtc,
+            PlannedSets = entry.PlannedSets,
+            PlannedReps = entry.PlannedReps,
+            ActualSets = entry.ActualSets,
+            ActualReps = entry.ActualReps,
+            WeightKg = entry.WeightKg,
         };
     }
 

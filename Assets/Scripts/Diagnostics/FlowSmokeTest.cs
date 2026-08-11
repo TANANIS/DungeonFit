@@ -115,6 +115,7 @@ public static class FlowSmokeTest
         lines.AddRange(RunIdleRewardSmoke());
         lines.AddRange(RunBlacksmithSmoke());
         lines.AddRange(RunBetaContentSmoke());
+        lines.AddRange(RunExerciseHistorySmoke());
         lines.AddRange(RunActorVisualSmoke());
         lines.AddRange(RunRunInterruptionSmoke());
         lines.AddRange(RunChurchSmoke());
@@ -579,6 +580,52 @@ public static class FlowSmokeTest
                     !string.IsNullOrWhiteSpace(exercise.SafetyNote));
             yield return $"BETA_EXERCISES dungeon={dungeonTypeId} count={dungeonExercises.Count} recommended={dungeonExercises.Count(exercise => exercise.IsRecommended)} complete={complete}";
         }
+    }
+
+    private static IEnumerable<string> RunExerciseHistorySmoke()
+    {
+        var session = new GameSession(persistenceEnabled: false);
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
+            new DungeonRouteSlot("shoulders", 4, 12, "chest_quest_01", 90, "shoulders_pike_push_up"),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90, "legs_bodyweight_squat"),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90, "core_plank"),
+        });
+        session.StartOrGetActiveRun();
+        var stage = session.ActiveRun!.CurrentStage;
+        var summary = new RunSummary(
+            "Smoke Cleared",
+            stage.RoomName,
+            3,
+            3,
+            new RewardBundle(RewardSource.DungeonRoom, 10, null),
+            CompletedResults(3),
+            null,
+            session.Player.CurrentHp,
+            10,
+            ExerciseId: stage.ExerciseId,
+            DungeonTypeId: stage.DungeonTypeId,
+            TargetReps: 15);
+        session.RecordStageResult(summary, new ExerciseHistoryEntry
+        {
+            ExerciseId = stage.ExerciseId,
+            DungeonTypeId = stage.DungeonTypeId,
+            PlannedSets = 3,
+            PlannedReps = 15,
+            ActualSets = 3,
+            ActualReps = 15,
+        });
+        var last = session.GetLastExerciseHistory(stage.ExerciseId);
+        var record = session.GetExercisePersonalRecord(stage.ExerciseId);
+        yield return $"EXERCISE_HISTORY count={session.ExerciseHistory.Count} last={last?.ExerciseId ?? "none"} sets={last?.ActualSets ?? -1} reps={last?.ActualReps ?? -1} weight={(last?.WeightKg.HasValue == true ? last.WeightKg.Value.ToString("0.#") : "bodyweight")} prReps={record?.MaxReps ?? -1}";
+
+        var migrated = new SaveGameState
+        {
+            ExerciseHistory = null,
+        };
+        var changed = GameSession.NormalizeSaveState(migrated);
+        yield return $"EXERCISE_HISTORY_MIGRATION changed={changed} count={migrated.ExerciseHistory?.Count ?? -1} version={migrated.Version}";
     }
 
     private static IEnumerable<string> RunActorVisualSmoke()

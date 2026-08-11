@@ -70,6 +70,7 @@ public static class FlowSmokeUiLoader
                 session.BuildRoomSupplyViewModel());
             parent.AddChild(room);
             yield return "ROOM_CHALLENGE_UI_LOADED";
+            yield return $"ROOM_CHALLENGE_PREPARING {room.SmokeIsPreparing()} timer={room.SmokeTimerText()}";
             yield return $"ROOM_PAUSE_OPENED {room.SmokeOpenPauseMenu()}";
             yield return $"ROOM_PAUSE_RESUMED {room.SmokeResumePauseMenu()}";
             Release(parent, room);

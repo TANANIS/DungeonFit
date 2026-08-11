@@ -558,9 +558,9 @@ public partial class RouteSlotDialogView : Control
             .Where(exercise => _activeFilter switch
             {
                 ExerciseFilter.Recommended => exercise.IsRecommended,
-                ExerciseFilter.Machine => exercise.TrainingType == Text.Machine,
-                ExerciseFilter.Dumbbell => exercise.TrainingType == Text.Dumbbell,
-                ExerciseFilter.Bodyweight => exercise.TrainingType == Text.Bodyweight,
+                ExerciseFilter.Machine => exercise.TrainingType == ExerciseCatalog.Machine,
+                ExerciseFilter.Dumbbell => exercise.TrainingType == ExerciseCatalog.Dumbbell,
+                ExerciseFilter.Bodyweight => exercise.TrainingType == ExerciseCatalog.Bodyweight,
                 _ => true,
             });
     }

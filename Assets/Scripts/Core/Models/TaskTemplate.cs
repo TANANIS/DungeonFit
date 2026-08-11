@@ -17,4 +17,6 @@ public sealed record TaskTemplate(
 	public int RestSeconds { get; init; } = 90;
 
 	public int DungeonLevel { get; init; } = 1;
+
+	public string ExerciseId { get; init; } = string.Empty;
 }

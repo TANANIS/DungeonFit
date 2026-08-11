@@ -66,6 +66,7 @@ Wave peak also drives battle presentation. Each rep emits an attack anticipation
 
 Room Challenge is controlled by an explicit phase controller:
 
+- `Preparing`
 - `ActiveWave`
 - `RestCounting`
 - `AwaitingReport`
@@ -81,16 +82,23 @@ Room Challenge is controlled by an explicit phase controller:
 The intended flow is:
 
 ```text
-Wave completed
+Enter room
+-> 3 second preparation countdown
+-> Active Wave
+-> Wave completed
 -> Rest countdown
 -> Ready now
 -> player reports completed or withdraw
+-> next wave 3 second preparation countdown
 -> next wave active
 -> 4/4 completed
 -> Boss Cleared
+-> enter actual training record
 -> Continue
 -> Set Summary
 ```
+
+During rest, the player can adjust only the current room's remaining target sets and next-wave reps. These runtime changes do not rewrite the saved Dungeon Route.
 
 If the player chooses to end training from Set Summary, the flow must go to Daily Summary first, not directly back to Town. Gold is applied only after Daily Summary `Open All`.
 
@@ -250,6 +258,7 @@ Current saved data includes:
 - Banked rewards.
 - Daily reward claimed state.
 - Last run summary.
+- Exercise history entries for last performance and PR-style lookups. PR values are derived from history instead of saved as duplicate state.
 - Notice Board refresh key for the current 24-hour short-term quest board.
 - Active short-term quest state.
 
@@ -258,6 +267,7 @@ Save is triggered when:
 - The route is updated.
 - A run starts.
 - A stage result is banked.
+- A post-room exercise record is submitted.
 - Daily rewards are claimed.
 - The daily run is completed and the player returns to Town. At this point the selected route is cleared so the next dungeon entry starts from a blank plan.
 

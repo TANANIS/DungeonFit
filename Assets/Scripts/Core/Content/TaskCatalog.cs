@@ -59,6 +59,7 @@ public sealed class TaskCatalog
         {
             MusicId = slot.MusicId,
             RestSeconds = timing.RestSeconds,
+            ExerciseId = exercise.Id,
         };
     }
 }

@@ -5,6 +5,11 @@ namespace DungeonFit.Core.Models;
 
 public sealed class RoomRun
 {
+	private const int MinSets = 1;
+	private const int MaxSets = 8;
+	private const int MinReps = 1;
+	private const int MaxReps = 50;
+
 	private readonly List<CompletionResult> _setResults = new();
 	private readonly List<CombatSetResult> _combatResults = new();
 	private readonly PlayerCombatStats _playerStats;
@@ -26,6 +31,8 @@ public sealed class RoomRun
 		_playerStats = playerStats;
 		_enemy = enemy;
 		_enemyLevel = Math.Max(1, task.DungeonLevel);
+		TargetSets = Math.Clamp(task.TotalSets, MinSets, MaxSets);
+		TargetReps = Math.Clamp(task.TargetReps, MinReps, MaxReps);
 		CurrentPlayerHp = Math.Clamp(initialPlayerHp, 0, playerStats.MaxHp);
 	}
 
@@ -33,7 +40,11 @@ public sealed class RoomRun
 
 	public int CurrentPlayerHp { get; private set; }
 
-	public bool IsComplete => _setResults.Count >= Task.TotalSets;
+	public int TargetSets { get; private set; }
+
+	public int TargetReps { get; private set; }
+
+	public bool IsComplete => _setResults.Count >= TargetSets;
 
 	public bool IsSkipped { get; private set; }
 
@@ -47,10 +58,17 @@ public sealed class RoomRun
 
 	public RoomProgress Progress => new(
 		IsComplete || IsSkipped ? _setResults.Count : _setResults.Count + 1,
-		Task.TotalSets,
-		!IsComplete && !IsSkipped && _setResults.Count + 1 == Task.TotalSets,
+		TargetSets,
+		!IsComplete && !IsSkipped && _setResults.Count + 1 == TargetSets,
 		IsComplete,
 		IsSkipped);
+
+	public void AdjustTargets(int targetSets, int targetReps)
+	{
+		var minimumSets = Math.Clamp(Progress.CurrentSet, MinSets, MaxSets);
+		TargetSets = Math.Clamp(targetSets, minimumSets, MaxSets);
+		TargetReps = Math.Clamp(targetReps, MinReps, MaxReps);
+	}
 
 	public ActiveSetCombatState BeginActiveSet()
 	{

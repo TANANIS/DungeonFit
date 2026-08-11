@@ -303,7 +303,9 @@ public partial class Main : Control
             activeRun.CurrentStageIndex + 1,
             activeRun.Plan.Stages.Count,
             activeRun.CurrentPlayerHp,
-            _session.BuildRoomSupplyViewModel());
+            _session.BuildRoomSupplyViewModel(),
+            _session.GetLastExerciseHistory(activeRun.CurrentStage.ExerciseId),
+            _session.GetExercisePersonalRecord(activeRun.CurrentStage.ExerciseId));
         room.RoomContinueRequested += CompleteRoomAndShowSetSummary;
         room.ReturnToTownRequested += ReturnTownFromPausedRoom;
         room.SmallPotionRequested += currentHp => _session.UseSmallPotionInRoom(currentHp);
@@ -315,9 +317,9 @@ public partial class Main : Control
         ShowTown();
     }
 
-    private void CompleteRoomAndShowSetSummary(RunSummary summary)
+    private void CompleteRoomAndShowSetSummary(RunSummary summary, ExerciseHistoryEntry? exerciseRecord)
     {
-        _session.RecordStageResult(summary);
+        _session.RecordStageResult(summary, exerciseRecord);
         ShowSetSummary();
     }
 

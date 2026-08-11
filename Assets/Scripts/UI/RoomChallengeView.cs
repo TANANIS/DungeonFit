@@ -16,7 +16,9 @@ public partial class RoomChallengeView : Control
     private readonly EnemyCatalog _enemyCatalog = new();
     private readonly RoomPhaseController _phase = new();
 
-    public event Action<RunSummary>? RoomContinueRequested;
+    private const double PrepareSeconds = 3;
+
+    public event Action<RunSummary, ExerciseHistoryEntry?>? RoomContinueRequested;
     public event Action<int>? ReturnToTownRequested;
     public event Func<int, SupplyUseResult>? SmallPotionRequested;
 
@@ -27,11 +29,17 @@ public partial class RoomChallengeView : Control
     private int _initialPlayerHp;
     private RunSummary? _lastSummary;
     private RoomSupplyViewModel _supply = new(0, 3, false);
+    private ExerciseHistoryEntry? _lastExerciseHistory;
+    private ExercisePersonalRecord? _exercisePersonalRecord;
     private RoomRun _room = null!;
     private WorkoutTimingProfile _timing = null!;
+    private string _selectedMusicId = string.Empty;
+    private double _prepareRemainingSeconds;
+    private string _pendingWaveMessage = string.Empty;
     private double _restRemainingSeconds;
     private bool _isRestCountingDown;
     private bool _isPaused;
+    private bool _restartMusicOnResume;
     private RoomAudioBridge _audioBridge = null!;
     private RoomResultPresenter _resultPresenter = null!;
     private BattleEncounterView _battleEncounter = null!;
@@ -44,6 +52,8 @@ public partial class RoomChallengeView : Control
     private Label _actionName = null!;
     private Label _setStatus = null!;
     private Label _restStatus = null!;
+    private Label _timerLabel = null!;
+    private Label _pauseMusicLabel = null!;
     private PanelContainer _restPanel = null!;
     private PanelContainer _reportPanel = null!;
     private PanelContainer _resultPanel = null!;
@@ -51,6 +61,10 @@ public partial class RoomChallengeView : Control
     private PanelContainer _supplyPanel = null!;
     private Label _supplyStatus = null!;
     private Button _smallPotionButton = null!;
+    private Button _reduceSetButton = null!;
+    private Button _increaseSetButton = null!;
+    private Button _reduceRepButton = null!;
+    private Button _increaseRepButton = null!;
     private WaveIndicatorView _waveIndicator = null!;
 
     public override void _Ready()
@@ -60,6 +74,7 @@ public partial class RoomChallengeView : Control
         _goldLabel = GetNode<Label>("%GoldLabel");
         _challengeName = GetNode<Label>("%ChallengeName");
         _roomName = GetNode<Label>("%RoomName");
+        _timerLabel = GetNode<Label>("%TimerLabel");
         _waveMarkers = GetNode<Label>("%WaveMarkers");
         _battleMessage = GetNode<Label>("%BattleMessage");
         _beatSubtitle = GetNode<Label>("%BeatSubtitle");
@@ -79,6 +94,10 @@ public partial class RoomChallengeView : Control
         _supplyPanel = GetNode<PanelContainer>("%SupplyPanel");
         _supplyStatus = GetNode<Label>("%SupplyStatus");
         _smallPotionButton = GetNode<Button>("%SmallPotionButton");
+        _reduceSetButton = GetNode<Button>("%ReduceSetButton");
+        _increaseSetButton = GetNode<Button>("%IncreaseSetButton");
+        _reduceRepButton = GetNode<Button>("%ReduceRepButton");
+        _increaseRepButton = GetNode<Button>("%IncreaseRepButton");
         _waveIndicator = GetNode<WaveIndicatorView>("%WaveIndicator");
         _battleEncounter = new BattleEncounterView(
             GetNode<PanelContainer>("%PlayerToken"),
@@ -120,6 +139,14 @@ public partial class RoomChallengeView : Control
         var extendButton = GetNode<Button>("%ExtendRestButton");
         DungeonFitUi.ApplyButton(extendButton, UiButtonStyle.Secondary);
         extendButton.Pressed += ExtendRest;
+        DungeonFitUi.ApplyButton(_reduceSetButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(_increaseSetButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(_reduceRepButton, UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyButton(_increaseRepButton, UiButtonStyle.Secondary);
+        _reduceSetButton.Pressed += () => AdjustRoomTargets(-1, 0);
+        _increaseSetButton.Pressed += () => AdjustRoomTargets(1, 0);
+        _reduceRepButton.Pressed += () => AdjustRoomTargets(0, -1);
+        _increaseRepButton.Pressed += () => AdjustRoomTargets(0, 1);
         DungeonFitUi.ApplyButton(_smallPotionButton, UiButtonStyle.Secondary);
         DungeonFitUi.ApplyIconTextContent(_smallPotionButton, UiThemePaths.RoomPotion, Text.UsePotion, 32, 22, vertical: false);
         _smallPotionButton.Pressed += UseSmallPotion;
@@ -137,7 +164,25 @@ public partial class RoomChallengeView : Control
     {
         _audioBridge.Process(delta);
 
-        if (_isPaused || !_isRestCountingDown)
+        if (_isPaused)
+        {
+            return;
+        }
+
+        if (_phase.IsPreparing)
+        {
+            _prepareRemainingSeconds = Math.Max(0, _prepareRemainingSeconds - delta);
+            Refresh(_room.Progress);
+
+            if (_prepareRemainingSeconds <= 0)
+            {
+                StartWave(_pendingWaveMessage);
+            }
+
+            return;
+        }
+
+        if (!_isRestCountingDown)
         {
             return;
         }
@@ -178,7 +223,9 @@ public partial class RoomChallengeView : Control
         int stageNumber,
         int totalStages,
         int initialPlayerHp,
-        RoomSupplyViewModel? supply = null)
+        RoomSupplyViewModel? supply = null,
+        ExerciseHistoryEntry? lastExerciseHistory = null,
+        ExercisePersonalRecord? exercisePersonalRecord = null)
     {
         _player = player;
         _task = task;
@@ -186,6 +233,8 @@ public partial class RoomChallengeView : Control
         _totalStages = totalStages;
         _initialPlayerHp = initialPlayerHp;
         _supply = supply ?? new RoomSupplyViewModel(0, 3, false);
+        _lastExerciseHistory = lastExerciseHistory;
+        _exercisePersonalRecord = exercisePersonalRecord;
 
         if (IsNodeReady())
         {
@@ -203,6 +252,16 @@ public partial class RoomChallengeView : Control
     {
         ResumeDungeon();
         return !_isPaused && !_pausePanel.Visible;
+    }
+
+    public bool SmokeIsPreparing()
+    {
+        return _phase.IsPreparing && _prepareRemainingSeconds > 0;
+    }
+
+    public string SmokeTimerText()
+    {
+        return _timerLabel.Text;
     }
 
     public bool SmokeShowEnemyVisual(string dungeonTypeId, int currentSet, int totalSets, bool isBossWave)
@@ -235,16 +294,16 @@ public partial class RoomChallengeView : Control
     {
         var enemy = _enemyCatalog.GetForDungeon(_task.DungeonTypeId);
         _room = _roomService.Start(_task, _player.CombatStats, enemy, _initialPlayerHp);
-        _timing = _routeRules.CreateTimingProfile(
-            new DungeonRouteSlot(_task.DungeonTypeId, _task.TotalSets, _task.TargetReps, _task.MusicId, _task.RestSeconds),
-            _task.Bpm);
+        _selectedMusicId = _task.MusicId;
+        RebuildTimingProfile();
         _battleEncounter.SetEnemy(enemy, _task.DungeonLevel);
         _isPaused = false;
+        _restartMusicOnResume = false;
         _pausePanel.Visible = false;
         _restPanel.Visible = false;
         _reportPanel.Visible = false;
         _resultPresenter.Hide();
-        StartWave(Text.WaveActive);
+        StartPreparing(Text.WaveActive);
         Refresh(_room.Progress);
     }
 
@@ -306,6 +365,29 @@ public partial class RoomChallengeView : Control
         status.AddThemeFontSizeOverride("font_size", 28);
         layout.AddChild(status);
 
+        _pauseMusicLabel = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        _pauseMusicLabel.AddThemeFontSizeOverride("font_size", 26);
+        layout.AddChild(_pauseMusicLabel);
+
+        var musicRow = new HBoxContainer
+        {
+            CustomMinimumSize = new Vector2(0, 72),
+        };
+        musicRow.AddThemeConstantOverride("separation", 14);
+        layout.AddChild(musicRow);
+
+        var previousMusicButton = CreatePauseMenuButton(Text.PreviousMusic, UiButtonStyle.Secondary);
+        previousMusicButton.Pressed += () => CycleMusic(-1);
+        musicRow.AddChild(previousMusicButton);
+
+        var nextMusicButton = CreatePauseMenuButton(Text.NextMusic, UiButtonStyle.Secondary);
+        nextMusicButton.Pressed += () => CycleMusic(1);
+        musicRow.AddChild(nextMusicButton);
+
         var resumeButton = CreatePauseMenuButton(Text.ResumeDungeon, UiButtonStyle.Primary);
         resumeButton.Pressed += ResumeDungeon;
         layout.AddChild(resumeButton);
@@ -327,6 +409,24 @@ public partial class RoomChallengeView : Control
         return button;
     }
 
+    private void StartPreparing(string message)
+    {
+        _isPaused = false;
+        _restartMusicOnResume = false;
+        _pausePanel.Visible = false;
+        _phase.StartPreparing();
+        _prepareRemainingSeconds = PrepareSeconds;
+        _pendingWaveMessage = message;
+        _isRestCountingDown = false;
+        _restPanel.Visible = false;
+        _reportPanel.Visible = false;
+        _waveIndicator.ShowRest();
+        _audioBridge.StopImmediate();
+        _beatSubtitle.Text = Text.Preparing;
+        _battleMessage.Text = $"{message}\n{string.Format(Text.PreparingMessage, Math.Ceiling(_prepareRemainingSeconds))}";
+        Refresh(_room.Progress);
+    }
+
     private void StartWave(string message)
     {
         _isPaused = false;
@@ -337,11 +437,13 @@ public partial class RoomChallengeView : Control
         _reportPanel.Visible = false;
         _beatSubtitle.Text = _room.Progress.IsBossWave ? Text.BossBeatFlow : Text.BeatFlow;
         _battleMessage.Text = message;
+        RebuildTimingProfile();
         _waveIndicator.Configure(_timing);
         var combatState = _roomService.BeginActiveSet(_room);
         _waveIndicator.StartSet();
-        _audioBridge.StartActiveSet(_task.MusicId, _timing.ActiveSetSeconds);
+        _audioBridge.StartActiveSet(_selectedMusicId, _timing.ActiveSetSeconds);
         _battleEncounter.ShowActiveWave(_room.Progress, combatState);
+        Refresh(_room.Progress);
     }
 
     private void EnterBreak()
@@ -413,7 +515,7 @@ public partial class RoomChallengeView : Control
         }
 
         var message = BuildSetResultMessage(combatResult);
-        StartWave(message);
+        StartPreparing(message);
         Refresh(progress);
     }
 
@@ -439,14 +541,17 @@ public partial class RoomChallengeView : Control
             title,
             _task.RoomName,
             _room.Progress.CompletedSets,
-            _task.TotalSets,
+            _room.TargetSets,
             reward,
             _room.SetResults.ToArray(),
             _room.CombatResults.ToArray(),
             _room.CurrentPlayerHp,
-            TrainingExperienceRules.Calculate(_room.Progress.CompletedSets, _task.TotalSets, _room.CombatResults));
+            TrainingExperienceRules.Calculate(_room.Progress.CompletedSets, _room.TargetSets, _room.CombatResults),
+            TargetReps: _room.TargetReps,
+            ExerciseId: _task.ExerciseId,
+            DungeonTypeId: _task.DungeonTypeId);
         _battleEncounter.ShowResult(_room.Progress, _room.CombatResults.LastOrDefault());
-        _resultPresenter.Show(_lastSummary);
+        _resultPresenter.Show(_lastSummary, _task, _lastExerciseHistory, _exercisePersonalRecord);
         _supplyPanel.Visible = false;
         _battleMessage.Text = title == "Boss Cleared"
             ? Text.StageRewardBanked
@@ -458,34 +563,148 @@ public partial class RoomChallengeView : Control
     {
         _roomName.Text = string.Format(Text.RoomNameFormat, _stageNumber, _totalStages, GetDungeonName(_task));
         _challengeName.Text = _task.ChallengeName;
-        _actionName.Text = string.Format(Text.ActionFormat, _task.ActionName, _task.TotalSets, _task.TargetReps);
+        _actionName.Text = string.Format(Text.ActionFormat, _task.ActionName, _room.TargetSets, _room.TargetReps);
         _setStatus.Text = progress.IsComplete
-            ? string.Format(Text.SetCompleteFormat, _task.TotalSets, _task.TotalSets)
+            ? string.Format(Text.SetCompleteFormat, progress.TotalSets, progress.TotalSets)
             : progress.IsSkipped
                 ? Text.WithdrawnStatus
                 : _isRestCountingDown
                     ? string.Format(Text.SetRestFormat, progress.CurrentSet, progress.TotalSets, Math.Ceiling(_restRemainingSeconds))
+                    : _phase.IsPreparing
+                        ? string.Format(Text.SetPreparingFormat, progress.CurrentSet, progress.TotalSets)
                     : _phase.IsActiveWave
                         ? string.Format(Text.SetActiveFormat, progress.CurrentSet, progress.TotalSets)
                         : string.Format(Text.SetWaitingRestFormat, progress.CurrentSet, progress.TotalSets, _timing.RestSeconds);
         _restStatus.Text = _isRestCountingDown
             ? string.Format(Text.RestTimerFormat, FormatSeconds(_restRemainingSeconds))
+            : _phase.IsPreparing
+                ? string.Format(Text.PrepareTimerFormat, FormatSeconds(_prepareRemainingSeconds))
             : _phase.IsActiveWave
                 ? string.Format(Text.ActiveWaveFormat, _timing.RepsPerMinute)
                 : string.Format(Text.RestTimerFormat, FormatSeconds(_timing.RestSeconds));
+        _timerLabel.Text = BuildTopTimerText();
         if (_isPaused)
         {
             _setStatus.Text = Text.PausedStatus;
             _restStatus.Text = Text.PausedStatus;
+            _timerLabel.Text = Text.PausedStatus;
         }
 
         _waveMarkers.Text = BuildWaveMarkers(progress);
         _goldLabel.Text = string.Format(Text.GoldFormat, _player.Gold);
         GetNode<Label>("%NowPlaying").Text = string.Format(
             Text.NowPlayingFormat,
-            _musicCatalog.GetById(_task.MusicId).DisplayName,
+            _musicCatalog.GetById(_selectedMusicId).DisplayName,
             _timing.RepsPerMinute);
+        RefreshRestAdjustmentButtons(progress);
+        RefreshPauseMusicLabel();
         RefreshSupply();
+    }
+
+    private string BuildTopTimerText()
+    {
+        if (_phase.IsPreparing)
+        {
+            return string.Format(Text.TopPrepareTimerFormat, FormatSeconds(_prepareRemainingSeconds));
+        }
+
+        if (_isRestCountingDown)
+        {
+            return string.Format(Text.TopRestTimerFormat, FormatSeconds(_restRemainingSeconds));
+        }
+
+        if (_phase.IsActiveWave)
+        {
+            return string.Format(Text.TopActiveTimerFormat, FormatSeconds(_waveIndicator.RemainingSeconds));
+        }
+
+        if (_phase.IsAwaitingReport)
+        {
+            return Text.AwaitingReportTimer;
+        }
+
+        if (_phase.IsResult)
+        {
+            return Text.ResultTimer;
+        }
+
+        return Text.ReadyTimer;
+    }
+
+    private void RefreshRestAdjustmentButtons(RoomProgress progress)
+    {
+        var canAdjust = _isRestCountingDown;
+        _reduceSetButton.Disabled = !canAdjust || _room.TargetSets <= progress.CurrentSet;
+        _increaseSetButton.Disabled = !canAdjust || _room.TargetSets >= DungeonRouteRules.MaxSets;
+        _reduceRepButton.Disabled = !canAdjust || _room.TargetReps <= DungeonRouteRules.MinReps;
+        _increaseRepButton.Disabled = !canAdjust || _room.TargetReps >= DungeonRouteRules.MaxReps;
+        _reduceSetButton.Text = Text.ReduceSet;
+        _increaseSetButton.Text = Text.IncreaseSet;
+        _reduceRepButton.Text = Text.ReduceRep;
+        _increaseRepButton.Text = Text.IncreaseRep;
+    }
+
+    private void RefreshPauseMusicLabel()
+    {
+        if (_pauseMusicLabel is null)
+        {
+            return;
+        }
+
+        var track = _musicCatalog.GetById(_selectedMusicId);
+        _pauseMusicLabel.Text = string.Format(Text.PauseMusicFormat, track.DisplayName);
+    }
+
+    private void AdjustRoomTargets(int setDelta, int repDelta)
+    {
+        if (!_isRestCountingDown)
+        {
+            return;
+        }
+
+        _room.AdjustTargets(_room.TargetSets + setDelta, _room.TargetReps + repDelta);
+        RebuildTimingProfile();
+        _battleMessage.Text = string.Format(Text.RoomTargetsAdjusted, _room.TargetSets, _room.TargetReps);
+        Refresh(_room.Progress);
+    }
+
+    private void CycleMusic(int delta)
+    {
+        var tracks = _musicCatalog.GetAll();
+        var currentIndex = 0;
+        for (var index = 0; index < tracks.Count; index++)
+        {
+            if (tracks[index].Id == _selectedMusicId)
+            {
+                currentIndex = index;
+                break;
+            }
+        }
+
+        var nextIndex = (currentIndex + delta + tracks.Count) % tracks.Count;
+        _selectedMusicId = tracks[nextIndex].Id;
+        RebuildTimingProfile();
+        if (_phase.IsActiveWave)
+        {
+            _audioBridge.StopImmediate();
+            _restartMusicOnResume = _isPaused;
+        }
+
+        _battleMessage.Text = string.Format(Text.MusicChanged, tracks[nextIndex].DisplayName);
+        Refresh(_room.Progress);
+    }
+
+    private void RebuildTimingProfile()
+    {
+        _timing = _routeRules.CreateTimingProfile(
+            new DungeonRouteSlot(
+                _task.DungeonTypeId,
+                _room.TargetSets,
+                _room.TargetReps,
+                _selectedMusicId,
+                _task.RestSeconds,
+                _task.ExerciseId),
+            _task.Bpm);
     }
 
     private void UseSmallPotion()
@@ -573,6 +792,12 @@ public partial class RoomChallengeView : Control
         _isPaused = false;
         _waveIndicator.SetPaused(false);
         _audioBridge.SetPaused(false);
+        if (_restartMusicOnResume && _phase.IsActiveWave)
+        {
+            _audioBridge.StartActiveSet(_selectedMusicId, _timing.ActiveSetSeconds);
+            _restartMusicOnResume = false;
+        }
+
         _pausePanel.Visible = false;
         _battleMessage.Text = Text.ResumedMessage;
         Refresh(_room.Progress);
@@ -615,10 +840,10 @@ public partial class RoomChallengeView : Control
         Refresh(_room.Progress);
     }
 
-    private void RequestRoomExit(RunSummary summary)
+    private void RequestRoomExit(RunSummary summary, ExerciseHistoryEntry? exerciseRecord)
     {
         _audioBridge.StopImmediate();
-        RoomContinueRequested?.Invoke(summary);
+        RoomContinueRequested?.Invoke(summary, exerciseRecord);
     }
 
     private static string FormatSeconds(double seconds)
@@ -648,6 +873,8 @@ public partial class RoomChallengeView : Control
         public const string WaveActive = "Wave \u555f\u52d5\u3002\u8ddf\u8457\u7bc0\u594f\u5b8c\u6210\u9019\u7d44\uff0c\u76f4\u5230\u9032\u5165\u4f11\u606f\u3002";
         public const string BossBeatFlow = "Boss \u7bc0\u594f";
         public const string BeatFlow = "\u7bc0\u594f\u6307\u793a";
+        public const string Preparing = "\u6e96\u5099";
+        public const string PreparingMessage = "\u6e96\u5099\u958b\u59cb\uff1a{0:0}";
         public const string Rest = "\u4f11\u606f";
         public const string BossWaveEnded = "Boss Wave \u7d50\u675f\u3002\u4f11\u606f\u5012\u6578\u958b\u59cb\u3002";
         public const string WaveEnded = "Wave \u7d50\u675f\u3002\u4f11\u606f\u5012\u6578\u958b\u59cb\u3002";
@@ -667,15 +894,32 @@ public partial class RoomChallengeView : Control
         public const string SetCompleteFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f\u5b8c\u6210";
         public const string WithdrawnStatus = "\u5df2\u64a4\u9000\uff0c\u6311\u6230\u66ab\u505c";
         public const string SetRestFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f {2:0}s";
+        public const string SetPreparingFormat = "\u7d44\u6578 {0} / {1}  \u6e96\u5099\u4e2d";
         public const string SetActiveFormat = "\u7d44\u6578 {0} / {1}  Wave \u9032\u884c\u4e2d";
         public const string SetWaitingRestFormat = "\u7d44\u6578 {0} / {1}  \u4f11\u606f {2}s";
         public const string RestTimerFormat = "\u4f11\u606f  {0}";
+        public const string PrepareTimerFormat = "\u6e96\u5099  {0}";
         public const string ActiveWaveFormat = "Wave \u9032\u884c\u4e2d  {0} BPM";
+        public const string TopPrepareTimerFormat = "\u6e96\u5099 {0}";
+        public const string TopActiveTimerFormat = "\u52d5\u4f5c {0}";
+        public const string TopRestTimerFormat = "\u4f11\u606f {0}";
+        public const string AwaitingReportTimer = "\u7b49\u5f85\u56de\u5831";
+        public const string ResultTimer = "\u623f\u9593\u7d50\u7b97";
+        public const string ReadyTimer = "\u5f85\u547d";
         public const string GoldFormat = "\u91d1\u5e63 {0}";
         public const string NowPlayingFormat = "\u64ad\u653e\u4e2d  {0}  /  Wave {1} BPM";
         public const string PauseToggled = "Wave \u66ab\u505c\u72c0\u614b\u5df2\u5207\u63db\u3002";
         public const string ReadyNow = "\u5df2\u6e96\u5099\u597d\u3002\u8acb\u56de\u5831\u9019\u7d44\u5b8c\u6210\u72c0\u614b\u3002";
         public const string RestExtended = "\u4f11\u606f\u5ef6\u9577 30 \u79d2\u3002";
+        public const string ReduceSet = "\u7d44\u6578 -";
+        public const string IncreaseSet = "\u7d44\u6578 +";
+        public const string ReduceRep = "\u6b21\u6578 -";
+        public const string IncreaseRep = "\u6b21\u6578 +";
+        public const string RoomTargetsAdjusted = "\u672c\u623f\u9593\u8abf\u6574\u70ba {0} \u7d44 x {1} \u6b21\u3002";
+        public const string PauseMusicFormat = "\u95dc\u5361\u97f3\u6a02\uff1a{0}";
+        public const string PreviousMusic = "\u4e0a\u4e00\u9996";
+        public const string NextMusic = "\u4e0b\u4e00\u9996";
+        public const string MusicChanged = "\u97f3\u6a02\u5df2\u5207\u63db\uff1a{0}";
         public const string SupplyStatus = "\u5c0f\u578b\u85e5\u6c34 {0} / {1}";
         public const string UsePotion = "\u85e5\u6c34";
         public const string PotionUsed = "\u4f7f\u7528\u5c0f\u578b\u85e5\u6c34\uff0c\u6062\u5fa9 {0} HP\u3002\u76ee\u524d HP {1}\u3002";

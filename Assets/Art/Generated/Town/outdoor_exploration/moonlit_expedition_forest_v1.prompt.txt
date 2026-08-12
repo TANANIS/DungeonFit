@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: baked_scene_mode raster backdrop for DungeonFit's fixed in-app Outdoor Exploration panel.
+Input images: Moonlit Town render reference and current TownPlayerVisual layout reference.
+Primary request: Horizontal 16:9 moonlit forest exploration background with a lower-left to center trail, a crescent moon, violet crystal clusters, dense dark pines, and an unlettered crescent-moon trail marker.
+Style/medium: High-finish retro pixel-art RPG environmental illustration matching DungeonFit's Moonlit Town palette and mobile readability.
+Composition: Keep the left-center open for the Knight overlay and the upper-right darker and simpler for status copy.
+Constraints: No characters, creatures, coins, UI panels, icons, labels, readable writing, or watermark.

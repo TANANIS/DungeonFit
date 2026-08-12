@@ -1,0 +1,237 @@
+{
+  "input": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\raw\\dungeon_emblems_3x2_alpha.png",
+  "rows": 2,
+  "cols": 3,
+  "threshold": 100,
+  "edge_threshold": 150,
+  "component_mode": "all",
+  "component_padding": 10,
+  "min_component_area": 100,
+  "edge_touch_margin": 2,
+  "accepted": [
+    {
+      "index": 0,
+      "label": "chest",
+      "grid": [
+        0,
+        0
+      ],
+      "source_box": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "component_mode": "all",
+      "component_count": 1,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        109,
+        79,
+        436,
+        433
+      ],
+      "padded_crop_bbox": [
+        99,
+        69,
+        446,
+        443
+      ],
+      "edge_touch": false,
+      "output_size": [
+        347,
+        374
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\chest\\prop.png"
+    },
+    {
+      "index": 1,
+      "label": "shoulders",
+      "grid": [
+        0,
+        1
+      ],
+      "source_box": [
+        512,
+        0,
+        1024,
+        512
+      ],
+      "component_mode": "all",
+      "component_count": 1,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        75,
+        105,
+        425,
+        438
+      ],
+      "padded_crop_bbox": [
+        65,
+        95,
+        435,
+        448
+      ],
+      "edge_touch": false,
+      "output_size": [
+        370,
+        353
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\shoulders\\prop.png"
+    },
+    {
+      "index": 2,
+      "label": "back",
+      "grid": [
+        0,
+        2
+      ],
+      "source_box": [
+        1024,
+        0,
+        1536,
+        512
+      ],
+      "component_mode": "all",
+      "component_count": 1,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        53,
+        94,
+        410,
+        438
+      ],
+      "padded_crop_bbox": [
+        43,
+        84,
+        420,
+        448
+      ],
+      "edge_touch": false,
+      "output_size": [
+        377,
+        364
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\back\\prop.png"
+    },
+    {
+      "index": 3,
+      "label": "legs",
+      "grid": [
+        1,
+        0
+      ],
+      "source_box": [
+        0,
+        512,
+        512,
+        1024
+      ],
+      "component_mode": "all",
+      "component_count": 1,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        104,
+        63,
+        417,
+        380
+      ],
+      "padded_crop_bbox": [
+        94,
+        53,
+        427,
+        390
+      ],
+      "edge_touch": false,
+      "output_size": [
+        333,
+        337
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\legs\\prop.png"
+    },
+    {
+      "index": 4,
+      "label": "core",
+      "grid": [
+        1,
+        1
+      ],
+      "source_box": [
+        512,
+        512,
+        1024,
+        1024
+      ],
+      "component_mode": "all",
+      "component_count": 2,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        83,
+        63,
+        413,
+        390
+      ],
+      "padded_crop_bbox": [
+        73,
+        53,
+        423,
+        400
+      ],
+      "edge_touch": false,
+      "output_size": [
+        350,
+        347
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\core\\prop.png"
+    },
+    {
+      "index": 5,
+      "label": "arms",
+      "grid": [
+        1,
+        2
+      ],
+      "source_box": [
+        1024,
+        512,
+        1536,
+        1024
+      ],
+      "component_mode": "all",
+      "component_count": 1,
+      "selected_component_area": null,
+      "selected_component_bbox": null,
+      "crop_bbox": [
+        69,
+        73,
+        380,
+        380
+      ],
+      "padded_crop_bbox": [
+        59,
+        63,
+        390,
+        390
+      ],
+      "edge_touch": false,
+      "output_size": [
+        331,
+        327
+      ],
+      "status": "accepted",
+      "image": "Assets\\Art\\Generated\\DungeonPlan\\dungeon_emblems\\props\\arms\\prop.png"
+    }
+  ],
+  "rejected": [],
+  "edge_touch_props": []
+}

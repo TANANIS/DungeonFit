@@ -24,12 +24,14 @@ public partial class BlacksmithView : Control
 	private string? _selectedItemId;
 	private HubHeaderControls _header = null!;
 	private GridContainer _inventoryGrid = null!;
+	private TextureRect _detailIcon = null!;
 	private Label _detailTitle = null!;
 	private Label _detailMeta = null!;
 	private Label _detailStats = null!;
 	private Button _enhanceModeButton = null!;
 	private Button _extendModeButton = null!;
 	private Button _dismantleModeButton = null!;
+	private TextureRect _operationIcon = null!;
 	private Label _operationPreview = null!;
 	private Label _operationHint = null!;
 	private Button _actionButton = null!;
@@ -56,93 +58,155 @@ public partial class BlacksmithView : Control
 	private void BuildUi()
 	{
 		DungeonFitUi.ApplyTheme(this);
-		DungeonFitUi.AddBackground(this, UiThemePaths.CommonBackground);
+		var background = DungeonFitUi.AddBackground(this, UiThemePaths.BlacksmithWorkshopBackground);
+		background.OffsetTop = -250;
+		background.OffsetBottom = -250;
 
-		var safe = new MarginContainer();
-		safe.SetAnchorsPreset(LayoutPreset.FullRect);
-		safe.AddThemeConstantOverride("margin_left", 38);
-		safe.AddThemeConstantOverride("margin_top", 46);
-		safe.AddThemeConstantOverride("margin_right", 38);
-		safe.AddThemeConstantOverride("margin_bottom", 46);
+		var shade = new ColorRect
+		{
+			Color = new Color(0.018f, 0.012f, 0.048f, 0.22f),
+			MouseFilter = MouseFilterEnum.Ignore,
+		};
+		shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+		AddChild(shade);
+
+		var safe = CreateMargin(34, 32);
+		safe.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 		AddChild(safe);
 
 		var layout = new VBoxContainer();
-		layout.AddThemeConstantOverride("separation", 18);
+		layout.AddThemeConstantOverride("separation", 14);
 		safe.AddChild(layout);
 
 		var header = HubHeaderBuilder.Build(Text.BackShort, out _header);
+		ApplyForgePanel(header, new Color(0.018f, 0.014f, 0.055f, 0.94f), new Color(0.63f, 0.23f, 0.9f, 0.98f), 3);
+		DungeonFitUi.ApplyButton(_header.ActionButton, UiButtonStyle.Primary);
 		_header.ActionButton.Pressed += () => BackToTownRequested?.Invoke();
 		layout.AddChild(header);
 
-		var hero = CreatePanel(220, UiPanelStyle.Main);
+		var hero = new Control
+		{
+			CustomMinimumSize = new Vector2(0, 480),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
 		layout.AddChild(hero);
-		var heroLayout = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-		heroLayout.AddThemeConstantOverride("separation", 8);
+		var heroLayout = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		heroLayout.SetAnchorsPreset(LayoutPreset.TopWide);
+		heroLayout.OffsetTop = 42;
+		heroLayout.OffsetBottom = 184;
+		heroLayout.AddThemeConstantOverride("separation", 4);
 		hero.AddChild(heroLayout);
-		heroLayout.AddChild(CreateCenteredLabel(Text.Title, 58));
-		heroLayout.AddChild(CreateCenteredLabel(Text.Subtitle, 30));
-		heroLayout.AddChild(CreateCenteredLabel(Text.Description, 24));
+		var title = CreateNoWrapCenteredLabel(Text.Title, 80);
+		title.AddThemeColorOverride("font_color", new Color(0.94f, 0.88f, 1f));
+		title.AddThemeColorOverride("font_outline_color", new Color(0.16f, 0.045f, 0.28f));
+		title.AddThemeConstantOverride("outline_size", 10);
+		heroLayout.AddChild(title);
+		var subtitle = CreateNoWrapCenteredLabel(Text.Subtitle, 38);
+		subtitle.AddThemeColorOverride("font_color", new Color(1f, 0.82f, 0.44f));
+		heroLayout.AddChild(subtitle);
+		heroLayout.AddChild(CreateNoWrapCenteredLabel(Text.Description, 26));
 
-		var middle = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-		middle.AddThemeConstantOverride("separation", 18);
-		layout.AddChild(middle);
+		var workstation = new PanelContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+		ApplyForgePanel(workstation, new Color(0.025f, 0.016f, 0.07f, 0.9f), new Color(0.67f, 0.24f, 0.92f, 0.95f), 4);
+		layout.AddChild(workstation);
+		var workstationMargin = CreateMargin(18, 16);
+		workstation.AddChild(workstationMargin);
+		var workstationLayout = new VBoxContainer();
+		workstationLayout.AddThemeConstantOverride("separation", 12);
+		workstationMargin.AddChild(workstationLayout);
 
-		var inventoryPanel = CreatePanel(410, UiPanelStyle.Card);
-		inventoryPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		middle.AddChild(inventoryPanel);
-		var inventoryMargin = CreateMargin(18, 16);
+		var itemRow = new HBoxContainer { CustomMinimumSize = new Vector2(0, 390) };
+		itemRow.AddThemeConstantOverride("separation", 14);
+		workstationLayout.AddChild(itemRow);
+
+		var inventoryPanel = new PanelContainer { CustomMinimumSize = new Vector2(440, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		ApplyForgePanel(inventoryPanel, new Color(0.035f, 0.022f, 0.085f, 0.9f), new Color(0.49f, 0.24f, 0.75f, 0.94f), 3);
+		itemRow.AddChild(inventoryPanel);
+		var inventoryMargin = CreateMargin(12, 12);
 		inventoryPanel.AddChild(inventoryMargin);
-		_inventoryGrid = new GridContainer { Columns = 2 };
-		_inventoryGrid.AddThemeConstantOverride("h_separation", 12);
-		_inventoryGrid.AddThemeConstantOverride("v_separation", 12);
-		inventoryMargin.AddChild(_inventoryGrid);
+		var inventoryLayout = new VBoxContainer();
+		inventoryLayout.AddThemeConstantOverride("separation", 7);
+		inventoryMargin.AddChild(inventoryLayout);
+		inventoryLayout.AddChild(CreateSectionLabel(Text.Inventory, 22));
+		_inventoryGrid = new GridContainer { Columns = 3, SizeFlagsVertical = SizeFlags.ExpandFill };
+		_inventoryGrid.AddThemeConstantOverride("h_separation", 8);
+		_inventoryGrid.AddThemeConstantOverride("v_separation", 8);
+		inventoryLayout.AddChild(_inventoryGrid);
 
-		var detailPanel = CreatePanel(410, UiPanelStyle.Card);
-		detailPanel.CustomMinimumSize = new Vector2(430, 410);
-		detailPanel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		middle.AddChild(detailPanel);
-		var detailMargin = CreateMargin(22, 20);
+		var detailPanel = new PanelContainer { CustomMinimumSize = new Vector2(460, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		ApplyForgePanel(detailPanel, new Color(0.26f, 0.16f, 0.095f, 0.96f), new Color(0.78f, 0.55f, 0.3f, 0.96f), 3);
+		itemRow.AddChild(detailPanel);
+		var detailMargin = CreateMargin(16, 14);
 		detailPanel.AddChild(detailMargin);
-		var detailLayout = new VBoxContainer();
-		detailLayout.AddThemeConstantOverride("separation", 14);
-		detailMargin.AddChild(detailLayout);
-		_detailTitle = CreateLabel(string.Empty, 34);
+		var detailRow = new HBoxContainer();
+		detailRow.AddThemeConstantOverride("separation", 14);
+		detailMargin.AddChild(detailRow);
+		var detailIconFrame = new PanelContainer
+		{
+			CustomMinimumSize = new Vector2(150, 150),
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
+		};
+		ApplyForgePanel(detailIconFrame, new Color(0.035f, 0.025f, 0.055f, 0.95f), new Color(0.35f, 0.2f, 0.5f, 0.9f), 2);
+		detailRow.AddChild(detailIconFrame);
+		var detailIconCenter = new CenterContainer();
+		detailIconFrame.AddChild(detailIconCenter);
+		_detailIcon = DungeonFitUi.CreateIcon(UiThemePaths.BlacksmithEnhanceIcon, 124, "EquipmentIcon");
+		detailIconCenter.AddChild(_detailIcon);
+		var detailLayout = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		detailLayout.AddThemeConstantOverride("separation", 7);
+		detailRow.AddChild(detailLayout);
+		_detailTitle = CreateLabel(string.Empty, 28);
+		_detailTitle.AddThemeColorOverride("font_color", new Color(0.92f, 0.68f, 1f));
 		detailLayout.AddChild(_detailTitle);
-		_detailMeta = CreateLabel(string.Empty, 25);
+		_detailMeta = CreateLabel(string.Empty, 19);
+		_detailMeta.AddThemeColorOverride("font_color", new Color(1f, 0.86f, 0.55f));
 		detailLayout.AddChild(_detailMeta);
-		_detailStats = CreateLabel(string.Empty, 25);
+		_detailStats = CreateLabel(string.Empty, 18);
+		_detailStats.SizeFlagsVertical = SizeFlags.ExpandFill;
+		_detailStats.AddThemeColorOverride("font_color", new Color(0.96f, 0.87f, 0.72f));
 		detailLayout.AddChild(_detailStats);
 
-		var modeRow = new HBoxContainer();
-		modeRow.AddThemeConstantOverride("separation", 12);
-		layout.AddChild(modeRow);
-		_enhanceModeButton = CreateButton(Text.EnhanceMode, 0, 76, 30, UiButtonStyle.Primary);
-		_enhanceModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		var modeRow = new HBoxContainer { CustomMinimumSize = new Vector2(0, 82) };
+		modeRow.AddThemeConstantOverride("separation", 10);
+		workstationLayout.AddChild(modeRow);
+		_enhanceModeButton = CreateModeButton(UiThemePaths.BlacksmithEnhanceIcon, Text.EnhanceMode);
 		_enhanceModeButton.Pressed += () => SetMode(BlacksmithMode.Enhance);
 		modeRow.AddChild(_enhanceModeButton);
-		_extendModeButton = CreateButton(Text.ExtendMode, 0, 76, 30, UiButtonStyle.Secondary);
-		_extendModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_extendModeButton = CreateModeButton(UiThemePaths.BlacksmithExtendIcon, Text.ExtendMode);
 		_extendModeButton.Pressed += () => SetMode(BlacksmithMode.Extend);
 		modeRow.AddChild(_extendModeButton);
-		_dismantleModeButton = CreateButton(Text.DismantleMode, 0, 76, 30, UiButtonStyle.Secondary);
-		_dismantleModeButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_dismantleModeButton = CreateModeButton(UiThemePaths.BlacksmithDismantleIcon, Text.DismantleMode);
 		_dismantleModeButton.Pressed += () => SetMode(BlacksmithMode.Dismantle);
 		modeRow.AddChild(_dismantleModeButton);
 
-		var operationPanel = CreatePanel(220, UiPanelStyle.Card);
-		layout.AddChild(operationPanel);
-		var operationMargin = CreateMargin(24, 18);
-		operationPanel.AddChild(operationMargin);
-		var operationLayout = new VBoxContainer();
-		operationLayout.AddThemeConstantOverride("separation", 12);
-		operationMargin.AddChild(operationLayout);
-		_operationPreview = CreateCenteredLabel(string.Empty, 28);
-		operationLayout.AddChild(_operationPreview);
-		_operationHint = CreateCenteredLabel(string.Empty, 23);
-		operationLayout.AddChild(_operationHint);
-		_actionButton = CreateButton(string.Empty, 0, 84, 34, UiButtonStyle.Primary);
+		var previewPanel = new PanelContainer { CustomMinimumSize = new Vector2(0, 290) };
+		ApplyForgePanel(previewPanel, new Color(0.045f, 0.032f, 0.09f, 0.94f), new Color(0.62f, 0.42f, 0.23f, 0.94f), 3);
+		workstationLayout.AddChild(previewPanel);
+		var previewMargin = CreateMargin(16, 10);
+		previewPanel.AddChild(previewMargin);
+		var previewRow = new HBoxContainer();
+		previewRow.AddThemeConstantOverride("separation", 18);
+		previewMargin.AddChild(previewRow);
+		_operationIcon = DungeonFitUi.CreateIcon(UiThemePaths.BlacksmithForgeIcon, 210, "ForgeActionIcon");
+		previewRow.AddChild(_operationIcon);
+		var previewLayout = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
+		previewLayout.AddThemeConstantOverride("separation", 6);
+		previewRow.AddChild(previewLayout);
+		_operationPreview = CreateLabel(string.Empty, 26);
+		_operationPreview.HorizontalAlignment = HorizontalAlignment.Center;
+		previewLayout.AddChild(_operationPreview);
+		_operationHint = CreateLabel(string.Empty, 20);
+		_operationHint.HorizontalAlignment = HorizontalAlignment.Center;
+		_operationHint.AddThemeColorOverride("font_color", new Color(1f, 0.78f, 0.42f));
+		previewLayout.AddChild(_operationHint);
+
+		_actionButton = CreateButton(string.Empty, 0, 150, 42, UiButtonStyle.Primary);
 		_actionButton.Pressed += RunSelectedAction;
-		operationLayout.AddChild(_actionButton);
+		workstationLayout.AddChild(_actionButton);
+
+		var returnButton = CreateButton(Text.ReturnTown, 0, 110, 34, UiButtonStyle.Primary);
+		returnButton.Pressed += () => BackToTownRequested?.Invoke();
+		workstationLayout.AddChild(returnButton);
 	}
 
 	private void SetMode(BlacksmithMode mode)
@@ -169,21 +233,17 @@ public partial class BlacksmithView : Control
 		if (_model.Items.Count == 0)
 		{
 			_inventoryGrid.Columns = 1;
-			var empty = CreateCenteredLabel(Text.EmptyInventory, 30);
-			empty.CustomMinimumSize = new Vector2(0, 340);
-			empty.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+			var empty = CreateCenteredLabel(Text.EmptyInventory, 24);
 			empty.SizeFlagsVertical = SizeFlags.ExpandFill;
-			empty.VerticalAlignment = VerticalAlignment.Center;
 			_inventoryGrid.AddChild(empty);
 			return;
 		}
 
-		_inventoryGrid.Columns = 2;
+		_inventoryGrid.Columns = 3;
 		foreach (var item in _model.Items)
 		{
-			var button = CreateButton(BuildInventoryText(item), 0, 116, 21, UiButtonStyle.Secondary);
-			button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-			button.Disabled = item.Id == _selectedItemId;
+			var selected = item.Id == _selectedItemId;
+			var button = CreateInventoryButton(item, selected);
 			var itemId = item.Id;
 			button.Pressed += () =>
 			{
@@ -199,34 +259,28 @@ public partial class BlacksmithView : Control
 		var item = SelectedItem;
 		if (item is null)
 		{
+			_detailIcon.Texture = LoadTexture(UiThemePaths.BlacksmithEnhanceIcon);
 			_detailTitle.Text = Text.NoItemTitle;
 			_detailMeta.Text = Text.NoItemMeta;
 			_detailStats.Text = string.Empty;
 			return;
 		}
 
+		_detailIcon.Texture = LoadTexture(item.IconPath);
 		_detailTitle.Text = $"{item.DisplayName}  +{item.EnhancementLevel}";
-		_detailMeta.Text = $"{item.Rarity} | {item.SlotLabel} | 戰力 {item.EffectivePower}/{item.Power}";
-		var markers = item.IsEquipped ? Text.Equipped : Text.NotEquipped;
-		if (item.IsLocked)
-		{
-			markers += $" / {Text.Locked}";
-		}
-
-		var levelState = item.IsWithinRecommendedLevel
-			? Text.LevelRangeOk
-			: Text.LevelRangeDecayed;
-		var modifiers = item.ModifierLines.Count == 0
-			? Text.NoModifiers
-			: string.Join("\n", item.ModifierLines);
-		_detailStats.Text = $"{markers}\n{Text.EnhancementLevel} {item.EnhancementLevel} / {item.MaxEnhancementLevel}\n{Text.LevelRange} {item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}  {levelState}\n{modifiers}";
+		_detailMeta.Text = $"{item.Rarity} | {item.SlotLabel}\n{Text.Power} {item.EffectivePower}";
+		var equipState = item.IsEquipped ? Text.Equipped : Text.NotEquipped;
+		var lockState = item.IsLocked ? $" / {Text.Locked}" : string.Empty;
+		var rangeState = item.IsWithinRecommendedLevel ? Text.LevelRangeOk : Text.LevelRangeDecayed;
+		var modifiers = item.ModifierLines.Count == 0 ? Text.NoModifiers : string.Join("\n", item.ModifierLines);
+		_detailStats.Text = $"{equipState}{lockState}\n{Text.EnhancementLevel} +{item.EnhancementLevel} / +{item.MaxEnhancementLevel}\n{Text.LevelRange} Lv.{item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}  {rangeState}\n{modifiers}";
 	}
 
 	private void RefreshOperation()
 	{
-		_enhanceModeButton.Disabled = _mode == BlacksmithMode.Enhance;
-		_extendModeButton.Disabled = _mode == BlacksmithMode.Extend;
-		_dismantleModeButton.Disabled = _mode == BlacksmithMode.Dismantle;
+		RefreshModeButton(_enhanceModeButton, UiThemePaths.BlacksmithEnhanceIcon, Text.EnhanceMode, _mode == BlacksmithMode.Enhance);
+		RefreshModeButton(_extendModeButton, UiThemePaths.BlacksmithExtendIcon, Text.ExtendMode, _mode == BlacksmithMode.Extend);
+		RefreshModeButton(_dismantleModeButton, UiThemePaths.BlacksmithDismantleIcon, Text.DismantleMode, _mode == BlacksmithMode.Dismantle);
 		var item = SelectedItem;
 
 		switch (_mode)
@@ -247,7 +301,8 @@ public partial class BlacksmithView : Control
 	{
 		var cost = item is null ? 0 : BlacksmithRules.GetEnhancementCost(item.EnhancementLevel);
 		var canRun = item is not null && item.EnhancementLevel < item.MaxEnhancementLevel && _model.Character.Gold >= cost;
-		_operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.EnhancePreviewFormat, item.Power, item.Power + 1);
+		_operationIcon.Texture = LoadTexture(UiThemePaths.BlacksmithForgeIcon);
+		_operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.EnhancePreviewFormat, item.EffectivePower, item.EffectivePower + 1);
 		_operationHint.Text = item is null ? Text.EnhanceHint : canRun ? string.Format(Text.CostFormat, cost) : BuildEnhanceDisabledReason(item, cost);
 		_actionButton.Text = Text.RunEnhance;
 		_actionButton.Disabled = !canRun;
@@ -257,6 +312,7 @@ public partial class BlacksmithView : Control
 	{
 		var cost = item is null ? 0 : BlacksmithRules.GetLevelExtensionCost(item.LevelExtension);
 		var canRun = item is not null && item.LevelExtension < item.MaxLevelExtension && _model.Character.Gold >= cost;
+		_operationIcon.Texture = LoadTexture(UiThemePaths.BlacksmithExtendIcon);
 		_operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.ExtendPreviewFormat, item.EffectiveRecommendedLevelMax, item.EffectiveRecommendedLevelMax + 1);
 		_operationHint.Text = item is null ? Text.ExtendHint : canRun ? string.Format(Text.CostFormat, cost) : BuildExtendDisabledReason(item, cost);
 		_actionButton.Text = Text.RunExtend;
@@ -267,6 +323,7 @@ public partial class BlacksmithView : Control
 	{
 		var canRun = item is not null && item.EnhancementLevel > 0;
 		var refund = item is null ? 0 : BlacksmithRules.GetDismantleRefund(item.EnhancementLevel);
+		_operationIcon.Texture = LoadTexture(UiThemePaths.BlacksmithDismantleIcon);
 		_operationPreview.Text = item is null ? Text.SelectItemPrompt : string.Format(Text.DismantlePreviewFormat, item.EnhancementLevel);
 		_operationHint.Text = item is null ? Text.DismantleHint : canRun ? string.Format(Text.RefundFormat, refund) : Text.CannotDismantleZero;
 		_actionButton.Text = Text.RunDismantle;
@@ -298,12 +355,6 @@ public partial class BlacksmithView : Control
 		}
 	}
 
-	private static string BuildInventoryText(BlacksmithItemViewModel item)
-	{
-		var marker = item.IsEquipped ? $"{Text.Equipped} " : string.Empty;
-		return $"{marker}{item.DisplayName}\n{item.SlotLabel} / {item.Rarity} / +{item.EnhancementLevel}\n戰力 {item.EffectivePower}  Lv.{item.RecommendedLevelMin}-{item.EffectiveRecommendedLevelMax}";
-	}
-
 	private string BuildEnhanceDisabledReason(BlacksmithItemViewModel item, int cost)
 	{
 		if (item.EnhancementLevel >= item.MaxEnhancementLevel)
@@ -324,11 +375,81 @@ public partial class BlacksmithView : Control
 		return _model.Character.Gold < cost ? string.Format(Text.NotEnoughGoldFormat, cost) : string.Empty;
 	}
 
-	private static PanelContainer CreatePanel(int height, UiPanelStyle style)
+	private static Button CreateInventoryButton(BlacksmithItemViewModel item, bool selected)
 	{
-		var panel = new PanelContainer { CustomMinimumSize = new Vector2(0, height) };
-		DungeonFitUi.ApplyPanel(panel, style);
-		return panel;
+		var button = new Button { Text = string.Empty, CustomMinimumSize = new Vector2(0, 108) };
+		DungeonFitUi.ApplyButton(button, selected ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+		var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
+		center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+		button.AddChild(center);
+		var content = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore };
+		content.AddThemeConstantOverride("separation", 1);
+		center.AddChild(content);
+		content.AddChild(DungeonFitUi.CreateIcon(item.IconPath, 62));
+		var name = CreateNoWrapCenteredLabel(item.DisplayName, 15);
+		name.CustomMinimumSize = new Vector2(104, 18);
+		name.ClipText = true;
+		content.AddChild(name);
+		var level = CreateNoWrapCenteredLabel($"+{item.EnhancementLevel}  {item.Rarity}", 13);
+		level.CustomMinimumSize = new Vector2(104, 16);
+		level.ClipText = true;
+		level.AddThemeColorOverride("font_color", selected ? new Color(1f, 0.86f, 0.52f) : new Color(0.85f, 0.72f, 1f));
+		content.AddChild(level);
+		return button;
+	}
+
+	private static Button CreateModeButton(string iconPath, string label)
+	{
+		var button = new Button { Text = string.Empty };
+		DungeonFitUi.ApplyButton(button, UiButtonStyle.Secondary);
+		button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		var center = new CenterContainer { MouseFilter = MouseFilterEnum.Ignore };
+		center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+		button.AddChild(center);
+		var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		row.AddThemeConstantOverride("separation", 7);
+		center.AddChild(row);
+		row.AddChild(DungeonFitUi.CreateIcon(iconPath, 54));
+		var text = new Label
+		{
+			Text = label,
+			AutowrapMode = TextServer.AutowrapMode.Off,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = MouseFilterEnum.Ignore,
+		};
+		text.AddThemeFontSizeOverride("font_size", 22);
+		row.AddChild(text);
+		return button;
+	}
+
+	private static void RefreshModeButton(Button button, string iconPath, string label, bool selected)
+	{
+		DungeonFitUi.ApplyButton(button, selected ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+	}
+
+	private static Texture2D? LoadTexture(string path)
+	{
+		return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : GD.Load<Texture2D>(UiThemePaths.BlacksmithForgeIcon);
+	}
+
+	private static void ApplyForgePanel(PanelContainer panel, Color background, Color border, int borderWidth)
+	{
+		panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+		{
+			BgColor = background,
+			BorderColor = border,
+			BorderWidthLeft = borderWidth,
+			BorderWidthTop = borderWidth,
+			BorderWidthRight = borderWidth,
+			BorderWidthBottom = borderWidth,
+			CornerRadiusTopLeft = 7,
+			CornerRadiusTopRight = 7,
+			CornerRadiusBottomRight = 7,
+			CornerRadiusBottomLeft = 7,
+			ShadowColor = new Color(0.17f, 0.02f, 0.35f, 0.74f),
+			ShadowSize = 5,
+		});
 	}
 
 	private static MarginContainer CreateMargin(int horizontal, int vertical)
@@ -348,6 +469,13 @@ public partial class BlacksmithView : Control
 		return label;
 	}
 
+	private static Label CreateSectionLabel(string text, int fontSize)
+	{
+		var label = CreateLabel(text, fontSize);
+		label.AddThemeColorOverride("font_color", new Color(1f, 0.82f, 0.42f));
+		return label;
+	}
+
 	private static Label CreateCenteredLabel(string text, int fontSize)
 	{
 		var label = CreateLabel(text, fontSize);
@@ -355,13 +483,21 @@ public partial class BlacksmithView : Control
 		return label;
 	}
 
-	private static Button CreateButton(string text, int width, int height, int fontSize, UiButtonStyle style)
+	private static Label CreateNoWrapCenteredLabel(string text, int fontSize)
 	{
-		var button = new Button
+		var label = new Label
 		{
 			Text = text,
-			CustomMinimumSize = new Vector2(width, height),
+			AutowrapMode = TextServer.AutowrapMode.Off,
+			HorizontalAlignment = HorizontalAlignment.Center,
 		};
+		label.AddThemeFontSizeOverride("font_size", fontSize);
+		return label;
+	}
+
+	private static Button CreateButton(string text, int width, int height, int fontSize, UiButtonStyle style)
+	{
+		var button = new Button { Text = text, CustomMinimumSize = new Vector2(width, height) };
 		button.AddThemeFontSizeOverride("font_size", fontSize);
 		DungeonFitUi.ApplyButton(button, style);
 		return button;
@@ -369,39 +505,42 @@ public partial class BlacksmithView : Control
 
 	private static class Text
 	{
-		public const string BackShort = "返回";
-		public const string Title = "鐵匠鋪";
-		public const string Subtitle = "強化、延長、拆解裝備";
-		public const string Description = "消耗金幣提高戰力，或延長低階裝備的可用等級。";
-		public const string EnhanceMode = "強化";
-		public const string ExtendMode = "延長";
-		public const string DismantleMode = "拆解";
-		public const string EmptyInventory = "目前沒有可處理的裝備。";
-		public const string NoItemTitle = "尚未選擇裝備";
-		public const string NoItemMeta = "從左側選擇一件裝備查看詳細數值。";
-		public const string Equipped = "已裝備";
-		public const string NotEquipped = "未裝備";
-		public const string Locked = "已鎖定";
-		public const string NoModifiers = "沒有額外詞綴。";
-		public const string EnhancementLevel = "強化等級";
-		public const string LevelRange = "可用等級";
-		public const string LevelRangeOk = "效果完整";
-		public const string LevelRangeDecayed = "超出等級，效果衰減";
-		public const string SelectItemPrompt = "請先選擇裝備";
-		public const string EnhancePreviewFormat = "目前戰力 {0}  >>>  強化後戰力 {1}";
-		public const string EnhanceHint = "選擇一件裝備後可消耗金幣強化。";
-		public const string ExtendPreviewFormat = "目前可用到 Lv.{0}  >>>  延長後 Lv.{1}";
-		public const string ExtendHint = "延長可用等級可解除高等級時的效果衰減。";
-		public const string CostFormat = "消耗 {0} Gold";
-		public const string RunEnhance = "執行強化";
-		public const string RunExtend = "延長等級";
-		public const string DismantlePreviewFormat = "目前 +{0}  >>>  拆解後 +0";
-		public const string DismantleHint = "拆解強化等級，取回部分強化資源。";
-		public const string RefundFormat = "返還 {0} Gold";
-		public const string CannotDismantleZero = "這件裝備尚未強化，無法拆解。";
-		public const string RunDismantle = "拆解強化";
-		public const string MaxEnhancementReached = "這件裝備已達強化上限。";
-		public const string MaxExtensionReached = "這件裝備已達延長上限。";
-		public const string NotEnoughGoldFormat = "金幣不足，需要 {0} Gold。";
+		public const string BackShort = "\u8fd4\u56de";
+		public const string Title = "\u9435\u5320\u92ea";
+		public const string Subtitle = "\u6708\u9435\u4e4b\u7210  \u00b7  \u5f37\u5316  \u00b7  \u5ef6\u9577  \u00b7  \u5206\u89e3";
+		public const string Description = "\u9078\u64c7\u88dd\u5099\uff0c\u8b93\u6bcf\u4e00\u6b21\u9304\u64ca\u90fd\u6210\u70ba\u66f4\u5f37\u7684\u6230\u529b\u3002";
+		public const string Inventory = "\u88dd\u5099\u7bb1";
+		public const string EnhanceMode = "\u5f37\u5316";
+		public const string ExtendMode = "\u5ef6\u9577";
+		public const string DismantleMode = "\u5206\u89e3";
+		public const string EmptyInventory = "\u76ee\u524d\u6c92\u6709\u53ef\u4ee5\u6253\u9020\u7684\u88dd\u5099\u3002";
+		public const string NoItemTitle = "\u9078\u64c7\u4e00\u4ef6\u88dd\u5099";
+		public const string NoItemMeta = "\u5de6\u5074\u88dd\u5099\u683c\u6703\u986f\u793a\u7576\u524d\u64c1\u6709\u7684\u7269\u54c1\u3002";
+		public const string Equipped = "\u88dd\u5099\u4e2d";
+		public const string NotEquipped = "\u80cc\u5305\u4e2d";
+		public const string Locked = "\u5df2\u4e0a\u9396";
+		public const string Power = "\u653b\u64ca";
+		public const string NoModifiers = "\u7121\u984d\u5916\u5c6c\u6027";
+		public const string EnhancementLevel = "\u5f37\u5316";
+		public const string LevelRange = "\u9069\u7528\u7b49\u7d1a";
+		public const string LevelRangeOk = "\u9069\u7528";
+		public const string LevelRangeDecayed = "\u7b49\u7d1a\u4e0d\u8db3";
+		public const string SelectItemPrompt = "\u9078\u64c7\u4e00\u4ef6\u88dd\u5099\u4f86\u958b\u59cb\u934a\u9020\u3002";
+		public const string EnhancePreviewFormat = "\u76ee\u524d  \u653b\u64ca +{0}    \u2192    \u5f37\u5316\u5f8c  \u653b\u64ca +{1}";
+		public const string EnhanceHint = "\u5f37\u5316\u6703\u63d0\u9ad8\u6b66\u5668\u6216\u9632\u5177\u7684\u6230\u529b\u3002";
+		public const string ExtendPreviewFormat = "\u76ee\u524d\u9069\u7528 Lv.{0}    \u2192    \u5ef6\u9577\u81f3 Lv.{1}";
+		public const string ExtendHint = "\u5ef6\u9577\u88dd\u5099\u7684\u9069\u7528\u7b49\u7d1a\u3002";
+		public const string CostFormat = "\u6d88\u8017\uff1a{0} Gold";
+		public const string RunEnhance = "\u9032\u884c\u5f37\u5316";
+		public const string RunExtend = "\u5ef6\u9577\u7b49\u7d1a";
+		public const string DismantlePreviewFormat = "\u5f37\u5316 +{0}    \u2192    \u5206\u89e3\u56de\u5f37\u5316 +0";
+		public const string DismantleHint = "\u5206\u89e3\u6703\u8fd4\u9084\u4e00\u90e8\u5206\u5f37\u5316\u8cbb\u7528\u3002";
+		public const string RefundFormat = "\u8fd4\u9084\uff1a{0} Gold";
+		public const string CannotDismantleZero = "\u9019\u4ef6\u88dd\u5099\u5c1a\u672a\u5f37\u5316\u3002";
+		public const string RunDismantle = "\u9032\u884c\u5206\u89e3";
+		public const string ReturnTown = "\u8fd4\u56de\u57ce\u93ae";
+		public const string MaxEnhancementReached = "\u5df2\u9054\u5f37\u5316\u4e0a\u9650\u3002";
+		public const string MaxExtensionReached = "\u5df2\u9054\u5ef6\u9577\u4e0a\u9650\u3002";
+		public const string NotEnoughGoldFormat = "Gold \u4e0d\u8db3\uff0c\u9700\u8981 {0} Gold\u3002";
 	}
 }

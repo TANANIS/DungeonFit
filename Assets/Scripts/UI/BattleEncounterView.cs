@@ -35,6 +35,7 @@ public sealed class BattleEncounterView
             "\u5192\u96aa\u8005",
             BattleActorAnimationSet.PlayerKnight,
             flipHorizontal: false);
+        _player.SetAnimationSet(BattleActorAnimationSet.PlayerKnight, displayScale: 1.7f, anchorYOffset: -0.04f);
         _enemy = new BattleActorView(
             enemyToken,
             enemyLabel,
@@ -67,7 +68,7 @@ public sealed class BattleEncounterView
             ? $"\u6700\u7d42 Wave  {enemyLabel}"
             : $"Wave {progress.CurrentSet}  {enemyLabel}";
         _player.SetState(BattleActorState.Idle);
-        _enemy.SetState(progress.IsBossWave ? BattleActorState.Active : BattleActorState.Idle);
+        _enemy.SetState(BattleActorState.Idle);
         RefreshHealth(progress, state);
     }
 
@@ -347,11 +348,11 @@ public sealed class BattleEncounterView
         }
 
         var playerPosition = new Vector2(
-            _stage.Size.X * -0.03f,
-            _stage.Size.Y * 0.36f);
+            _stage.Size.X * 0.02f,
+            _stage.Size.Y * 0.30f);
         var enemyPosition = new Vector2(
-            _stage.Size.X - _enemy.TokenSize.X + (_stage.Size.X * 0.04f),
-            _stage.Size.Y * 0.31f);
+            _stage.Size.X - _enemy.TokenSize.X - (_stage.Size.X * 0.04f),
+            _stage.Size.Y * 0.20f);
 
         _player.SetTokenPosition(playerPosition);
         _enemy.SetTokenPosition(enemyPosition);

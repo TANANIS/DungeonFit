@@ -42,6 +42,13 @@ public partial class Main : Control
             return;
         }
 
+        if (userArgs.Contains("--ui-screenshot-room-boss-test"))
+        {
+            GD.Print(await UiScreenshotTest.CaptureRoomBossVisual(this));
+            GetTree().Quit();
+            return;
+        }
+
         if (userArgs.Contains("--flow-smoke-test"))
         {
             foreach (var line in FlowSmokeTest.RunDefaultPlanProgression())

@@ -7,7 +7,7 @@ public sealed class EnemyCatalog
 {
     private readonly Dictionary<string, EnemyDefinition> _enemies = new()
     {
-        ["chest"] = new("moon_guard", "\u6708\u5149\u885b\u5175", "\u6708\u5149\u91cd\u76fe\u968a\u9577", 30, 2, 60, 4, ActorVisualIds.SkeletonArmored, ActorVisualIds.WerebearBoss, ActorVisualIds.AxemanArmored),
+        ["chest"] = new("moon_guard", "\u6708\u5149\u885b\u5175", "\u6708\u5149\u91cd\u76fe\u968a\u9577", 30, 2, 60, 4, ActorVisualIds.SkeletonArmored, ActorVisualIds.MoonGuardBoss, ActorVisualIds.AxemanArmored),
         ["shoulders"] = new("banner_knight", "\u65d7\u5e5f\u9a0e\u58eb", "\u96d9\u80a9\u8a66\u7149\u5b98", 32, 2, 64, 4, ActorVisualIds.SkeletonArcher, ActorVisualIds.OrcRiderBoss, ActorVisualIds.OrcArmored),
         ["back"] = new("chain_watcher", "\u9396\u934a\u770b\u5b88", "\u80cc\u810a\u5de8\u50cf", 36, 3, 72, 5, ActorVisualIds.SkeletonBasic, ActorVisualIds.WerewolfBoss, ActorVisualIds.SkeletonGreatsword),
         ["legs"] = new("stone_runner", "\u77f3\u5eca\u5954\u8005", "\u6c89\u8db3\u5b88\u9580\u8005", 38, 3, 76, 5, ActorVisualIds.OrcBasic, ActorVisualIds.OrcRiderBoss, ActorVisualIds.OrcElite),

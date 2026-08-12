@@ -41,6 +41,34 @@ public static class DungeonFitUi
         return background;
     }
 
+    public static TextureRect AddDungeonPortalBackground(Control root, string texturePath)
+    {
+        var background = AddBackground(root, texturePath);
+        background.OffsetTop = -70;
+        background.OffsetBottom = -70;
+        return background;
+    }
+
+    public static TextureRect AddMapBackground(Control root, string texturePath)
+    {
+        var background = CreateTextureRect(texturePath, "MapArtBackground", TextureRect.StretchModeEnum.KeepAspectCovered);
+        background.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        background.MouseFilter = Control.MouseFilterEnum.Ignore;
+        root.AddChild(background);
+        root.MoveChild(background, 0);
+        return background;
+    }
+
+    public static TextureRect AddPanelBackground(PanelContainer panel, string texturePath)
+    {
+        var background = CreateTextureRect(texturePath, "PanelArtBackground", TextureRect.StretchModeEnum.KeepAspectCovered);
+        background.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        background.MouseFilter = Control.MouseFilterEnum.Ignore;
+        panel.AddChild(background);
+        panel.MoveChild(background, 0);
+        return background;
+    }
+
     public static TextureRect CreateIcon(string texturePath, int size, string name = "Icon")
     {
         var icon = CreateTextureRect(texturePath, name, TextureRect.StretchModeEnum.KeepAspectCentered);
@@ -50,9 +78,147 @@ public static class DungeonFitUi
         return icon;
     }
 
+    public static Texture2D CreateAtlasTexture(string texturePath, Rect2 region)
+    {
+        return new AtlasTexture
+        {
+            Atlas = LoadTexture(texturePath),
+            Region = region,
+        };
+    }
+
+    public static TextureRect DecorateExistingSpritePanel(
+        PanelContainer panel,
+        string texturePath,
+        Rect2 region,
+        int spriteSize)
+    {
+        ApplyPanel(panel, UiPanelStyle.Token);
+        foreach (var child in panel.GetChildren())
+        {
+            panel.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var center = new CenterContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+        };
+        center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        panel.AddChild(center);
+
+        var sprite = new TextureRect
+        {
+            Name = "Sprite",
+            Texture = CreateAtlasTexture(texturePath, region),
+            CustomMinimumSize = new Vector2(spriteSize, spriteSize),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.Scale,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        center.AddChild(sprite);
+        return sprite;
+    }
+
     public static void ApplyPanel(PanelContainer panel, UiPanelStyle style = UiPanelStyle.Main)
     {
         panel.AddThemeStyleboxOverride("panel", CreateTexturePanelStyle(GetPanelTexturePath(style), PanelTextureMargin) ?? CreatePanelStyle(style));
+    }
+
+    public static void ApplyExplorationPanel(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.035f, 0.025f, 0.09f, 0.56f),
+            BorderColor = new Color(0.68f, 0.34f, 0.9f, 0.98f),
+            BorderWidthLeft = 4,
+            BorderWidthTop = 4,
+            BorderWidthRight = 4,
+            BorderWidthBottom = 4,
+            CornerRadiusTopLeft = 10,
+            CornerRadiusTopRight = 10,
+            CornerRadiusBottomRight = 10,
+            CornerRadiusBottomLeft = 10,
+            ContentMarginLeft = 12,
+            ContentMarginTop = 10,
+            ContentMarginRight = 12,
+            ContentMarginBottom = 10,
+        });
+    }
+
+    public static void ApplyPortraitFrame(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.08f, 0.025f, 0.16f, 0.96f),
+            BorderColor = new Color(0.9f, 0.7f, 0.3f, 1f),
+            BorderWidthLeft = 4,
+            BorderWidthTop = 4,
+            BorderWidthRight = 4,
+            BorderWidthBottom = 4,
+            CornerRadiusTopLeft = 8,
+            CornerRadiusTopRight = 8,
+            CornerRadiusBottomRight = 8,
+            CornerRadiusBottomLeft = 8,
+            ShadowColor = new Color(0.43f, 0.12f, 0.72f, 0.72f),
+            ShadowSize = 6,
+            ContentMarginLeft = 4,
+            ContentMarginTop = 4,
+            ContentMarginRight = 4,
+            ContentMarginBottom = 4,
+        });
+    }
+
+    public static void ApplyExplorationActorPanel(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+    }
+
+    public static void ApplyDungeonPlanHeader(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+    }
+
+    public static void ApplyDungeonPlanSurface(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", CreateDungeonPlanPanelStyle(0.16f, 4));
+    }
+
+    public static void ApplyDungeonRouteRow(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", CreateDungeonPlanPanelStyle(0.7f, 2));
+    }
+
+    public static void ApplyDungeonEmblemButton(Button button, bool selected)
+    {
+        button.AddThemeStyleboxOverride("normal", CreateDungeonEmblemButtonStyle(selected, 1f));
+        button.AddThemeStyleboxOverride("hover", CreateDungeonEmblemButtonStyle(selected, 1.14f));
+        button.AddThemeStyleboxOverride("pressed", CreateDungeonEmblemButtonStyle(selected, 0.9f));
+        button.AddThemeStyleboxOverride("disabled", CreateDungeonEmblemButtonStyle(false, 0.42f));
+        button.AddThemeColorOverride("font_color", new Color(1f, 0.83f, 0.45f));
+        button.AddThemeColorOverride("font_hover_color", new Color(1f, 0.93f, 0.72f));
+        button.AddThemeColorOverride("font_disabled_color", new Color(0.55f, 0.5f, 0.6f));
+    }
+
+    public static void ApplyArenaPanel(PanelContainer panel)
+    {
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.025f, 0.027f, 0.08f, 0.38f),
+            BorderColor = new Color(0.62f, 0.52f, 0.31f, 0.95f),
+            BorderWidthLeft = 4,
+            BorderWidthTop = 4,
+            BorderWidthRight = 4,
+            BorderWidthBottom = 4,
+            CornerRadiusTopLeft = 18,
+            CornerRadiusTopRight = 18,
+            CornerRadiusBottomRight = 18,
+            CornerRadiusBottomLeft = 18,
+        });
     }
 
     public static void ApplyButton(Button button, UiButtonStyle style = UiButtonStyle.Secondary)
@@ -133,6 +299,60 @@ public static class DungeonFitUi
             label.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
             layout.AddChild(label);
         }
+    }
+
+    public static void DecorateExistingFacilityPanel(
+        PanelContainer panel,
+        string texturePath,
+        string titleText,
+        string subtitleText)
+    {
+        panel.AddThemeStyleboxOverride("panel", CreateFacilityPanelStyle());
+        foreach (var child in panel.GetChildren())
+        {
+            panel.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var center = new CenterContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+        };
+        center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        panel.AddChild(center);
+
+        var layout = new VBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        layout.AddThemeConstantOverride("separation", 2);
+        center.AddChild(layout);
+        layout.AddChild(CreateIcon(texturePath, 50));
+
+        var title = new Label
+        {
+            Text = titleText,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        title.AddThemeFontSizeOverride("font_size", 24);
+        title.AddThemeColorOverride("font_color", new Color(1f, 0.82f, 0.42f));
+        layout.AddChild(title);
+
+        var subtitle = new Label
+        {
+            Text = subtitleText,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        subtitle.AddThemeFontSizeOverride("font_size", 15);
+        subtitle.AddThemeColorOverride("font_color", new Color(0.93f, 0.84f, 1f));
+        layout.AddChild(subtitle);
     }
 
     public static void ApplyIconTextContent(
@@ -338,6 +558,80 @@ public static class DungeonFitUi
             ContentMarginBottom = 10,
         };
         return panel;
+    }
+
+    private static StyleBoxFlat CreateFacilityPanelStyle()
+    {
+        return new StyleBoxFlat
+        {
+            BgColor = new Color(0.055f, 0.025f, 0.12f, 0.86f),
+            BorderColor = new Color(0.64f, 0.3f, 0.9f, 0.98f),
+            BorderWidthLeft = 3,
+            BorderWidthTop = 3,
+            BorderWidthRight = 3,
+            BorderWidthBottom = 3,
+            CornerRadiusTopLeft = 7,
+            CornerRadiusTopRight = 7,
+            CornerRadiusBottomRight = 7,
+            CornerRadiusBottomLeft = 7,
+            ShadowColor = new Color(0.1f, 0.0f, 0.24f, 0.82f),
+            ShadowSize = 4,
+            ContentMarginLeft = 4,
+            ContentMarginTop = 3,
+            ContentMarginRight = 4,
+            ContentMarginBottom = 3,
+        };
+    }
+
+    private static StyleBoxFlat CreateDungeonPlanPanelStyle(float alpha, int borderWidth)
+    {
+        return new StyleBoxFlat
+        {
+            BgColor = new Color(0.02f, 0.014f, 0.07f, alpha),
+            BorderColor = new Color(0.58f, 0.22f, 0.82f, 0.96f),
+            BorderWidthLeft = borderWidth,
+            BorderWidthTop = borderWidth,
+            BorderWidthRight = borderWidth,
+            BorderWidthBottom = borderWidth,
+            CornerRadiusTopLeft = 8,
+            CornerRadiusTopRight = 8,
+            CornerRadiusBottomRight = 8,
+            CornerRadiusBottomLeft = 8,
+            ShadowColor = new Color(0.14f, 0f, 0.3f, 0.64f),
+            ShadowSize = borderWidth == 2 ? 3 : 6,
+            ContentMarginLeft = 10,
+            ContentMarginTop = 8,
+            ContentMarginRight = 10,
+            ContentMarginBottom = 8,
+        };
+    }
+
+    private static StyleBoxFlat CreateDungeonEmblemButtonStyle(bool selected, float brightness)
+    {
+        var baseColor = selected
+            ? new Color(0.28f, 0.12f, 0.47f, 0.94f)
+            : new Color(0.045f, 0.025f, 0.12f, 0.9f);
+        return new StyleBoxFlat
+        {
+            BgColor = new Color(baseColor.R * brightness, baseColor.G * brightness, baseColor.B * brightness, baseColor.A),
+            BorderColor = selected
+                ? new Color(0.95f, 0.55f, 1f, 1f)
+                : new Color(0.54f, 0.24f, 0.78f, 0.98f),
+            BorderWidthLeft = selected ? 4 : 3,
+            BorderWidthTop = selected ? 4 : 3,
+            BorderWidthRight = selected ? 4 : 3,
+            BorderWidthBottom = selected ? 4 : 3,
+            CornerRadiusTopLeft = 7,
+            CornerRadiusTopRight = 7,
+            CornerRadiusBottomRight = 7,
+            CornerRadiusBottomLeft = 7,
+            ShadowColor = new Color(0.48f, 0.08f, 0.75f, selected ? 0.92f : 0.55f),
+            ShadowSize = selected ? 7 : 4,
+            ContentMarginLeft = 6,
+            ContentMarginTop = 4,
+            ContentMarginRight = 6,
+            ContentMarginBottom = 4,
+        };
     }
 
     private static StyleBoxFlat CreateButtonStyle(UiButtonStyle style, bool pressed, float brightness)

@@ -67,6 +67,7 @@ public sealed class BlacksmithViewModel
         return new BlacksmithItemViewModel(
             item.Id,
             item.DisplayName,
+            item.IconPath,
             GetSlotLabel(item.Slot),
             item.Rarity,
             item.Power,
@@ -157,6 +158,7 @@ public sealed record BlacksmithCharacterSummary(
 public sealed record BlacksmithItemViewModel(
     string Id,
     string DisplayName,
+    string IconPath,
     string SlotLabel,
     string Rarity,
     int Power,

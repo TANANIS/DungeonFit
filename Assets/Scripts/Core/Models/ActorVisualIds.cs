@@ -15,4 +15,5 @@ public static class ActorVisualIds
     public const string AxemanArmored = "axeman_armored";
     public const string WerewolfBoss = "werewolf_boss";
     public const string WerebearBoss = "werebear_boss";
+    public const string MoonGuardBoss = "moon_guard_boss";
 }

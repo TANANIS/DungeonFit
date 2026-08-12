@@ -14,7 +14,7 @@ public partial class DungeonRouteSlotRowView : PanelContainer
     public override void _Ready()
     {
         BindNodes();
-        DungeonFitUi.ApplyPanel(this, UiPanelStyle.Card);
+        DungeonFitUi.ApplyDungeonRouteRow(this);
         DungeonFitUi.ApplyButton(_removeButton, UiButtonStyle.Danger);
         _removeButton.Pressed += () => RemoveRequested?.Invoke();
     }

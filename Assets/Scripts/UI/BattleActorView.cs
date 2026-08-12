@@ -86,6 +86,7 @@ public sealed class BattleActorView
     {
         _displayScale = Mathf.Max(0.1f, displayScale);
         _anchorYOffset = anchorYOffset;
+        _sprite.FlipH = animationSet.FlipHorizontal;
         _sprite.SpriteFrames = SpriteSheetFramesBuilder.Build(animationSet);
         _sprite.Animation = GetAnimationName(_state);
         _sprite.Play();

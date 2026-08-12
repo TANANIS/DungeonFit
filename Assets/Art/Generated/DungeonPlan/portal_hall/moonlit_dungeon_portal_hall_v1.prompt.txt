@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: baked_scene_mode background for DungeonFit's Choose Dungeon screen.
+Input image: DungeonFit's selection render target.
+Primary request: A vertical 9:16 moonlit ruined stone hall with a centered violet-magenta portal, side pillars, violet flame braziers, crystal clusters, and a foreground rune circle.
+Composition: The upper third remains dark for title copy; six dark card-safe pads surround the portal for the dungeon selection overlay.
+Style/medium: Polished retro pixel-art RPG environment matching the DungeonFit render target.
+Constraints: No characters, labels, readable writing, buttons, check marks, arrows, watermark, or interactive UI text.

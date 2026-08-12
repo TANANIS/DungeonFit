@@ -28,6 +28,24 @@ public sealed class ActorVisualCatalog
         [ActorVisualIds.AxemanArmored] = Build(ActorVisualIds.AxemanArmored, 1.12f, 0.0f),
         [ActorVisualIds.WerewolfBoss] = Build(ActorVisualIds.WerewolfBoss, 1.18f, -0.01f),
         [ActorVisualIds.WerebearBoss] = Build(ActorVisualIds.WerebearBoss, 1.23f, -0.02f),
+        [ActorVisualIds.MoonGuardBoss] = new(
+            ActorVisualIds.MoonGuardBoss,
+            0.82f,
+            -0.02f,
+            "res://Assets/Art/Generated/RoomChallenge/MoonGuardBoss/processed/idle/sheet-transparent.png",
+            "res://Assets/Art/Generated/RoomChallenge/MoonGuardBoss/processed/attack/sheet-transparent.png",
+            "res://Assets/Art/Generated/RoomChallenge/MoonGuardBoss/processed/hurt/sheet-transparent.png",
+            "res://Assets/Art/Generated/RoomChallenge/MoonGuardBoss/processed/death/sheet-transparent.png",
+            null,
+            2,
+            2,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            false),
     };
 
     public ActorVisualDefinition Get(string? visualId)

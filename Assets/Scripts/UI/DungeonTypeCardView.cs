@@ -23,11 +23,14 @@ public partial class DungeonTypeCardView : Button
     {
         BindNodes();
         _category = category;
+        SetMeta("dungeon_id", category.Id);
         _nameLabel.Text = category.ShortName;
         _checkLabel.Visible = selected;
-        _icon.Visible = false;
+        _checkLabel.Text = selected ? "\u2713" : string.Empty;
+        _icon.Texture = GD.Load<Texture2D>(UiThemePaths.DungeonPlanEmblem(category.Id));
+        _icon.Visible = _icon.Texture is not null;
         Disabled = disabled;
-        DungeonFitUi.ApplyButton(this, selected ? UiButtonStyle.Primary : UiButtonStyle.Secondary);
+        DungeonFitUi.ApplyDungeonEmblemButton(this, selected);
     }
 
     private void RequestSelected()

@@ -1,0 +1,5 @@
+Use case: stylized-concept.
+Asset type: single transparent-ready interactive marker for the Moonlit Town blacksmith facility in a Godot mobile RPG map.
+Input images: Moonlit Town style reference and the accepted facility-marker sheet visual reference.
+Create exactly one compact blacksmith emblem: a dark steel anvil with a compact upright hammer, framed by a small circular violet-and-gold crest and two tiny violet crystals. Match the polished retro pixel-art inspired navy, violet, magenta, and gold visual language of the reference sheet.
+Center the full emblem within the middle 45% of the canvas and leave generous empty padding on every side. The hammer must remain fully inside the circular crest. The background is perfectly uniform solid #00FF00 chroma-key green. Do not include shadows, glow spill, gradients, texture, floor plane, borders, text, watermarks, labels, letters, numbers, UI, characters, buildings, scenery, or #00FF00 in the emblem.

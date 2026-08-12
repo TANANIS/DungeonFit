@@ -61,6 +61,21 @@ public sealed class DungeonRouteListView
         }
     }
 
+    public void RefreshReference(IReadOnlyList<DungeonRouteSlot> selectedDungeonRoute)
+    {
+        ClearChildren(_routeList);
+
+        for (var index = 0; index < selectedDungeonRoute.Count; index++)
+        {
+            var slot = selectedDungeonRoute[index];
+            var category = _categoryCatalog.GetById(slot.DungeonTypeId);
+            var exercise = _exerciseCatalog.GetById(slot.DungeonTypeId, slot.ExerciseId);
+            var row = _rowScene.Instantiate<DungeonRouteSlotRowView>();
+            row.Initialize(index + 1, $"{category.ShortName}{Text.DungeonSuffix} / {exercise.Name}", canRemove: true);
+            _routeList.AddChild(row);
+        }
+    }
+
     private string BuildRouteText(
         bool canEditPlan,
         IReadOnlyList<DungeonRouteSlot> selectedDungeonRoute,

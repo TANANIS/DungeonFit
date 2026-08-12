@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "name": "moon_guard_boss",
+  "processing": {
+    "cell_size": 100,
+    "fit_scale": 0.72,
+    "trim_border": 4,
+    "edge_clean_depth": 3,
+    "align": "feet",
+    "shared_scale": true,
+    "scale_strategy": "fit",
+    "component_mode": "largest",
+    "component_padding": 8,
+    "min_component_area": 1,
+    "edge_touch_margin": 3
+  },
+  "output_origin": [
+    50.0,
+    86
+  ],
+  "reference": {
+    "target": "creature",
+    "mode": "idle",
+    "rows": 2,
+    "cols": 2,
+    "body_scale_mean": 0.5328704952919219,
+    "body_scale_cv": 0.028207027649195155,
+    "anchor_y_mean": 0.855815831987076
+  },
+  "qc": {
+    "max_body_scale_drift": 0.1
+  }
+}

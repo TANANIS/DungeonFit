@@ -37,7 +37,7 @@ layout_mode = 2
 theme_override_constants/separation = 14
 
 [node name="Header" type="PanelContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 134)
+custom_minimum_size = Vector2(0, 320)
 layout_mode = 2
 
 [node name="HeaderMargin" type="MarginContainer" parent="SafeMargin/Layout/Header"]
@@ -74,7 +74,14 @@ text = "已選 0 / 4"
 horizontal_alignment = 1
 autowrap_mode = 3
 
+[node name="DungeonSelectionStage" type="Control" parent="SafeMargin/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 420)
+layout_mode = 2
+size_flags_vertical = 3
+
 [node name="RoutePanel" type="PanelContainer" parent="SafeMargin/Layout"]
+custom_minimum_size = Vector2(0, 650)
 layout_mode = 2
 
 [node name="RouteMargin" type="MarginContainer" parent="SafeMargin/Layout/RoutePanel"]
@@ -87,20 +94,6 @@ theme_override_constants/margin_bottom = 18
 [node name="RouteLayout" type="VBoxContainer" parent="SafeMargin/Layout/RoutePanel/RouteMargin"]
 layout_mode = 2
 theme_override_constants/separation = 12
-
-[node name="DungeonPickerTitle" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 29
-text = "討伐區域"
-horizontal_alignment = 1
-
-[node name="DungeonTypeGrid" type="GridContainer" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 246)
-layout_mode = 2
-columns = 3
-theme_override_constants/h_separation = 12
-theme_override_constants/v_separation = 14
 
 [node name="RouteTitle" type="Label" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 layout_mode = 2
@@ -122,22 +115,29 @@ horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="ButtonRow" type="HBoxContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 82)
+custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 theme_override_constants/separation = 12
+visible = false
 
-[node name="BackTownButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
+[node name="BackTownButton" type="Button" parent="."]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 76)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 28
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 0
+offset_left = 28.0
+offset_top = 28.0
+offset_right = 98.0
+offset_bottom = 98.0
+theme_override_font_sizes/font_size = 34
 text = "返回城鎮"
 
-[node name="StartAdventureButton" type="Button" parent="SafeMargin/Layout/ButtonRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 76)
+[node name="RouteSpacer" type="Control" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 28
+size_flags_vertical = 3
+
+[node name="StartAdventureButton" type="Button" parent="SafeMargin/Layout/RoutePanel/RouteMargin/RouteLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+theme_override_font_sizes/font_size = 31
 text = "至少選 4 個"

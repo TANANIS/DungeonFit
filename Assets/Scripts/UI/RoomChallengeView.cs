@@ -70,7 +70,6 @@ public partial class RoomChallengeView : Control
     public override void _Ready()
     {
         DungeonFitUi.ApplyTheme(this);
-        DungeonFitUi.AddBackground(this, UiThemePaths.RoomBackground);
         _goldLabel = GetNode<Label>("%GoldLabel");
         _challengeName = GetNode<Label>("%ChallengeName");
         _roomName = GetNode<Label>("%RoomName");
@@ -259,6 +258,17 @@ public partial class RoomChallengeView : Control
         return _phase.IsPreparing && _prepareRemainingSeconds > 0;
     }
 
+    public bool SmokeStartActiveWave()
+    {
+        if (!IsNodeReady() || _room is null || _phase.IsResult)
+        {
+            return false;
+        }
+
+        StartWave(Text.WaveActive);
+        return _phase.IsActiveWave;
+    }
+
     public string SmokeTimerText()
     {
         return _timerLabel.Text;
@@ -309,15 +319,13 @@ public partial class RoomChallengeView : Control
 
     private void ApplyArtStyles(ProgressBar bossHealth)
     {
-        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/BattleStage"), UiPanelStyle.Battle);
+        DungeonFitUi.ApplyArenaPanel(GetNode<PanelContainer>("SafeMargin/Layout/BattleStage"));
         DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/BeatFlow"), UiPanelStyle.Card);
         DungeonFitUi.ApplyPanel(_restPanel, UiPanelStyle.Card);
         DungeonFitUi.ApplyPanel(_supplyPanel, UiPanelStyle.Card);
         DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/WorkoutStatus"), UiPanelStyle.Card);
         DungeonFitUi.ApplyPanel(_reportPanel, UiPanelStyle.Overlay);
         DungeonFitUi.ApplyPanel(_resultPanel, UiPanelStyle.Overlay);
-        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("%PlayerToken"), UiPanelStyle.Token);
-        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("%EnemyToken"), UiPanelStyle.Token);
         DungeonFitUi.ApplyProgressBar(bossHealth, new Color(0.78f, 0.2f, 0.28f));
     }
 

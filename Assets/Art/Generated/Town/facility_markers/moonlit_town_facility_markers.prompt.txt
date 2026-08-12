@@ -1,0 +1,6 @@
+Use case: stylized-concept.
+Asset type: 2D game UI map facility-marker prop sheet for Godot.
+Input images: existing Moonlit Town map style reference and a 2-row by 3-column layout guide used only for slot count, centering, and safe padding.
+Create exactly one 2x3 prop sheet, six separate compact fantasy facility emblems in row-major order: glowing herbal potion bottle with tiny leaves; tavern beer stein with warm amber foam; blacksmith anvil with crossed hammer; parchment notice board with pinned scrolls; moonlit fountain with violet crystal and water ring; small gothic church crest with crescent-moon stained-glass window.
+Style: polished high-end retro pixel-art inspired mobile RPG UI matching Moonlit Town dark navy, violet, magenta crystal glow, warm gold and amber highlights, ornate clean silhouettes, not chunky low-resolution pixels.
+Every emblem is upright, centered, fully contained in an equal cell with generous empty gutters and safe padding. The background outside every emblem is perfectly flat uniform #00FF00 chroma-key green. Do not include text, numbers, labels, UI panels, watermarks, characters, buildings, landscape, guide lines, borders, or #00FF00 inside an emblem.

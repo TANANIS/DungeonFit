@@ -38,9 +38,7 @@ public static class UiScreenshotTest
         session.UpdateDungeonRoute(new[]
         {
             new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
-            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
-            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
-            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("shoulders", 4, 12, "chest_quest_01", 90),
         });
 
         var town = Load<TownView>(TownScenePath);
@@ -53,6 +51,7 @@ public static class UiScreenshotTest
             session.BuildBodyProfileViewModel(),
             session.BuildTutorialGuideViewModel());
         lines.Add(await TryCapture(parent, town, "Town"));
+        lines.Add(await TryCaptureTownPlayerVisual(parent, session));
         lines.Add(await TryCaptureTownProfileOnboarding(parent, session));
         lines.Add(await TryCaptureTownBodyMetricsDialog(parent, session));
 
@@ -63,10 +62,18 @@ public static class UiScreenshotTest
             session.SelectedDungeonRoute,
             session.CanEditPlan,
             session.ActiveShortTermQuests);
-        lines.Add(await TryCapture(parent, plan, "DungeonPlan"));
+        lines.Add(await TryCaptureDungeonPlanReference(parent, plan));
 
         lines.Add(await TryCaptureDungeonPlanDialog(parent, session));
         lines.Add(await TryCaptureDungeonPlanMusicDialog(parent, session));
+
+        session.UpdateDungeonRoute(new[]
+        {
+            new DungeonRouteSlot("chest", 4, 12, "chest_quest_01", 90, "chest_push_up"),
+            new DungeonRouteSlot("legs", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("core", 4, 12, "chest_quest_01", 90),
+            new DungeonRouteSlot("arms", 4, 12, "chest_quest_01", 90),
+        });
 
         var activeRun = session.StartOrGetActiveRun();
         if (activeRun is null)
@@ -167,6 +174,13 @@ public static class UiScreenshotTest
         return lines;
     }
 
+    public static async Task<string> CaptureRoomBossVisual(Control parent)
+    {
+        parent.GetWindow().Size = new Vector2I(540, 960);
+        EnsureOutputDirectory();
+        return await TryCaptureRoomVisual(parent, "chest", 1, 1, isBossWave: true, "RoomChallengeBoss");
+    }
+
     private static async Task<string> Capture<TView>(Control parent, TView view, string name)
         where TView : Control
     {
@@ -175,6 +189,77 @@ public static class UiScreenshotTest
         await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
 
         return CaptureMounted(parent, view, name);
+    }
+
+    private static async Task<string> TryCaptureTownPlayerVisual(Control parent, GameSession session)
+    {
+        var town = Load<TownView>(TownScenePath);
+        try
+        {
+            town.Initialize(
+                session.Player,
+                session.SelectedPlan,
+                session.LastRunSummary,
+                session.BuildIdleRewardViewModel(),
+                session.GetSaveStatus(),
+                session.BuildBodyProfileViewModel(),
+                session.BuildTutorialGuideViewModel());
+            parent.AddChild(town);
+            for (var frame = 0; frame < 12; frame++)
+            {
+                await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
+
+            if (!town.SmokeHideTutorial())
+            {
+                parent.RemoveChild(town);
+                town.Free();
+                return "UI_SCREENSHOT_SKIPPED TownPlayerVisual tutorial-not-built";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, town, "TownPlayerVisual");
+        }
+        catch (System.Exception exception)
+        {
+            if (town.GetParent() == parent)
+            {
+                parent.RemoveChild(town);
+            }
+
+            town.Free();
+            return $"UI_SCREENSHOT_FAILED TownPlayerVisual {exception.GetType().Name}";
+        }
+    }
+
+    private static async Task<string> TryCaptureDungeonPlanReference(Control parent, DungeonPlanView plan)
+    {
+        try
+        {
+            parent.AddChild(plan);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+
+            if (!plan.SmokeApplyReferencePresentation())
+            {
+                parent.RemoveChild(plan);
+                plan.Free();
+                return "UI_SCREENSHOT_SKIPPED DungeonPlan reference-presentation-not-ready";
+            }
+
+            await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            return CaptureMounted(parent, plan, "DungeonPlan");
+        }
+        catch (System.Exception exception)
+        {
+            if (plan.GetParent() == parent)
+            {
+                parent.RemoveChild(plan);
+            }
+
+            plan.Free();
+            return $"UI_SCREENSHOT_FAILED DungeonPlan {exception.GetType().Name}";
+        }
     }
 
     private static string CaptureMounted<TView>(Control parent, TView view, string name)
@@ -291,6 +376,7 @@ public static class UiScreenshotTest
             parent.AddChild(room);
             await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
             await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            room.SmokeStartActiveWave();
 
             if (!room.SmokeShowEnemyVisual(dungeonTypeId, currentSet, totalSets, isBossWave))
             {
@@ -300,6 +386,10 @@ public static class UiScreenshotTest
             }
 
             await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            if (isBossWave)
+            {
+                await parent.ToSignal(parent.GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
             return CaptureMounted(parent, room, name);
         }
         catch (System.Exception exception)

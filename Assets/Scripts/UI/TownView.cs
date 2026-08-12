@@ -9,6 +9,10 @@ namespace DungeonFit.UI;
 
 public partial class TownView : Control
 {
+    private const double TownWalkFrameDuration = 0.14;
+    private static readonly Rect2 TownKnightPortraitRegion = new(0, 0, 96, 96);
+    private static readonly Rect2 TownKnightWalkFrameRegion = new(0, 0, 100, 100);
+
     public event Action? EnterDungeonRequested;
     public event Action? NoticeBoardRequested;
     public event Action? TavernRequested;
@@ -56,6 +60,10 @@ public partial class TownView : Control
     private readonly List<Button> _goalButtons = new();
     private bool _hasInitialized;
     private bool _onboardingPromptShown;
+    private TextureRect? _townWalkSprite;
+    private Texture2D[] _townWalkFrames = Array.Empty<Texture2D>();
+    private double _townWalkElapsed;
+    private int _townWalkFrameIndex;
 
     public override void _Ready()
     {
@@ -76,27 +84,27 @@ public partial class TownView : Control
         GetNode<Button>("%SettingsButton").Pressed += ShowSettings;
         var townGrid = GetNode<GridContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid");
         var noticeBoard = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/NoticeBoard");
-        DecorateFacility(noticeBoard, "notice_board", Text.NoticeBoard);
+        DecorateFacility(noticeBoard, "notice_board", Text.NoticeBoard, Text.NoticeBoardDetail);
         noticeBoard.MouseDefaultCursorShape = CursorShape.PointingHand;
         noticeBoard.GuiInput += OnNoticeBoardInput;
         var tavern = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Tavern");
-        DecorateFacility(tavern, "tavern", Text.Tavern);
+        DecorateFacility(tavern, "tavern", Text.Tavern, Text.TavernDetail);
         tavern.MouseDefaultCursorShape = CursorShape.PointingHand;
         tavern.GuiInput += OnTavernInput;
         var blacksmith = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/GeneralStore");
-        DecorateFacility(blacksmith, "blacksmith", Text.Blacksmith);
+        DecorateFacility(blacksmith, "blacksmith", Text.Blacksmith, Text.BlacksmithDetail);
         blacksmith.MouseDefaultCursorShape = CursorShape.PointingHand;
         blacksmith.GuiInput += OnBlacksmithInput;
         var herbShop = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/HerbShop");
-        DecorateFacility(herbShop, "herb_shop", Text.HerbShop);
+        DecorateFacility(herbShop, "herb_shop", Text.HerbShop, Text.HerbShopDetail);
         herbShop.MouseDefaultCursorShape = CursorShape.PointingHand;
         herbShop.GuiInput += OnHerbShopInput;
         var fountain = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Fountain");
-        DecorateFacility(fountain, "fountain", Text.Fountain);
+        DecorateFacility(fountain, "fountain", Text.Fountain, Text.FountainDetail);
         fountain.MouseDefaultCursorShape = CursorShape.PointingHand;
         fountain.GuiInput += OnFountainInput;
         var church = GetNode<PanelContainer>("SafeMargin/Layout/TownStage/TownMargin/TownLayout/TownGrid/Church");
-        DecorateFacility(church, "church", Text.Church);
+        DecorateFacility(church, "church", Text.Church, Text.ChurchDetail);
         church.MouseDefaultCursorShape = CursorShape.PointingHand;
         church.GuiInput += OnChurchInput;
         BuildTownMap(townGrid, herbShop, tavern, blacksmith, noticeBoard, fountain, church);
@@ -105,6 +113,22 @@ public partial class TownView : Control
         BuildBodyPanel();
         BuildTutorialPanel();
         Refresh();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_townWalkSprite is null || _townWalkFrames.Length == 0)
+        {
+            return;
+        }
+
+        _townWalkElapsed += delta;
+        while (_townWalkElapsed >= TownWalkFrameDuration)
+        {
+            _townWalkElapsed -= TownWalkFrameDuration;
+            _townWalkFrameIndex = (_townWalkFrameIndex + 1) % _townWalkFrames.Length;
+            _townWalkSprite.Texture = _townWalkFrames[_townWalkFrameIndex];
+        }
     }
 
     public void Initialize(
@@ -129,6 +153,17 @@ public partial class TownView : Control
         {
             Refresh();
         }
+    }
+
+    public bool SmokeHideTutorial()
+    {
+        if (_tutorialPanel is null)
+        {
+            return false;
+        }
+
+        _tutorialPanel.Visible = false;
+        return true;
     }
 
     public void UpdateSaveStatus(SaveStatus saveStatus)
@@ -799,11 +834,30 @@ public partial class TownView : Control
     {
         DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/Header"), UiPanelStyle.Main);
         DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/TownStage"), UiPanelStyle.Main);
-        DungeonFitUi.ApplyPanel(GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel"), UiPanelStyle.Card);
-        DungeonFitUi.DecorateExistingIconPanel(
+        var idlePanel = GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel");
+        DungeonFitUi.ApplyExplorationPanel(idlePanel);
+        DungeonFitUi.AddPanelBackground(idlePanel, UiThemePaths.MoonlitExpeditionForestBackground);
+        var portrait = GetNode<PanelContainer>("SafeMargin/Layout/Header/HeaderMargin/HeaderRow/Portrait");
+        DungeonFitUi.DecorateExistingSpritePanel(
+            portrait,
+            UiThemePaths.TownPlayerPortrait,
+            TownKnightPortraitRegion,
+            86);
+        DungeonFitUi.ApplyPortraitFrame(portrait);
+        _townWalkSprite = DungeonFitUi.DecorateExistingSpritePanel(
             GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleToken"),
-            UiThemePaths.IdleToken,
-            96);
+            UiThemePaths.TownPlayerWalkFrame(1),
+            TownKnightWalkFrameRegion,
+            186);
+        DungeonFitUi.ApplyExplorationActorPanel(
+            GetNode<PanelContainer>("SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleToken"));
+        _townWalkFrames = new Texture2D[8];
+        for (var index = 0; index < _townWalkFrames.Length; index++)
+        {
+            _townWalkFrames[index] = DungeonFitUi.CreateAtlasTexture(
+                UiThemePaths.TownPlayerWalkFrame(index + 1),
+                TownKnightWalkFrameRegion);
+        }
         DungeonFitUi.ApplyButton(GetNode<Button>("%EnterDungeonButton"), UiButtonStyle.Primary);
         DungeonFitUi.ApplyButton(GetNode<Button>("%SettingsButton"), UiButtonStyle.Secondary);
         DungeonFitUi.ApplyProgressBar(
@@ -811,14 +865,13 @@ public partial class TownView : Control
             new Color(0.48f, 0.82f, 0.58f));
     }
 
-    private static void DecorateFacility(PanelContainer panel, string iconId, string labelText)
+    private static void DecorateFacility(PanelContainer panel, string iconId, string labelText, string subtitleText)
     {
-        if (panel.GetChildCount() > 0 && panel.GetChild(0) is Label label)
-        {
-            label.Text = labelText;
-        }
-
-        DungeonFitUi.DecorateExistingIconPanel(panel, UiThemePaths.TownFacilityIcon(iconId), 86);
+        DungeonFitUi.DecorateExistingFacilityPanel(
+            panel,
+            UiThemePaths.TownFacilityIcon(iconId),
+            labelText,
+            subtitleText);
     }
 
     private void BuildTownMap(
@@ -842,6 +895,7 @@ public partial class TownView : Control
         };
         townLayout.AddChild(map);
         townLayout.MoveChild(map, gridIndex);
+        DungeonFitUi.AddMapBackground(map, UiThemePaths.MoonlitTownMapBackground);
 
         PlaceFacility(map, herbShop, new Vector2(22, 168), new Vector2(225, 132));
         PlaceFacility(map, tavern, new Vector2(362, 72), new Vector2(255, 152));
@@ -994,10 +1048,16 @@ public partial class TownView : Control
         public const string BossCleared = "Boss \u64ca\u7834";
         public const string RoomWithdrawn = "\u623f\u9593\u64a4\u9000";
         public const string NoticeBoard = "\u544a\u793a\u677f";
+        public const string NoticeBoardDetail = "\u4efb\u52d9\u30fb\u61f8\u8cde\u30fb\u60c5\u5831";
         public const string Tavern = "\u9152\u9928";
+        public const string TavernDetail = "\u4efb\u52d9\u30fb\u62db\u52df\u30fb\u5c0d\u8a71";
         public const string Blacksmith = "\u9435\u5320\u92ea";
+        public const string BlacksmithDetail = "\u934a\u9020\u30fb\u5f37\u5316\u30fb\u88dd\u5099";
         public const string HerbShop = "\u85e5\u8349\u92ea";
+        public const string HerbShopDetail = "\u85e5\u6c34\u30fb\u6062\u5fa9\u30fb\u7d20\u6750";
         public const string Fountain = "\u6708\u5149\u6cc9";
+        public const string FountainDetail = "\u795d\u798f\u30fb\u6062\u5fa9\u30fb\u7948\u79b1";
         public const string Church = "\u6559\u5802";
+        public const string ChurchDetail = "\u5fa9\u6d3b\u30fb\u795d\u798f\u30fb\u7948\u79b1";
     }
 }

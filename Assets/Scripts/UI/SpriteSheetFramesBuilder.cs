@@ -10,11 +10,11 @@ public static class SpriteSheetFramesBuilder
     {
         var frames = new SpriteFrames();
 
-        ReplaceAnimation(frames, "idle", animationSet.IdlePath, loop: true, framesPerSecond: 6);
-        ReplaceAnimation(frames, "attack", animationSet.AttackPath, loop: false, framesPerSecond: 12);
-        ReplaceAnimation(frames, "hurt", animationSet.HurtPath, loop: false, framesPerSecond: 8);
-        ReplaceAnimation(frames, "death", animationSet.DeathPath, loop: false, framesPerSecond: 7);
-        ReplaceAnimation(frames, "block", animationSet.BlockPath ?? animationSet.HurtPath, loop: false, framesPerSecond: 8);
+        ReplaceAnimation(frames, "idle", animationSet.IdlePath, animationSet.IdleColumns, animationSet.IdleRows, loop: true, framesPerSecond: 6);
+        ReplaceAnimation(frames, "attack", animationSet.AttackPath, animationSet.AttackColumns, animationSet.AttackRows, loop: false, framesPerSecond: 12);
+        ReplaceAnimation(frames, "hurt", animationSet.HurtPath, animationSet.HurtColumns, animationSet.HurtRows, loop: false, framesPerSecond: 8);
+        ReplaceAnimation(frames, "death", animationSet.DeathPath, animationSet.DeathColumns, animationSet.DeathRows, loop: false, framesPerSecond: 7);
+        ReplaceAnimation(frames, "block", animationSet.BlockPath ?? animationSet.HurtPath, animationSet.HurtColumns, animationSet.HurtRows, loop: false, framesPerSecond: 8);
 
         return frames;
     }
@@ -23,6 +23,8 @@ public static class SpriteSheetFramesBuilder
         SpriteFrames frames,
         string animationName,
         string texturePath,
+        int configuredColumns,
+        int rows,
         bool loop,
         double framesPerSecond)
     {
@@ -39,16 +41,22 @@ public static class SpriteSheetFramesBuilder
         frames.SetAnimationSpeed(animationName, framesPerSecond);
 
         var texture = GD.Load<Texture2D>(texturePath);
-        var frameCount = Mathf.Max(1, texture.GetWidth() / FrameSize);
+        var columns = configuredColumns > 0
+            ? configuredColumns
+            : Mathf.Max(1, texture.GetWidth() / FrameSize);
+        var frameRows = Mathf.Max(1, rows);
 
-        for (var index = 0; index < frameCount; index++)
+        for (var row = 0; row < frameRows; row++)
         {
-            var frameTexture = new AtlasTexture
+            for (var column = 0; column < columns; column++)
             {
-                Atlas = texture,
-                Region = new Rect2(index * FrameSize, 0, FrameSize, FrameSize),
-            };
-            frames.AddFrame(animationName, frameTexture);
+                var frameTexture = new AtlasTexture
+                {
+                    Atlas = texture,
+                    Region = new Rect2(column * FrameSize, row * FrameSize, FrameSize, FrameSize),
+                };
+                frames.AddFrame(animationName, frameTexture);
+            }
         }
     }
 }

@@ -37,7 +37,7 @@ layout_mode = 2
 theme_override_constants/separation = 22
 
 [node name="Header" type="PanelContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 132)
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 
 [node name="HeaderMargin" type="MarginContainer" parent="SafeMargin/Layout/Header"]
@@ -52,7 +52,7 @@ layout_mode = 2
 theme_override_constants/separation = 18
 
 [node name="Portrait" type="PanelContainer" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(92, 92)
+custom_minimum_size = Vector2(112, 112)
 layout_mode = 2
 
 [node name="PortraitLabel" type="Label" parent="SafeMargin/Layout/Header/HeaderMargin/HeaderRow/Portrait"]
@@ -218,7 +218,7 @@ horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="IdlePanel" type="PanelContainer" parent="SafeMargin/Layout"]
-custom_minimum_size = Vector2(0, 250)
+custom_minimum_size = Vector2(0, 290)
 layout_mode = 2
 
 [node name="IdleMargin" type="MarginContainer" parent="SafeMargin/Layout/IdlePanel"]
@@ -233,7 +233,7 @@ layout_mode = 2
 theme_override_constants/separation = 22
 
 [node name="IdleToken" type="PanelContainer" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout"]
-custom_minimum_size = Vector2(180, 180)
+custom_minimum_size = Vector2(210, 210)
 layout_mode = 2
 
 [node name="IdleTokenLabel" type="Label" parent="SafeMargin/Layout/IdlePanel/IdleMargin/IdleLayout/IdleToken"]

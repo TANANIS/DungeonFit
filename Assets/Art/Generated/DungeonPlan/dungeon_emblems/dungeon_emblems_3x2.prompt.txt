@@ -1,0 +1,5 @@
+Use case: stylized-concept
+Asset type: 3x2 chroma-key sprite sheet for DungeonFit dungeon-selection emblems.
+Primary request: Six centered emblems in reading order: chest shield, shoulder armor, back crown, armored boots, violet core orb, crossed dumbbells.
+Style/medium: Polished retro pixel-art RPG inventory emblems with purple-black carved metal, magenta-violet rim light, and small gold accents.
+Constraints: Flat #00ff00 chroma-key background outside the emblems, generous per-cell padding, no frame, label, character, shadow, or watermark.
